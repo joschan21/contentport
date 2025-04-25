@@ -176,7 +176,6 @@ ${message.content}
 
           if (!tweetToEdit) throw new Error("tweet doesnt exist.")
 
-          console.log("TWEET TO EDIT ARRIVING", tweetToEdit)
           const prompt = `You are a tweet ghost writer. Write or modify this tweet according to the user's wishes. A user may reference documents they have attached to the message for additional context. If the user refers to a style they want (e.g. referencing their previous tweets or tone), match it EXACTLY.
 
 <messages>
@@ -209,13 +208,14 @@ ${xmlAttachedDocs}
     : ""
 }
 
-Return only the final tweet text without any explanation.`
+<edited_tweet>`
 
           console.log("FINAL PROMPT!!", prompt)
 
           const result = await generateText({
             model: anthropic("claude-3-opus-latest"),
             prompt,
+            stopSequences: ["</edited_tweet>"],
             system: `You are a tweet ghost writer. Write or modify this tweet according to the user's wishes. A user may reference documents they have attached to the message for additional context. If the user refers to a style they want (e.g. referencing their previous tweets or tone), match it EXACTLY - same tone, emojis and emoji frequency, etc.
 
 <rules>

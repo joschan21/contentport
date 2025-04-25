@@ -78,8 +78,8 @@ export function ContextSidebar({
 
   const removeDocument = (id: string) => {
     deleteDocument.mutate(id)
-    if (pathname === `/context/${id}`) {
-      router.push("/main")
+    if (pathname === `/dashboard/context/${id}`) {
+      router.push("/dashboard")
     }
   }
 
@@ -105,9 +105,9 @@ export function ContextSidebar({
               <div
                 key={tweet.id}
                 className={`flex items-center gap-2 p-2 rounded-md ${
-                  pathname === "/main" ? "bg-muted" : "bg-muted/50"
+                  pathname === "/dashboard" ? "bg-muted" : "bg-muted/50"
                 } cursor-pointer`}
-                onClick={() => router.push("/main")}
+                onClick={() => router.push("/dashboard")}
               >
                 <Twitter className="size-4 text-blue-500 fill-blue-500" />
                 <span className="text-sm font-medium">
@@ -147,11 +147,11 @@ export function ContextSidebar({
                   <div
                     key={doc.id}
                     className={`flex items-center justify-between group p-2 rounded-md ${
-                      pathname === `/context/${doc.id}`
+                      pathname === `/dashboard/context/${doc.id}`
                         ? "bg-muted"
                         : "hover:bg-muted/50"
                     } cursor-pointer`}
-                    onClick={() => router.push(`/context/${doc.id}`)}
+                    onClick={() => router.push(`/dashboard/context/${doc.id}`)}
                   >
                     <div className="flex items-center gap-2">
                       <FileText className="size-4 text-muted-foreground" />
