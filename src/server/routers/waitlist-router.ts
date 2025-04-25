@@ -6,7 +6,7 @@ import { Ratelimit } from "@upstash/ratelimit"
 
 const ratelimit = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(444, "1 h"),
+  limiter: Ratelimit.slidingWindow(4, "1 h"),
 })
 
 export const waitlistRouter = j.router({
