@@ -158,7 +158,7 @@ export default function Tweet({
 
       <div className="flex gap-3 relative z-10">
         <Avatar className="h-12 w-12 rounded-full border-2 border-white bg-white">
-          <AvatarImage src="/profile_picture.jpg" alt="@joshtriedcoding" />
+          <AvatarImage src="/images/profile_picture.jpg" alt="@joshtriedcoding" />
           <AvatarFallback>{author.avatarFallback}</AvatarFallback>
         </Avatar>
 

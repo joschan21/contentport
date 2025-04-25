@@ -202,7 +202,7 @@ export function TweetSuggestion({
       <div className="my-3 !mt-5 rounded-lg bg-white border border-dashed border-stone-200 shadow-sm overflow-hidden">
         <div className="flex items-start gap-3 p-6">
           <Avatar className="h-10 w-10 rounded-full border border-border/30">
-            <AvatarImage src="/profile_picture.jpg" alt="@joshtriedcoding" />
+            <AvatarImage src="/images/profile_picture.jpg" alt="@joshtriedcoding" />
             <AvatarFallback className="bg-primary/10 text-primary text-sm/6">
               J
             </AvatarFallback>

@@ -107,7 +107,7 @@ const Page = () => {
         <div className="relative hidden aspect-[1/1] p-6 w-full md:block md:w-1/2">
           <div className="relative select-none pointer-events-none w-full h-full rounded-2xl overflow-hidden">
             <Image
-              src="/painting.png"
+              src="/images/painting.png"
               alt="Content Creation Platform"
               fill
               className="rounded-r-lg object-cover"
