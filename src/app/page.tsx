@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { authClient } from "@/lib/auth-client"
 import { client } from "@/lib/client"
 import NumberFlow from "@number-flow/react"
 import { useMutation, useQuery } from "@tanstack/react-query"
