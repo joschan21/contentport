@@ -8,10 +8,16 @@ interface Env {
 
 export const j = jstack.init<Env>()
 
+const allowlist = ["neske.joscha@gmail.com"]
+
 const authMiddleware = j.middleware(async ({ c, ctx, next }) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
 
   if (!session) {
+    throw new HTTPException(401, { message: "Unauthorized" })
+  }
+
+  if (!allowlist.includes(session.user.email)) {
     throw new HTTPException(401, { message: "Unauthorized" })
   }
 
