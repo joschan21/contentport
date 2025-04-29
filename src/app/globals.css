@@ -1,4 +1,6 @@
 @tailwind base;
+
+@custom-variant dark (&:is(.dark *));
 @tailwind components;
 @tailwind utilities;
 
@@ -94,7 +96,7 @@ body {
 }
 
 .inline-link {
-  @apply inline
+  @apply inline;
 }
 
 /* node styles */
@@ -130,7 +132,7 @@ body {
 }
 
 .show-placeholder::before {
-  @apply text-stone-400
+  @apply text-stone-400;
 }
 
 .show-placeholder::before {
@@ -142,4 +144,13 @@ body {
 
 [contenteditable="true"] {
   min-height: 1.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

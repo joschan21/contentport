@@ -4,28 +4,20 @@ import { useChat } from "@ai-sdk/react"
 
 import {
   ArrowUp,
-  AudioWaveform,
-  BookOpen,
   Bot,
   Check,
   CheckCircle2,
   Command,
-  Frame,
-  GalleryVerticalEnd,
+  Feather,
   Loader2,
-  MessageSquare,
-  PieChart,
-  SendIcon,
-  Settings2,
+  Plus,
   Sparkles,
-  SquareTerminal,
-  Target,
   User,
   X,
-  Zap,
 } from "lucide-react"
-import { useRef, useState, useEffect, useLayoutEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 
+import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -40,6 +32,8 @@ import { MentionProvider, useMentionContext } from "@/hooks/mention-ctx"
 import { useTweetContext } from "@/hooks/tweet-ctx"
 import { MentionPlugin } from "@/lib/mention-plugin"
 import { MentionNode } from "@/lib/nodes"
+import PlaceholderPlugin from "@/lib/placeholder-plugin"
+import { cn } from "@/lib/utils"
 import { InferInput } from "@/server"
 import { LexicalComposer } from "@lexical/react/LexicalComposer"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
@@ -48,15 +42,21 @@ import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary"
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin"
 import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin"
 import { $getRoot } from "lexical"
+import { nanoid } from "nanoid"
 import { useQueryState } from "nuqs"
 import { KeyboardEvent as ReactKeyboardEvent } from "react"
-import { nanoid } from "nanoid"
-import PlaceholderPlugin from "@/lib/placeholder-plugin"
+import { Improvements } from "./improvements"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 import { Separator } from "./ui/separator"
-import { Improvements } from "./improvements"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
-import { cn } from "@/lib/utils"
+import { EditTweetToolResult } from "@/server/routers/chat-router"
+import { TextShimmer } from "./ui/text-shimmer"
+import { Textarea } from "./ui/textarea"
+import { Input } from "./ui/input"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import { client } from "@/lib/client"
+import { HTTPException } from "hono/http-exception"
+import { toast } from "sonner"
 
 const initialConfig = {
   namespace: "context-document-editor",
@@ -100,7 +100,9 @@ function ChatInput({
   const { tweets, contents } = useTweetContext()
   const { messages, status } = useChat({
     id: chatId,
-    body: { chatId },
+    body: {
+      chatId,
+    },
     maxSteps: 5,
     api: "/api/chat/generate",
   })
@@ -188,6 +190,77 @@ function ChatInput({
   )
 }
 
+function TweetSuggestionLoader() {
+  return (
+    <div>
+      <div className="my-3 !mt-5 rounded-lg bg-white border border-dashed border-stone-200 shadow-sm overflow-hidden">
+        <div className="flex items-start gap-3 p-6">
+          <Avatar className="h-10 w-10 rounded-full border border-border/30">
+            <AvatarImage
+              src="/images/profile_picture.jpg"
+              alt="@joshtriedcoding"
+            />
+            <AvatarFallback className="bg-primary/10 text-primary text-sm/6">
+              J
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-base leading-relaxed font-semibold">
+                Josh tried coding
+              </span>
+              <span className="text-sm/6 text-muted-foreground">
+                @joshtriedcoding
+              </span>
+            </div>
+            <div className="mt-1 text-base leading-relaxed whitespace-pre-line">
+              <TextShimmer
+                className=" [--base-gradient-color:#78716c]"
+                duration={0.7}
+              >
+                Creating...
+              </TextShimmer>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface TweetCard {
+  src?: string
+  username: string
+  name: string
+  text?: string
+}
+
+const TweetCard = ({ name, username, src, text }: TweetCard) => {
+  return (
+    <div className="w-full">
+      <div className="text-left rounded-lg bg-white border border-dashed border-stone-200 shadow-sm overflow-hidden">
+        <div className="flex items-start gap-3 p-6">
+          <Avatar className="h-10 w-10 rounded-full border border-border/30">
+            <AvatarImage src={src} alt={`@${username}`} />
+            <AvatarFallback className="bg-primary/10 text-primary text-sm/6">
+              {name.slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-base font-semibold">{name}</span>
+              <span className="text-sm/6 text-muted-foreground">
+                @{username}
+              </span>
+            </div>
+            <div className="mt-1 text-base whitespace-pre-line">{text}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function TweetSuggestion({
   id,
   suggestion,
@@ -198,11 +271,14 @@ export function TweetSuggestion({
   const { acceptSuggestion, rejectSuggestion } = useTweetContext()
 
   return (
-    <div>
-      <div className="my-3 !mt-5 rounded-lg bg-white border border-dashed border-stone-200 shadow-sm overflow-hidden">
+    <div className="w-full">
+      <div className="text-left rounded-lg bg-white shadow overflow-hidden">
         <div className="flex items-start gap-3 p-6">
           <Avatar className="h-10 w-10 rounded-full border border-border/30">
-            <AvatarImage src="/images/profile_picture.jpg" alt="@joshtriedcoding" />
+            <AvatarImage
+              src="/images/profile_picture.jpg"
+              alt="@joshtriedcoding"
+            />
             <AvatarFallback className="bg-primary/10 text-primary text-sm/6">
               J
             </AvatarFallback>
@@ -222,7 +298,7 @@ export function TweetSuggestion({
           </div>
         </div>
       </div>
-      <div className="flex justify-end gap-2 p-2 bg-muted/20">
+      {/* <div className="flex justify-end gap-2 p-2 bg-muted/20">
         <button
           onClick={() => rejectSuggestion(id)}
           className="flex items-center gap-1 font-medium bg-red-50 text-red-700 ring-1 ring-red-600/10 ring-inset text-xs px-3 py-1.5 rounded-full bg-background hover:bg-red-100 transition-colors"
@@ -237,21 +313,19 @@ export function TweetSuggestion({
           <Check className="size-3" />
           <span>Apply</span>
         </button>
-      </div>
+      </div> */}
     </div>
   )
 }
 
 export function AppSidebar({ children }: { children: React.ReactNode }) {
-  const [activeTab, setActiveTab] = useQueryState<"improvements" | "assistant">(
-    "tab",
-    {
-      defaultValue: "improvements",
-      parse: (value): "improvements" | "assistant" =>
-        value === "assistant" ? "assistant" : "improvements",
-      serialize: (value) => value,
-    }
-  )
+  const [activeTab, setActiveTab] = useQueryState<
+    "assistant" | "writing-style"
+  >("tab", {
+    defaultValue: "assistant",
+    parse: (value) => (value === "assistant" ? "assistant" : "writing-style"),
+    serialize: (value) => value,
+  })
 
   const [chatId, setChatId] = useQueryState("chatId", {
     defaultValue: nanoid(),
@@ -259,7 +333,8 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     serialize: (value) => value,
   })
 
-  const { tweets, addSuggestion } = useTweetContext()
+  const { tweets, addImprovements } = useTweetContext()
+  const { toggleSidebar } = useSidebar()
 
   const { messages, handleInputChange, handleSubmit, setInput } = useChat({
     id: chatId,
@@ -285,9 +360,10 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
 
         if (!hasFired && part.toolInvocation.state === "result") {
           // tool is done generating tweet
-          const { id, content } = part.toolInvocation.result
+          const { id, improvedText, diffs } = part.toolInvocation
+            .result as EditTweetToolResult
 
-          addSuggestion(id, content)
+          addImprovements(id, diffs)
 
           // if (part.toolInvocation.toolName === "create_tweet") {
           //   createTweet(id)
@@ -308,59 +384,115 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
   const { width } = useSidebar()
   const isNarrow = parseInt(width.replace(/[^\d.]/g, "")) * 16 < 400
 
+  const [tweetLink, setTweetLink] = useState("")
+  const [prompt, setPrompt] = useState("")
+
+  const { data: style, refetch } = useQuery({
+    queryKey: ["get-user-style"],
+    queryFn: async () => {
+      const res = await client.style.get.$get()
+      return await res.json()
+    },
+  })
+
+  // Initialize prompt from style data when it loads
+  useEffect(() => {
+    if (style?.prompt) {
+      setPrompt(style.prompt)
+    }
+  }, [style?.prompt])
+
+  const { mutate: importTweets, isPending: isImporting } = useMutation({
+    mutationFn: async ({ link }: { link: string }) => {
+      await client.style.import.$post({ link })
+    },
+    onSuccess: () => {
+      setTweetLink("")
+      refetch()
+    },
+    onError: (error: HTTPException) => {
+      toast.error(error.message)
+    },
+  })
+
+  const { mutate: deleteTweet, isPending: isDeleting } = useMutation({
+    mutationFn: async ({ tweetId }: { tweetId: string }) => {
+      await client.style.delete.$post({ tweetId })
+    },
+    onSuccess: () => {
+      refetch()
+    },
+    onError: (error: HTTPException) => {
+      toast.error(error.message)
+    },
+  })
+
+  const { mutate: savePrompt, isPending: isSaving } = useMutation({
+    mutationFn: async () => {
+      await client.style.save.$post({ prompt })
+    },
+    onSuccess: () => {
+      refetch()
+      toast.success("Style prompt saved successfully")
+    },
+    onError: (error: HTTPException) => {
+      toast.error(error.message)
+    },
+  })
+
   return (
     <>
       {children}
       <Tabs
-        defaultValue="improvements"
+        defaultValue="assistant"
         value={activeTab}
         onValueChange={(tab) =>
-          setActiveTab(tab as "assistant" | "improvements")
+          setActiveTab(tab as "assistant" | "writing-style")
         }
       >
-        <Sidebar side="right" collapsible="icon">
-          <SidebarHeader className="border-b border-border/40 p-4">
-            {/* <TabsList className={`w-full ${isNarrow ? 'grid grid-cols-1' : 'flex'} items-center gap-1 rounded-lg`}> */}
-            <TabsList
-              className={cn(
-                {
-                  "grid grid-cols-1 !h-auto": isNarrow,
-                  "flex !h-auto": !isNarrow,
-                },
-                "items-center gap-2 bg-stone-100 p-2 rounded-md"
-              )}
-            >
-              <TabsTrigger
-                value="improvements"
-                className={`flex items-center ${isNarrow ? "w-full" : "flex-1"} gap-1 px-3 border border-transparent py-2 text-stone-800 data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-stone-200 data-[state=active]:shadow-sm rounded-md`}
-              >
-                <Sparkles className="size-4" />
-                <span className="text-sm font-medium">Improvements</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="assistant"
-                className={`flex ${isNarrow ? "w-full" : "flex-1"} items-center border border-transparent gap-1 px-3 py-2 text-stone-800 data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-stone-200 data-[state=active]:shadow-sm rounded-md`}
-              >
-                <Bot className="size-4" />
-                <span className="text-sm font-medium">Assistant</span>
-              </TabsTrigger>
-            </TabsList>
-            {activeTab === "assistant" && (
-              <button
-                onClick={startNewChat}
-                className="ml-auto text-xs px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-              >
-                New Chat
-              </button>
-            )}
+        <Sidebar side="right" collapsible="offcanvas">
+          <SidebarHeader className="flex flex-col border-b border-stone-200 items-center justify-end gap-2 px-4">
+            <div className="w-full flex items-center justify-between">
+              <p className="text-sm/6 font-medium">
+                {activeTab === "assistant" ? "Assistant" : "Style"}
+              </p>
+              <div>
+                {" "}
+                <Button
+                  size="icon"
+                  variant={activeTab === "writing-style" ? "default" : "ghost"}
+                  title="Customize Writing Style"
+                  onClick={() =>
+                    setActiveTab(
+                      activeTab === "writing-style"
+                        ? "assistant"
+                        : "writing-style"
+                    )
+                  }
+                >
+                  <Feather className="size-4" />
+                </Button>
+                <Button
+                  onClick={startNewChat}
+                  size="icon"
+                  variant="ghost"
+                  title="New Chat"
+                >
+                  <Plus className="size-4" />
+                </Button>
+                <Button
+                  onClick={toggleSidebar}
+                  variant="ghost"
+                  size="icon"
+                  title="Close Sidebar"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            </div>
           </SidebarHeader>
-          <SidebarContent className="p-4 h-full">
+          <SidebarContent className="h-full p-4 !mb-8">
             <SidebarGroup className="h-full">
-              <TabsContent value="improvements">
-                <SidebarGroupLabel>Improvements</SidebarGroupLabel>
-                <Improvements />
-              </TabsContent>
-
               <TabsContent className="h-full" value="assistant">
                 <div className="flex flex-col-reverse space-y-reverse space-y-4 h-full overflow-y-auto">
                   {messages.length > 0 ? (
@@ -400,41 +532,8 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                               case "tool-invocation":
                                 switch (part.toolInvocation.state) {
                                   case "partial-call":
-                                    return (
-                                      <div
-                                        key={index}
-                                        className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-lg animate-pulse"
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          <div className="size-2 rounded-full bg-blue-400/30 dark:bg-blue-400/50" />
-                                          <p className="text-sm text-blue-600/70 dark:text-blue-300/70">
-                                            Processing...
-                                          </p>
-                                        </div>
-                                      </div>
-                                    )
                                   case "call":
-                                    return (
-                                      <div
-                                        key={index}
-                                        className="bg-gradient-to-br from-blue-50/50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/30 border border-blue-200/30 dark:border-blue-700/30 p-3 rounded-lg"
-                                      >
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <Command className="size-4 text-blue-600 dark:text-blue-400" />
-                                          <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                                            Using tool:{" "}
-                                            {part.toolInvocation.toolName}
-                                          </p>
-                                        </div>
-                                        <pre className="text-xs bg-white/50 dark:bg-black/20 p-2 rounded overflow-x-auto">
-                                          {JSON.stringify(
-                                            part.toolInvocation.args,
-                                            null,
-                                            2
-                                          )}
-                                        </pre>
-                                      </div>
-                                    )
+                                    return <TweetSuggestionLoader key={index} />
                                   case "result":
                                     if (
                                       part.toolInvocation.toolName ===
@@ -444,11 +543,22 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                                     ) {
                                       const result = part.toolInvocation.result
                                       return (
-                                        <TweetSuggestion
+                                        <div
                                           key={result.id}
-                                          id={result.id}
-                                          suggestion={result.content}
-                                        />
+                                          className="bg-stone-100 p-2 shadow-inner rounded-lg border border-dashed border-stone-200 rounded-b-xl"
+                                        >
+                                          <TweetSuggestion
+                                            id={result.id}
+                                            suggestion={result.improvedText}
+                                          />
+                                          <div className="flex flex-col gap-2 p-2 pt-4 text-sm/6">
+                                            <div className="flex justify-between">
+                                              <p>Suggested Changes:</p>
+                                            </div>
+
+                                            <Improvements />
+                                          </div>
+                                        </div>
                                       )
                                     }
                                     return (
@@ -498,10 +608,114 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
               </TabsContent>
+
+              <TabsContent className="h-full" value="writing-style">
+                <div className="flex flex-col h-full p-4 space-y-6">
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2 justify-start items-center">
+                        <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                          Fine-Tune Prompt
+                        </h3>
+                        <span className="text-xs px-2 py-0.5 bg-stone-200 text-stone-600 rounded-full">
+                          Optional
+                        </span>
+                      </div>
+                      <p className="text-sm text-stone-600">
+                        If the agent doesn't quite get your style, fine-tune it
+                        here
+                      </p>
+                    </div>
+                    <Textarea
+                      className="min-h-24"
+                      placeholder="My tweets always use this emoji (◆) for bullet points and usually consist of a short, catchy intro hook and three bullet points. I love the 🎉 emoji"
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                    />
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                      Style Reference
+                    </h3>
+                    <p className="text-sm text-stone-600">
+                      Paste a direct link to tweets to use as a style reference
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <div className="w-full flex items-center space-x-2">
+                        <Input
+                          value={tweetLink}
+                          onChange={(e) => {
+                            setTweetLink(e.target.value)
+                          }}
+                          className="flex-1 w-full bg-stone-100"
+                          type="text"
+                          placeholder="https://x.com/username/status/1234567890123456789"
+                        />
+                        <Button
+                          onClick={() => {
+                            importTweets({ link: tweetLink })
+                          }}
+                          disabled={isImporting}
+                          variant="outline"
+                          size="sm"
+                        >
+                          {isImporting ? "Importing..." : "Import"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col p-4 gap-2 items-center justify-center text-center h-full border border-dashed border-gray-200 bg-stone-100 dark:border-gray-800 rounded-lg">
+                      {style?.tweets.length ? (
+                        <div className="w-full h-full flex flex-col gap-2 justify-start">
+                          {style.tweets.map((tweet, index) => {
+                            return (
+                              <div className="relative" key={index}>
+                                <Button
+                                  variant="ghost"
+                                  className="absolute top-3 right-3 !p-1.5 aspect-square"
+                                  onClick={() =>
+                                    deleteTweet({ tweetId: tweet.id })
+                                  }
+                                  disabled={isDeleting}
+                                >
+                                  {isDeleting ? (
+                                    <Loader2 className="size-4 text-stone-500 animate-spin" />
+                                  ) : (
+                                    <X className="size-4 text-stone-500" />
+                                  )}
+                                </Button>
+                                <TweetCard
+                                  username={tweet.author.username}
+                                  name={tweet.author.name}
+                                  src={tweet.author.profile_image_url}
+                                  text={tweet.text}
+                                />
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <>
+                          <Sparkles className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            No imported tweets yet
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
+                            Curated style presets coming soon
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
             </SidebarGroup>
           </SidebarContent>
 
-          {activeTab === "assistant" && (
+          {activeTab === "assistant" ? (
             <SidebarFooter className="p-3 border-t">
               <MentionProvider>
                 <LexicalComposer initialConfig={initialConfig}>
@@ -513,6 +727,23 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                   />
                 </LexicalComposer>
               </MentionProvider>
+            </SidebarFooter>
+          ) : (
+            <SidebarFooter className="p-3 border-t">
+              <Button
+                className="w-full h-12"
+                onClick={() => savePrompt()}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Style"
+                )}
+              </Button>
             </SidebarFooter>
           )}
           <SidebarRail />

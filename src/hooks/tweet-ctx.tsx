@@ -1,28 +1,24 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useRef,
-} from "react"
-import { client } from "@/lib/client"
-import {
-  LexicalEditor,
-  $getRoot,
-  $createTextNode,
-  $createParagraphNode,
-  $getNodeByKey,
-} from "lexical"
-import DiffMatchPatch, { Diff } from "diff-match-patch"
 import {
   AdditionNode,
   DeletionNode,
-  UnchangedNode,
   ReplacementNode,
+  UnchangedNode,
 } from "@/lib/nodes"
-import { DiffWithReplacement } from "@/server/routers/improvement-router"
-import { useMutation, UseMutationResult } from "@tanstack/react-query"
-import { InferInput, InferOutput } from "@/server"
+import { DiffWithReplacement } from "@/lib/utils"
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getNodeByKey,
+  $getRoot,
+  LexicalEditor,
+} from "lexical"
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+} from "react"
 
 type DiffType = -1 | 0 | 1
 
@@ -30,12 +26,12 @@ interface Tweet {
   id: string
   suggestion: null | string
   improvements: {
-    clarity?: DiffWithReplacement[]
+    [category: string]: DiffWithReplacement[] | undefined
   }
 }
 
-type ImprovementOutput = InferOutput["improvement"]["clarity"]
-type ImprovementInput = InferInput["improvement"]["clarity"]
+// type ImprovementOutput = InferOutput["improvement"]["clarity"]
+// type ImprovementInput = InferInput["improvement"]["clarity"]
 
 interface TweetContextType {
   tweets: Tweet[]
@@ -48,19 +44,17 @@ interface TweetContextType {
   deleteTweet: (id: string) => void
   registerEditor: (id: string, editor: LexicalEditor) => void
   unregisterEditor: (id: string) => void
-  acceptChanges: (id: string, category: keyof Tweet["improvements"]) => void
-  rejectChanges: (id: string, category: keyof Tweet["improvements"]) => void
-  applyTweet: (id: string, content: string) => void
   createTweet: (id?: string) => void
   waitForEditor: (id: string, callback: () => void) => void
   editors: React.MutableRefObject<Map<string, LexicalEditor>>
   acceptImprovement: (id: string, diff: DiffWithReplacement) => void
-  improvementsMutation: UseMutationResult<
-    ImprovementOutput,
-    Error,
-    void,
-    unknown
-  >
+  rejectImprovement: (id: string, diff: DiffWithReplacement) => void
+  // improvementsMutation: UseMutationResult<
+  //   ImprovementOutput,
+  //   Error,
+  //   void,
+  //   unknown
+  // >
   contents: React.RefObject<Map<string, string>>
 }
 
@@ -83,20 +77,6 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
       prev.map((tweet) => (tweet.id === id ? { ...tweet, suggestion } : tweet))
     )
   }
-
-  // const getTweets = (): Tweet[] => {
-  //   return tweets.map((tweet) => {
-  //     const editor = editors.current.get(tweet.id)
-  //     if (!editor) throw new Error("no editor")
-
-  //     const text = editor.read(() => $getRoot().getTextContent())
-
-  //     return {
-  //       ...tweet,
-  //       content: tweet.suggestion || text,
-  //     }
-  //   })
-  // }
 
   const rejectSuggestion = (id: string) => {
     const editor = editors.current.get(id)
@@ -190,7 +170,9 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
       const editor = editors.current.get(id)
       if (!editor) return
 
-      const improvement = tweet.improvements?.clarity?.find(
+      // Find the improvement in any category
+      const category = diff.category
+      const improvement = tweet.improvements?.[category]?.find(
         (d) => d.id === diff.id
       )
       if (!improvement) return
@@ -207,11 +189,8 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
           const textNode = $createTextNode(node.getTextContent())
           node.replace(textNode)
         } else if (node instanceof ReplacementNode) {
-          console.log("YES")
           const textNode = $createTextNode(diff.replacement)
           node.replace(textNode)
-        } else {
-          console.log("no match", node)
         }
       })
 
@@ -225,7 +204,7 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
                 ...t,
                 improvements: {
                   ...t.improvements,
-                  clarity: t.improvements?.clarity?.filter(
+                  [category]: t.improvements?.[category]?.filter(
                     (d) => d.id !== diff.id
                   ),
                 },
@@ -237,12 +216,67 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
     [tweets, editors]
   )
 
+  const rejectImprovement = (id: string, diff: DiffWithReplacement) => {
+    const tweet = tweets.find((t) => t.id === id)
+    if (!tweet) return
+
+    const editor = editors.current.get(id)
+    if (!editor) return
+
+    // Find the improvement in any category
+    const category = diff.category
+    const improvement = tweet.improvements?.[category]?.find(
+      (d) => d.id === diff.id
+    )
+    if (!improvement) return
+
+    const key = improvements.current.get(diff.id)
+    if (!key) return
+
+    editor.update(() => {
+      const node = $getNodeByKey(key)
+
+      if (node instanceof DeletionNode) {
+        const textNode = $createTextNode(node.getTextContent())
+        node.replace(textNode)
+      } else if (node instanceof AdditionNode) {
+        node.remove()
+      } else if (node instanceof ReplacementNode) {
+        const textNode = $createTextNode(diff.text)
+        node.replace(textNode)
+      }
+    })
+
+    improvements.current.delete(diff.id)
+
+    setTweets((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              improvements: {
+                ...t.improvements,
+                [category]: t.improvements?.[category]?.filter(
+                  (d) => d.id !== diff.id
+                ),
+              },
+            }
+          : t
+      )
+    )
+  }
+
   const addImprovements = (id: string, diffs: DiffWithReplacement[]) => {
     const editor = editors.current.get(id)
+    const content = contents.current.get(id)
 
-    console.log("DIFFS", diffs)
+    if (!editor) throw new Error("no editor for improvement")
+    if (typeof content === "undefined")
+      throw new Error("no content for improvement")
 
-    editor?.update(() => {
+    checkpoints.current.set(id, content)
+
+    editor.update(() => {
       const p = $createParagraphNode()
       diffs.forEach((diff) => {
         if (diff.type === 2) {
@@ -281,41 +315,67 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
 
       root.append(p)
     })
-  }
 
-  const improvementsMutation = useMutation({
-    mutationFn: async () => {
-      const payload = tweets.map((tweet) => {
-        const content = contents.current.get(tweet.id) as string
-        checkpoints.current.set(tweet.id, content)
-        return { ...tweet, content }
-      })
-      const res = await client.improvement.clarity.$post({ tweets: payload })
-      return await res.json()
-    },
-    onSuccess: (data) => {
-      tweets.forEach((tweet) => {
-        const result = data.results.find((r) => r.id === tweet.id)
-        const content = contents.current.get(tweet.id) as string
+    // Group improvements by category
+    const improvementsByCategory = diffs.reduce<
+      Record<string, DiffWithReplacement[]>
+    >((acc, diff) => {
+      const category = diff.category
+      if (!acc[category]) {
+        acc[category] = []
+      }
+      acc[category].push(diff)
+      return acc
+    }, {})
 
-        if (result && result.improvedText !== content) {
-          addImprovements(tweet.id, result.diffs)
+    setTweets((prev) => {
+      return prev.map((tweet) => {
+        if (tweet.id !== id) return tweet
+
+        return {
+          ...tweet,
+          improvements: {
+            ...tweet.improvements,
+            ...improvementsByCategory,
+          },
         }
       })
+    })
+  }
 
-      setTweets((prev) => {
-        return prev.map((tweet) => {
-          const result = data.results.find((r) => r.id === tweet.id)
-          return {
-            ...tweet,
-            improvements: {
-              clarity: result?.diffs || undefined,
-            },
-          }
-        })
-      })
-    },
-  })
+  // const improvementsMutation = useMutation({
+  //   mutationFn: async () => {
+  //     const payload = tweets.map((tweet) => {
+  //       const content = contents.current.get(tweet.id) as string
+  //       checkpoints.current.set(tweet.id, content)
+  //       return { ...tweet, content }
+  //     })
+  //     const res = await client.improvement.clarity.$post({ tweets: payload })
+  //     return await res.json()
+  //   },
+  //   onSuccess: (data) => {
+  //     tweets.forEach((tweet) => {
+  //       const result = data.results.find((r) => r.id === tweet.id)
+  //       const content = contents.current.get(tweet.id) as string
+
+  //       if (result && result.improvedText !== content) {
+  //         addImprovements(tweet.id, result.diffs)
+  //       }
+  //     })
+
+  //     setTweets((prev) => {
+  //       return prev.map((tweet) => {
+  //         const result = data.results.find((r) => r.id === tweet.id)
+  //         if (!result) return tweet
+
+  //         return {
+  //           ...tweet,
+  //           suggestion: result.improvedText,
+  //         }
+  //       })
+  //     })
+  //   },
+  // })
 
   // const getImprovements = useCallback(async () => {
   //   const tweets = getTweets()
@@ -333,160 +393,6 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
 
   const unregisterEditor = useCallback((id: string) => {
     editors.current.delete(id)
-  }, [])
-
-  const acceptChanges = useCallback(
-    (id: string) => {
-      // const tweet = tweets.find((t) => t.id === id)
-      // const clarityImprovement = tweet?.improvements?.clarity
-      // if (!clarityImprovement) return
-      // const editor = editors.current.get(id)
-      // if (!editor) return
-      // editor.update(() => {
-      //   const root = $getRoot()
-      //   root.clear()
-      //   const textNode = $createTextNode(clarityImprovement)
-      //   const p = $createParagraphNode()
-      //   p.append(textNode)
-      //   root.append(p)
-      // })
-      // setTweets((prev) =>
-      //   prev.map((t) =>
-      //     t.id === id
-      //       ? {
-      //           ...t,
-      //           content: clarityImprovement,
-      //           improvements: {},
-      //         }
-      //       : t
-      //   )
-      // )
-    },
-    [tweets]
-  )
-
-  const rejectChanges = useCallback((id: string) => {
-    // setTweets((prev) =>
-    //   prev.map((t) =>
-    //     t.id === id
-    //       ? {
-    //           ...t,
-    //           improvements: {},
-    //         }
-    //       : t
-    //   )
-    // )
-  }, [])
-
-  // const previewTweet = (id: string, suggestion: string) => {
-  //   const editor = editors.current.get(id)
-
-  //   if (!editor) return { accept: () => {}, reject: () => {} }
-
-  //   const currentText = editor.read(() => $getRoot().getTextContent())
-
-  //   const diffs: Diff[] = dmp.diff_main(currentText, suggestion)
-  //   dmp.diff_cleanupSemantic(diffs)
-
-  //   editor.update(() => {
-  //     const root = $getRoot()
-  //     root.clear()
-  //     const p = $createParagraphNode()
-
-  //     for (let i = 0; i < diffs.length; i++) {
-  //       const [type, text] = diffs[i]
-  //       const next = diffs[i + 1]
-
-  //       if (text.length === 0) continue
-
-  //       console.log("type, text", type, text)
-
-  //       if (
-  //         type === DiffMatchPatch.DIFF_DELETE &&
-  //         next &&
-  //         next[0] === DiffMatchPatch.DIFF_INSERT
-  //       ) {
-  //         console.log("YEAH BUDDY REPLACEMENT")
-  //         p.append(new ReplacementNode(next[1]))
-  //         i++
-  //       } else {
-  //         switch (type) {
-  //           case DiffMatchPatch.DIFF_INSERT:
-  //             p.append(new AdditionNode(text))
-  //             break
-  //           case DiffMatchPatch.DIFF_DELETE:
-  //             p.append(new DeletionNode(text))
-  //             break
-  //           case DiffMatchPatch.DIFF_EQUAL:
-  //             p.append(new UnchangedNode(text))
-  //             break
-  //         }
-  //       }
-  //     }
-
-  //     root.append(p)
-  //   })
-
-  //   return {
-  //     accept: () => {
-  //       editor.update(() => {
-  //         const root = $getRoot()
-  //         root.clear()
-  //         const textNode = $createTextNode(suggestion)
-  //         const p = $createParagraphNode()
-  //         p.append(textNode)
-  //         root.append(p)
-  //       })
-
-  //       setTweets((prev) =>
-  //         prev.map((t) =>
-  //           t.id === id
-  //             ? {
-  //                 ...t,
-  //                 content: suggestion,
-  //                 improvements: {},
-  //               }
-  //             : t
-  //         )
-  //       )
-  //     },
-  //     reject: () => {
-  //       editor.update(() => {
-  //         const root = $getRoot()
-  //         root.clear()
-  //         const textNode = $createTextNode(currentText)
-  //         const p = $createParagraphNode()
-  //         p.append(textNode)
-  //         root.append(p)
-  //       })
-  //     },
-  //   }
-  // }
-
-  const applyTweet = useCallback((id: string, content: string) => {
-    const editor = editors.current.get(id)
-    if (!editor) return
-
-    editor.update(() => {
-      const root = $getRoot()
-      root.clear()
-      const textNode = $createTextNode(content)
-      const p = $createParagraphNode()
-      p.append(textNode)
-      root.append(p)
-    })
-
-    setTweets((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              content,
-              improvements: {},
-            }
-          : t
-      )
-    )
   }, [])
 
   const createTweet = useCallback((id?: string) => {
@@ -512,22 +418,20 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
       value={{
         tweets,
         addImprovements,
+        acceptImprovement,
+        rejectImprovement,
         addSuggestion,
         rejectSuggestion,
         acceptSuggestion,
         addTweet,
         updateTweet,
         deleteTweet,
-        improvementsMutation,
+        // improvementsMutation,
         registerEditor,
         unregisterEditor,
-        acceptChanges,
-        rejectChanges,
-        applyTweet,
         createTweet,
         waitForEditor,
         editors,
-        acceptImprovement,
         contents,
       }}
     >

@@ -13,13 +13,15 @@ import {
   SerializedLexicalNode,
 } from "lexical"
 import debounce from "lodash.debounce"
-import { ChangeEvent, useCallback, useEffect, useState } from "react"
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react"
 
 import { client } from "@/lib/client"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Input } from "./ui/input"
 import PlaceholderPlugin from "@/lib/placeholder-plugin"
+import { useDocumentContext } from "@/hooks/document-ctx"
+import { usePathname, useRouter } from "next/navigation"
 
 interface ContextDocumentEditorProps {
   documentId: string
@@ -39,6 +41,9 @@ export function ContextDocumentEditor({
 }: ContextDocumentEditorProps) {
   const [editor] = useLexicalComposerContext()
   const [title, setTitle] = useState("")
+  const queryClient = useQueryClient()
+  const { documentTitles, setDocumentTitle } = useDocumentContext()
+  const pathname = usePathname()
 
   const { data } = useQuery({
     queryKey: ["document", documentId],
@@ -52,8 +57,13 @@ export function ContextDocumentEditor({
     if (!data?.document) return
 
     const document = data.document
-    console.log("setting title", document.title)
     setTitle(document.title)
+
+    queryClient.setQueryData(["documents"], (old: Document[] = []) => {
+      return old.map((doc) =>
+        doc.id === documentId ? { ...doc, title: document.title } : doc
+      )
+    })
 
     if (!document.content) return
 
@@ -61,7 +71,7 @@ export function ContextDocumentEditor({
       const editorState = editor.parseEditorState(document.content!)
       editor.setEditorState(editorState)
     })
-  }, [data, editor])
+  }, [data, editor, documentId, queryClient])
 
   const {
     mutate: saveToRedis,
@@ -69,6 +79,7 @@ export function ContextDocumentEditor({
     isSuccess,
     isError,
   } = useMutation({
+    mutationKey: ["save-doc", pathname],
     mutationFn: async () => {
       const content = editor.getEditorState().toJSON()
 
@@ -80,6 +91,7 @@ export function ContextDocumentEditor({
 
       return res.json()
     },
+    onSuccess: ({ documentId }) => {},
   })
 
   const debouncedSave = useCallback(
@@ -93,6 +105,13 @@ export function ContextDocumentEditor({
     debouncedSave()
   }
 
+  const handleTitleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const newTitle = e.target.value
+    setTitle(newTitle)
+    setDocumentTitle(documentId, newTitle)
+    debouncedSave()
+  }
+
   // useEffect(() => {
   //   return () => {
   //     debouncedSave.cancel()
@@ -103,10 +122,11 @@ export function ContextDocumentEditor({
     <div className="w-full h-full p-4 space-y-4">
       <div className="flex gap-4 justify-between items-center">
         <input
+          autoFocus
           type="text"
           placeholder="Document title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          value={documentTitles[documentId] || title}
+          onChange={handleTitleChange}
           className="text-2xl/10 w-full tracking-tight focus:outline-none font-semibold bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
         />
         <div className="w-40 text-xs text-stone-800">

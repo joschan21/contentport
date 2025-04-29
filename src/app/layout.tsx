@@ -4,6 +4,7 @@ import { Instrument_Serif, JetBrains_Mono } from "next/font/google"
 import { GeistSans } from "geist/font/sans"
 import { Toaster } from "sonner"
 import { ClientProviders } from "@/components/providers/client-providers"
+import { DocumentProvider } from "@/hooks/document-ctx"
 
 export const metadata: Metadata = {
   title: "JStack App",
@@ -13,7 +14,6 @@ export const metadata: Metadata = {
 
 const elegant = Instrument_Serif({
   weight: "400",
-  style: "italic",
   variable: "--font-elegant",
   subsets: ["latin"],
 })
@@ -38,10 +38,12 @@ export default function RootLayout({
       <body
         className={`${GeistSans.className} ${elegant.variable} ${jetBrainsMono.variable} antialiased light`}
       >
-        <ClientProviders>
-          <Toaster position="top-center" />
-          {children}
-        </ClientProviders>
+        <DocumentProvider>
+          <ClientProviders>
+            <Toaster position="top-center" />
+            {children}
+          </ClientProviders>
+        </DocumentProvider>
       </body>
     </html>
   )

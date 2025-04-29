@@ -62,7 +62,7 @@ function TweetEditorContent() {
             </LexicalComposer>
           ))}
 
-          <div className="flex items-center mt-1">
+          {/* <div className="flex items-center mt-1">
             <button
               onClick={() => createTweet()}
               className="px-2.5 py-1 bg-white flex items-center relative rounded-lg cursor-pointer dark:text-gray-400 hover:bg-stone-50 border border-stone-200 shadow-sm border-dashed text-sm text-stone-700"
@@ -70,7 +70,7 @@ function TweetEditorContent() {
               <Plus className="size-3 mr-1" />
               Add tweet
             </button>
-          </div>
+          </div> */}
         </div>
       )}
     </div>

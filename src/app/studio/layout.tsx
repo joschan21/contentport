@@ -42,3 +42,4 @@ export default async function RootLayout({
     </ThemeProvider>
   )
 }
+

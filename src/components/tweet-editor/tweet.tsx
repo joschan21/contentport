@@ -51,7 +51,6 @@ export default function Tweet({
   const {
     registerEditor,
     unregisterEditor,
-    improvementsMutation,
     acceptSuggestion,
     rejectSuggestion,
     contents,
@@ -100,15 +99,16 @@ export default function Tweet({
     if (suggestion) rejectSuggestion(id)
   }
 
-  const handleImproveClarity = () => {
-    improvementsMutation.mutate()
-  }
-
   const handlePostToTwitter = () => {
     const tweetText = editor.read(() => $getRoot().getTextContent())
     const encodedText = encodeURIComponent(tweetText)
+
+    const sanitizedText = encodedText.endsWith("%0A")
+      ? encodedText.slice(0, -3)
+      : encodedText
+
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodedText}`,
+      `https://twitter.com/intent/tweet?text=${sanitizedText}`,
       "_blank"
     )
   }
@@ -158,7 +158,10 @@ export default function Tweet({
 
       <div className="flex gap-3 relative z-10">
         <Avatar className="h-12 w-12 rounded-full border-2 border-white bg-white">
-          <AvatarImage src="/images/profile_picture.jpg" alt="@joshtriedcoding" />
+          <AvatarImage
+            src="/images/profile_picture.jpg"
+            alt="@joshtriedcoding"
+          />
           <AvatarFallback>{author.avatarFallback}</AvatarFallback>
         </Avatar>
 
@@ -275,13 +278,13 @@ export default function Tweet({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50"
+                className="p-0 size-7 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50"
                 onClick={handlePostToTwitter}
               >
                 <Twitter className="h-4 w-4" />
                 <span className="sr-only">Post to Twitter</span>
               </Button>
-              <Button
+              {/* <Button
                 variant="ghost"
                 size="sm"
                 className="h-7 w-7 p-0 rounded-full text-gray-400 hover:text-amber-500 hover:bg-amber-50"
@@ -294,8 +297,8 @@ export default function Tweet({
                   <Sparkles className="h-4 w-4" />
                 )}
                 <span className="sr-only">Improve clarity</span>
-              </Button>
-              {onDelete && (
+              </Button> */}
+              {/* {onDelete && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -305,7 +308,7 @@ export default function Tweet({
                   <Trash2 className="h-4 w-4" />
                   <span className="sr-only">Delete tweet</span>
                 </Button>
-              )}
+              )} */}
             </div>
           </div>
         </div>

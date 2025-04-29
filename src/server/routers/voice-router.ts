@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { j, publicProcedure } from "../jstack"
+import { j, privateProcedure } from "../jstack"
 import OpenAI from "openai"
 import { createReadStream } from "fs"
 import { writeFile } from "fs/promises"
@@ -26,7 +26,7 @@ const dmp = new DiffMatchPatch()
 console.log("VOICE ROUTER LOADED")
 
 export const voiceRouter = j.router({
-  transcribe: publicProcedure
+  transcribe: privateProcedure
     .input(
       z.object({
         audioBase64: z.string(),
@@ -181,7 +181,7 @@ export const voiceRouter = j.router({
       //       })
     }),
 
-  generate: publicProcedure
+  generate: privateProcedure
     .input(
       z.object({
         command: z.string(),

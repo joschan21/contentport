@@ -4,49 +4,11 @@ import { Diff, diff_match_patch } from "diff-match-patch"
 import { z } from "zod"
 import { j, publicProcedure } from "../jstack"
 import { tweet } from "@/lib/validators"
+import { DiffWithReplacement, processDiffs } from "@/lib/utils"
 
 const dmp = new diff_match_patch()
 
-type DiffType = -1 | 0 | 1 | 2
-export type DiffWithReplacement = {
-  id: string
-  type: DiffType
-  text: string
-  category: string
-  replacement?: string
-  lexicalKey?: string
-}
 
-const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
-  const processed: DiffWithReplacement[] = []
-
-  for (let i = 0; i < diffs.length; i++) {
-    const current = diffs[i]
-    const next = diffs[i + 1]
-
-    if(!current![1].trim()) continue
-
-    if (current![0] === -1 && next && next[0] === 1) {
-      processed.push({
-        id: `diff-${i}-replacement`,
-        type: 2 as DiffType,
-        text: current![1],
-        category: "clarity",
-        replacement: next![1],
-      })
-      i++
-    } else {
-      processed.push({
-        id: `diff-${i}`,
-        type: current![0] as DiffType,
-        text: current![1],
-        category: "clarity",
-      })
-    }
-  }
-
-  return processed
-}
 
 const mockDiffs: DiffWithReplacement[] = [
   {
@@ -74,19 +36,6 @@ export const improvementRouter = j.router({
   clarity: publicProcedure
     .input(z.object({ tweets: z.array(tweet) }))
     .post(async ({ c, input }) => {
-      // await new Promise((r) => setTimeout(r, 1000))
-
-      // const mockResults = [
-      //   {
-      //     id: "initial-tweet",
-      //     improvedText:
-      //       "Years of trial and error finally showed them what worked.",
-      //     diffs: mockDiffs,
-      //   },
-      // ]
-
-      // return c.json({ success: true, results: mockResults })
-
       const { tweets } = input
       const results: {
         id: string
@@ -103,6 +52,7 @@ export const improvementRouter = j.router({
 Keep the original tone of the author (e.g. casual, professional, lowercase, etc.), and optimize the following tweet for clarity and smooth reading. Make it easy to read and scan without losing information.
 
 <rules>
+- Go for a clear, concise 6th grade reading level (no fancy words, the goal is to get the point across)
 - Do not change the style/tone of the tweet (e.g. casing, emojis, punctuation)
 - Your job is to optimize for easy readability and clarity
 - If you think the tweet is already as clear as it gets, return it 1:1
@@ -246,8 +196,6 @@ ${tweet.content}
         const rawDiffs = dmp.diff_main(tweet.content, text)
         dmp.diff_cleanupSemantic(rawDiffs)
         const processedDiffs = processDiffs(rawDiffs)
-
-        console.log("PROCESSED DIFFS", processedDiffs)
 
         results.push({
           id: tweet.id,

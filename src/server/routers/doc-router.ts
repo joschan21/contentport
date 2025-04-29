@@ -1,8 +1,9 @@
 import { z } from "zod"
-import { j, publicProcedure } from "../jstack"
+import { j, privateProcedure } from "../jstack"
 import { redis } from "../../lib/redis"
 import { HTTPException } from "hono/http-exception"
 import { SerializedEditorState, SerializedLexicalNode } from "lexical"
+import { after } from "next/server"
 
 interface Document {
   id: string
@@ -12,8 +13,14 @@ interface Document {
   [key: string]: unknown
 }
 
+interface DocumentMeta {
+  id: string
+  title: string
+  updatedAt: Date
+}
+
 export const docRouter = j.router({
-  save: publicProcedure
+  save: privateProcedure
     .input(
       z.object({
         documentId: z.string(),
@@ -21,18 +28,27 @@ export const docRouter = j.router({
         title: z.string(),
       })
     )
-    .mutation(async ({ c, input }) => {
+    .mutation(async ({ c, ctx, input }) => {
+      const { user } = ctx
       const { documentId, content, title } = input
 
       const document: Document = {
         id: documentId,
         title,
-        content:
-          content as unknown as SerializedEditorState<SerializedLexicalNode>,
+        content: content as unknown as SerializedEditorState<SerializedLexicalNode>,
         updatedAt: new Date(),
       }
 
-      await redis.json.set(`context:doc:${documentId}`, "$", document)
+      const meta: DocumentMeta = {
+        id: documentId,
+        title,
+        updatedAt: document.updatedAt,
+      }
+
+      await Promise.all([
+        redis.json.set(`doc:${user.email}:${documentId}`, "$", document),
+        redis.hset(`docs:${user.email}`, { [documentId]: meta }),
+      ])
 
       return c.superjson({
         success: true,
@@ -41,7 +57,8 @@ export const docRouter = j.router({
       })
     }),
 
-  create: publicProcedure.mutation(async ({ c, input }) => {
+  create: privateProcedure.mutation(async ({ c, ctx }) => {
+    const { user } = ctx
     const documentId = crypto.randomUUID()
 
     const document: Document = {
@@ -51,7 +68,18 @@ export const docRouter = j.router({
       updatedAt: new Date(),
     }
 
-    await redis.json.set(`context:doc:${documentId}`, "$", document)
+    const meta: DocumentMeta = {
+      id: documentId,
+      title: "",
+      updatedAt: document.updatedAt,
+    }
+
+    after(async () => {
+      await Promise.all([
+        redis.json.set(`doc:${user.email}:${documentId}`, "$", document),
+        redis.hset(`docs:${user.email}`, { [documentId]: meta }),
+      ])
+    })
 
     return c.superjson({
       success: true,
@@ -60,17 +88,18 @@ export const docRouter = j.router({
     })
   }),
 
-  get: publicProcedure
+  get: privateProcedure
     .input(
       z.object({
         documentId: z.string(),
       })
     )
-    .query(async ({ c, input }) => {
+    .query(async ({ c, ctx, input }) => {
+      const { user } = ctx
       const { documentId } = input
 
       const document = await redis.json.get<Document>(
-        `context:doc:${documentId}`
+        `doc:${user.email}:${documentId}`
       )
 
       if (!document) {
@@ -83,30 +112,32 @@ export const docRouter = j.router({
       })
     }),
 
-  list: publicProcedure.query(async ({ c }) => {
-    const keys = await redis.keys("context:doc:*")
+  list: privateProcedure.query(async ({ c, ctx }) => {
+    const { user } = ctx
+    const docs = await redis.hgetall(`docs:${user.email}`) || {}
 
-    const documents: Document[] = []
-
-    for (const key of keys) {
-      const document = await redis.json.get<Document>(key)
-      if (document) documents.push(document)
-    }
-
-    documents.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    const documents: DocumentMeta[] = Object.values(docs)
+      .map((doc) => doc as DocumentMeta)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 
     return c.superjson(documents)
   }),
 
-  delete: publicProcedure
+  delete: privateProcedure
     .input(
       z.object({
         documentId: z.string(),
       })
     )
-    .mutation(async ({ c, input }) => {
+    .mutation(async ({ c, ctx, input }) => {
+      const { user } = ctx
       const { documentId } = input
-      await redis.del(`context:doc:${documentId}`)
+
+      await Promise.all([
+        redis.del(`doc:${user.email}:${documentId}`),
+        redis.hdel(`docs:${user.email}`, documentId),
+      ])
+
       return c.superjson({
         success: true,
         documentId,

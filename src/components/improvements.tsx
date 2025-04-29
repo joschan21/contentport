@@ -1,266 +1,173 @@
 import { useTweetContext } from "@/hooks/tweet-ctx"
-import { DiffWithReplacement } from "@/server/routers/improvement-router"
+import { cn, DiffWithReplacement } from "@/lib/utils"
 import { Diff } from "diff-match-patch"
-import { Sparkles, MoreHorizontal } from "lucide-react"
+import {
+  Sparkles,
+  MoreHorizontal,
+  Check,
+  X,
+  Info,
+  ChevronRight,
+} from "lucide-react"
 import { useState } from "react"
+import { Button } from "./ui/button"
 
 const CategoryIcon = ({ category }: { category: string }) => {
+  // Define colors for different categories
+  const getCategoryColors = (category: string) => {
+    switch (category) {
+      case "clarity":
+        return "bg-blue-100 dark:bg-blue-900/30 text-blue-500"
+      case "write-initial-tweet":
+        return "bg-green-100 dark:bg-green-900/30 text-green-500"
+      case "tone":
+        return "bg-purple-100 dark:bg-purple-900/30 text-purple-500"
+      case "grammar":
+        return "bg-amber-100 dark:bg-amber-900/30 text-amber-500"
+      default:
+        return "bg-blue-100 dark:bg-blue-900/30 text-blue-500"
+    }
+  }
+
+  const colors = getCategoryColors(category)
+
   return (
-    <div className="size-4 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-      <div className="size-2 rounded-full bg-blue-500" />
+    <div
+      className={`size-4 rounded-full ${colors.split(" ")[0]} flex items-center justify-center`}
+    >
+      <div className={`size-2 rounded-full ${colors.split(" ")[2]}`} />
     </div>
   )
 }
 
-type SuggestionProps = {
+const CATEGORY_LABELS: Record<string, string> = {
+  "write-initial-content": "Initial Content",
+  clarity: "Clarity",
+  tone: "Tone",
+  grammar: "Grammar",
+}
+
+const ACTION_ICONS: Record<string, React.ReactNode> = {
+  Add: <span>✍️</span>,
+  Remove: <span>❌</span>,
+  Replace: <span>💡</span>,
+}
+
+type SuggestionCardProps = {
   diff: DiffWithReplacement
-  isExpanded: boolean
-  onExpand: () => void
   onAccept: () => void
+  onReject: () => void
 }
 
-const Deletion = ({
+export function SuggestionCard({
   diff,
-  isExpanded,
-  onExpand,
   onAccept,
-}: SuggestionProps) => {
+  onReject,
+}: SuggestionCardProps) {
+  const label = CATEGORY_LABELS[diff.category] || diff.category
+  const actionLabel =
+    diff.type === -1 ? "Remove" : diff.type === 1 ? "Add" : "Replace"
+  const icon = ACTION_ICONS[actionLabel]
+  const [isExpanded, setIsExpanded] = useState(false)
+
   return (
     <div
-      onClick={onExpand}
-      className={`group border-b border-gray-100 dark:border-gray-800 last:border-0 cursor-pointer transition-all duration-200 ${
-        isExpanded
-          ? "bg-gray-50 dark:bg-gray-900/30"
-          : "hover:bg-gray-50 dark:hover:bg-gray-900/30"
-      }`}
+      className="border bg-white rounded-md px-4 py-2"
+      tabIndex={0}
+      aria-label={`Suggestion: ${label}`}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onAccept()
+        if (e.key === "Escape") onReject()
+      }}
     >
-      <div className="px-3 py-2">
-        {!isExpanded ? (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <CategoryIcon category={diff.category || "Clarity"} />
-              <span className="text-gray-900 dark:text-gray-100 font-medium">
-                Remove sentence
-              </span>
-            </div>
-            <div className="pl-6">
-              <span className="text-gray-500">{diff.text.slice(0, 30)}...</span>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <CategoryIcon category={diff.category || "Clarity"} />
-              <span className="text-gray-900 dark:text-gray-100">
-                Clarity · Remove for clarity
-              </span>
-              <button
-                className="ml-auto text-gray-500 hover:text-gray-700"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <p className="text-base text-gray-900 dark:text-gray-100">
+      <div className="flex items-center">
+        <div
+          className="flex items-center flex-1 cursor-pointer"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <span className="text-sm mr-2">{icon}</span>
+          <span className="text-stone-700 text-sm">{actionLabel} content</span>
+          <ChevronRight
+            className={`w-4 h-4 ml-2 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+          />
+        </div>
+        <div className="flex gap-2 ml-auto">
+          <Button onClick={onAccept} size="sm">
+            <Check className="w-4 h-4" /> Apply
+          </Button>
+          <Button onClick={onReject} variant="ghost" size="sm">
+            <X className="w-4 h-4" /> Reject
+          </Button>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div
+          className={cn(
+            "mt-3 text-sm leading-relaxed px-2 py-2 rounded  whitespace-pre-wrap",
+            {
+              "bg-emerald-50": diff.type === 1,
+              "bg-rose-50": diff.type === -1,
+              "bg-teal-50": diff.type === 2,
+            }
+          )}
+        >
+          {diff.contextBefore && (
+            <span className="text-stone-700">{diff.contextBefore}</span>
+          )}
+          {diff.type === -1 ? (
+            <span className="line-through font-medium text-stone-400">
+              {diff.text.startsWith(" ") ? null : " "}
+              {diff.text}
+              {diff.text.endsWith(" ") ? null : " "}
+            </span>
+          ) : diff.type === 1 ? (
+            <span className="text-emerald-700 font-medium">
+              {diff.text.startsWith(" ") ? null : " "}
+              {diff.text}
+            </span>
+          ) : diff.type === 2 ? (
+            <>
+              {" "}
+              <span className="line-through font-medium text-stone-400">
                 {diff.text}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onAccept()
-                  }}
-                >
-                  Accept
-                </button>
-                <button
-                  className="px-3 py-1 text-gray-600 hover:text-gray-900 text-sm font-medium"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onExpand()
-                  }}
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-const Replacement = ({
-  diff,
-  isExpanded,
-  onExpand,
-  onAccept,
-}: SuggestionProps) => {
-  return (
-    <div
-      onClick={onExpand}
-      className={`group border-b border-gray-100 dark:border-gray-800 last:border-0 cursor-pointer transition-all duration-200 ${
-        isExpanded
-          ? "bg-gray-50 dark:bg-gray-900/30"
-          : "hover:bg-gray-50 dark:hover:bg-gray-900/30"
-      }`}
-    >
-      <div className="px-3 py-2">
-        {!isExpanded ? (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <CategoryIcon category={diff.category || "Clarity"} />
-              <span className="text-gray-900 dark:text-gray-100 font-medium">
-                Rephrase sentence
               </span>
-            </div>
-            <div className="pl-6">
-              <span className="text-gray-500">{diff.text.slice(0, 30)}...</span>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <CategoryIcon category={diff.category || "Clarity"} />
-              <span className="text-gray-900 dark:text-gray-100">
-                Clarity · Rewrite for clarity
-              </span>
-              <button
-                className="ml-auto text-gray-500 hover:text-gray-700"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <p className="text-base text-gray-900 dark:text-gray-100">
-                Change '<span className="replacement-node">{diff.text}</span>'
-                <span className="mx-1">to</span>
-                <span className="text-base text-gray-900 dark:text-gray-100">
-                  '<span className="replacement-node">{diff.replacement}</span>'
-                </span>
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onAccept()
-                  }}
-                >
-                  Accept
-                </button>
-                <button
-                  className="px-3 py-1 text-gray-600 hover:text-gray-900 text-sm font-medium"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onExpand()
-                  }}
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-const Addition = ({
-  diff,
-  isExpanded,
-  onExpand,
-  onAccept,
-}: SuggestionProps) => {
-  return (
-    <div
-      onClick={onExpand}
-      className={`group border-b border-gray-100 dark:border-gray-800 last:border-0 cursor-pointer transition-all duration-200 ${
-        isExpanded
-          ? "bg-gray-50 dark:bg-gray-900/30"
-          : "hover:bg-gray-50 dark:hover:bg-gray-900/30"
-      }`}
-    >
-      <div className="px-3 py-2">
-        {!isExpanded ? (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <CategoryIcon category={diff.category || "Clarity"} />
-              <span className="text-gray-900 dark:text-gray-100 font-medium">
-                Add sentence
-              </span>
-            </div>
-            <div className="pl-6">
-              <span className="text-gray-500">{diff.text.slice(0, 30)}...</span>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <CategoryIcon category={diff.category || "Clarity"} />
-              <span className="text-gray-900 dark:text-gray-100">
-                Clarity · Add for clarity
-              </span>
-              <button
-                className="ml-auto text-gray-500 hover:text-gray-700"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <p className="text-base text-gray-900 dark:text-gray-100">
-                <span className="text-blue-600 dark:text-blue-400">
-                  {diff.text}
-                </span>
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onAccept()
-                  }}
-                >
-                  Accept
-                </button>
-                <button
-                  className="px-3 py-1 text-gray-600 hover:text-gray-900 text-sm font-medium"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onExpand()
-                  }}
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+              <span className="text-emerald-700 font-medium">
+                {" "}
+                {diff.replacement}
+              </span>{" "}
+            </>
+          ) : null}
+          {diff.contextAfter && (
+            <span className="text-stone-700">{diff.contextAfter}</span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
 export const Improvements = () => {
-  const { tweets, acceptImprovement } = useTweetContext()
+  const { tweets, acceptImprovement, rejectImprovement } = useTweetContext()
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const allImprovements = tweets
-    .flatMap(
-      (tweet) =>
-        tweet.improvements?.clarity?.map((diff, index) => ({
-          id: `${tweet.id}-${index}`,
-          tweet,
-          diff,
-          index,
-        })) ?? []
-    )
+    .flatMap((tweet) => {
+      // Get all improvement categories from the tweet
+      const improvementCategories = Object.keys(tweet.improvements || {})
+
+      // Flatten all improvements from all categories
+      return improvementCategories.flatMap(
+        (category) =>
+          tweet.improvements?.[category]?.map((diff, index) => ({
+            id: `${tweet.id}-${category}-${index}`,
+            tweet,
+            diff,
+            index,
+            category,
+          })) ?? []
+      )
+    })
     .filter(
       (
         item
@@ -269,6 +176,7 @@ export const Improvements = () => {
         tweet: any
         diff: DiffWithReplacement
         index: number
+        category: string
       } =>
         item.diff !== undefined &&
         (item.diff.type === 2 || item.diff.type === -1 || item.diff.type === 1)
@@ -286,55 +194,55 @@ export const Improvements = () => {
     setExpandedId(null)
   }
 
+  const handleRejectImprovement = (
+    tweetId: string,
+    diff: DiffWithReplacement
+  ) => {
+    rejectImprovement(tweetId, diff)
+    setExpandedId(null)
+  }
+
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+    <div className="space-y-1">
       {allImprovements.length > 0 ? (
         <>
-          {allImprovements.map(({ id, tweet, diff }) => {
-            // We've already filtered out undefined tweets in the filter above
+          {allImprovements.map(({ id, tweet, diff, category }) => {
             const tweetId = tweet.id
 
             if (diff.type === 2) {
               return (
-                <Replacement
+                <SuggestionCard
                   key={id}
                   diff={diff}
-                  isExpanded={id === expandedId}
-                  onExpand={() => setExpandedId(id === expandedId ? null : id)}
                   onAccept={() => handleAcceptImprovement(tweetId, diff)}
+                  onReject={() => handleRejectImprovement(tweetId, diff)}
                 />
               )
             }
             if (diff.type === 1) {
               return (
-                <Addition
+                <SuggestionCard
                   key={id}
                   diff={diff}
-                  isExpanded={id === expandedId}
-                  onExpand={() => setExpandedId(id === expandedId ? null : id)}
                   onAccept={() => handleAcceptImprovement(tweetId, diff)}
+                  onReject={() => handleRejectImprovement(tweetId, diff)}
                 />
               )
             }
             return (
-              <Deletion
+              <SuggestionCard
                 key={id}
                 diff={diff}
-                isExpanded={id === expandedId}
-                onExpand={() => setExpandedId(id === expandedId ? null : id)}
                 onAccept={() => handleAcceptImprovement(tweetId, diff)}
+                onReject={() => handleRejectImprovement(tweetId, diff)}
               />
             )
           })}
         </>
       ) : (
-        <div className="flex h-full flex-1 flex-col items-center justify-center text-center p-8">
-          <p className="text-4xl leading-relaxed">🎉</p>
-          <p className="text-base text-stone-800 font-medium">
-            No more improvements!
-          </p>
-          <p className="text-sm/6 text-muted-foreground mt-1">
-            Possible improvements will show up here.
+        <div className="flex h-full text-left">
+          <p className="inline-flex gap-0.5 items-center rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
+            <Check className="size-3" /> All changes applied
           </p>
         </div>
       )}

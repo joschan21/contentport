@@ -1,22 +1,25 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { auth } from "./lib/auth"
+import { redis } from "./lib/redis"
 
-export function middleware(request: NextRequest) {
-  if (process.env.NODE_ENV === "development") {
-    return NextResponse.next()
+export async function middleware(req: NextRequest) {
+  const url = req.nextUrl.clone()
+  const { pathname } = req.nextUrl
+
+  if (pathname.includes("/studio")) {
+    const session = await auth.api.getSession({ headers: req.headers })
+    const allowlist = await redis.smembers("allowlist")
+
+    if (session && allowlist.includes(session.user.email)) {
+      return NextResponse.next()
+    } else {
+      url.pathname = "/"
+      return NextResponse.redirect(url)
+    }
   }
 
-  const { pathname } = request.nextUrl
-
-  if (pathname === "/") {
-    return NextResponse.next()
-  }
-
-  if (pathname.startsWith("/api/waitlist")) {
-    return NextResponse.next()
-  }
-
-  return NextResponse.redirect(new URL("/", request.url))
+  return NextResponse.next()
 }
 
 export const config = {

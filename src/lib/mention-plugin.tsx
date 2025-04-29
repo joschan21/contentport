@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query"
 import { client } from "@/lib/client"
 import { MentionNode, $createMentionNode } from "./nodes"
 import { useMentionContext } from "@/hooks/mention-ctx"
+import { useDocumentContext } from "@/hooks/document-ctx"
 
 const MENTION_TRIGGER = "@"
 
@@ -43,6 +44,7 @@ export function MentionPlugin() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
   const { addAttachedDocument, attachedDocumentIDs } = useMentionContext()
+  const { documentTitles } = useDocumentContext()
 
   const { data: documentsData } = useQuery({
     queryKey: ["documents"],
@@ -65,9 +67,14 @@ export function MentionPlugin() {
         const text = selection.anchor.getNode().getTextContent()
         const lastChar = text[selection.anchor.offset - 1]
 
+        const data = documentsData?.map((doc) => ({
+          ...doc,
+          title: documentTitles[doc.id] || doc.title || "Untitled document",
+        }))
+
         if (lastChar === MENTION_TRIGGER) {
           setShowSuggestions(true)
-          setSuggestions(documentsData || [])
+          setSuggestions(data || [])
           setSelectedIndex(0)
           lastTriggerRef.current = selection.anchor.offset - 1
 
@@ -81,7 +88,7 @@ export function MentionPlugin() {
             lastTriggerRef.current + 1,
             selection.anchor.offset
           )
-          const filtered = (documentsData || []).filter((doc) =>
+          const filtered = (data || []).filter((doc) =>
             doc.id.toLowerCase().includes(searchText.toLowerCase())
           )
           setSuggestions(filtered)
@@ -93,7 +100,7 @@ export function MentionPlugin() {
     return () => {
       removeListener()
     }
-  }, [editor, documentsData])
+  }, [editor, documentsData, documentTitles])
 
   // todo: small bug when deleting if mention is the only thing in the editor
   const insertMention = (
@@ -103,7 +110,6 @@ export function MentionPlugin() {
     if (!nodeToReplace) return
 
     addAttachedDocument(document.id)
-    console.log("added", document.id)
 
     const text = nodeToReplace.getTextContent()
     const triggerOffset = lastTriggerRef.current ?? 0

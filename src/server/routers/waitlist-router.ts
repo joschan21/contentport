@@ -1,8 +1,8 @@
+import { Ratelimit } from "@upstash/ratelimit"
+import { HTTPException } from "hono/http-exception"
 import { z } from "zod"
 import { redis } from "../../lib/redis"
 import { j, publicProcedure } from "../jstack"
-import { HTTPException } from "hono/http-exception"
-import { Ratelimit } from "@upstash/ratelimit"
 
 const ratelimit = new Ratelimit({
   redis,
@@ -41,7 +41,7 @@ export const waitlistRouter = j.router({
       return c.json({ success: true })
     }),
   count: publicProcedure.get(async ({ c }) => {
-    const count = await redis.get<string>("waitlist:count") || "0"
+    const count = (await redis.get<string>("waitlist:count")) || "0"
     return c.json({ count: parseInt(count) })
   }),
 })

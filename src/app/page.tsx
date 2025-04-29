@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { authClient } from "@/lib/auth-client"
 import { client } from "@/lib/client"
 import NumberFlow from "@number-flow/react"
 import { useMutation, useQuery } from "@tanstack/react-query"
@@ -45,33 +46,21 @@ const Page = () => {
     joinWaitlist()
   }
 
-  // const handleAccess = async () => {
-  //   const data = await authClient.signIn.social(
-  //     {
-  //       provider: "google",
-  //     },
-  //     {
-  //       onSuccess(context) {
-  //         window.location.href = "/dashboard"
-  //       },
-  //       onError(context) {
-  //         toast.error("Failed to sign in. Please try again.")
-  //       },
-  //     }
-  //   )
-  // }
+  const handleAccess = async () => {
+    await authClient.signIn.social({ provider: "google" })
+  }
 
   return (
     <section>
       <div className="flex relative z-10 min-h-screen items-center text-base leading-relaxed justify-center bg-stone-100 p-4">
-        {/* <Button
+        <Button
           onClick={handleAccess}
           variant="link"
           size="sm"
           className="absolute z-10 top-4 right-4 text-stone-600 hover:text-stone-900 hover:bg-stone-200/50"
         >
           access contentport 🔒
-        </Button> */}
+        </Button>
         <div
           className="absolute inset-0 z-0 pointer-events-none"
           style={{
