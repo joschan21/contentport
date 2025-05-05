@@ -8,7 +8,7 @@ interface Env {
 
 export const j = jstack.init<Env>()
 
-const allowlist = ["neske.joscha@gmail.com", "jcodog@cleoai.cloud"]
+const allowlist = ["neske.joscha@gmail.com", "jcodog@cleoai.cloud", "hola@tomasholtz.com"]
 
 const authMiddleware = j.middleware(async ({ c, ctx, next }) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
