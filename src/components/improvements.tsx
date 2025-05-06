@@ -63,12 +63,13 @@ export function SuggestionCard({
   diff,
   onAccept,
   onReject,
-}: SuggestionCardProps) {
+  isFirst = false,
+}: SuggestionCardProps & { isFirst?: boolean }) {
   const label = CATEGORY_LABELS[diff.category] || diff.category
   const actionLabel =
     diff.type === -1 ? "Remove" : diff.type === 1 ? "Add" : "Replace"
   const icon = ACTION_ICONS[actionLabel]
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(isFirst)
 
   return (
     <div
@@ -130,21 +131,32 @@ export function SuggestionCard({
             <>
               {" "}
               <span className="line-through font-medium text-stone-400">
-                {diff.text}
+                {diff.text.trimEnd()}
               </span>
               <span className="text-emerald-700 font-medium">
                 {" "}
-                {diff.replacement}
+                {diff.replacement?.trimEnd()}
               </span>{" "}
             </>
           ) : null}
-          {diff.contextAfter && (
-            <span className="text-stone-700">{diff.contextAfter}</span>
-          )}
+          {diff.contextAfter ? (
+            <ContextAfter diff={diff} text={diff.contextAfter} />
+          ) : null}
         </div>
       )}
     </div>
   )
+}
+
+function ContextAfter({
+  diff,
+  text,
+}: {
+  diff: DiffWithReplacement
+  text: string
+}) {
+  if (diff.type === 2 && diff.text.endsWith("\n")) return null
+  return <span className="text-stone-700">{text}</span>
 }
 
 export const Improvements = () => {
@@ -153,10 +165,7 @@ export const Improvements = () => {
 
   const allImprovements = tweets
     .flatMap((tweet) => {
-      // Get all improvement categories from the tweet
       const improvementCategories = Object.keys(tweet.improvements || {})
-
-      // Flatten all improvements from all categories
       return improvementCategories.flatMap(
         (category) =>
           tweet.improvements?.[category]?.map((diff, index) => ({
@@ -203,49 +212,31 @@ export const Improvements = () => {
   }
 
   return (
-    <div className="space-y-1">
-      {allImprovements.length > 0 ? (
-        <>
-          {allImprovements.map(({ id, tweet, diff, category }) => {
-            const tweetId = tweet.id
-
-            if (diff.type === 2) {
+    <div className="relative w-full">
+      <div className="h-full w-full">
+        {allImprovements.length > 0 ? (
+          <div className="space-y-1" >
+            {allImprovements.map(({ id, tweet, diff, category }, index) => {
+              const tweetId = tweet.id
               return (
                 <SuggestionCard
                   key={id}
                   diff={diff}
                   onAccept={() => handleAcceptImprovement(tweetId, diff)}
                   onReject={() => handleRejectImprovement(tweetId, diff)}
+                  isFirst={index === 0}
                 />
               )
-            }
-            if (diff.type === 1) {
-              return (
-                <SuggestionCard
-                  key={id}
-                  diff={diff}
-                  onAccept={() => handleAcceptImprovement(tweetId, diff)}
-                  onReject={() => handleRejectImprovement(tweetId, diff)}
-                />
-              )
-            }
-            return (
-              <SuggestionCard
-                key={id}
-                diff={diff}
-                onAccept={() => handleAcceptImprovement(tweetId, diff)}
-                onReject={() => handleRejectImprovement(tweetId, diff)}
-              />
-            )
-          })}
-        </>
-      ) : (
-        <div className="flex h-full text-left">
-          <p className="inline-flex gap-0.5 items-center rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
-            <Check className="size-3" /> All changes applied
-          </p>
-        </div>
-      )}
+            })}
+          </div>
+        ) : (
+          <div className="flex justify-center h-full w-full text-left bg-emerald-50 ring-1 ring-emerald-600/20 ring-inset rounded-md">
+            <p className="inline-flex gap-0.5 items-center px-2 py-1 text-xs font-medium text-emerald-700 ">
+              <Check className="size-3" /> All applied
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -280,7 +280,7 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
       const p = $createParagraphNode()
       diffs.forEach((diff) => {
         if (diff.type === 2) {
-          const node = new ReplacementNode(diff.text)
+          const node = new ReplacementNode(diff.replacement)
           const key = node.getKey()
 
           improvements.current.set(diff.id, key)

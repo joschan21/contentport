@@ -46,8 +46,8 @@ export const docRouter = j.router({
       }
 
       await Promise.all([
-        redis.json.set(`doc:${user.email}:${documentId}`, "$", document),
-        redis.hset(`docs:${user.email}`, { [documentId]: meta }),
+        redis.json.set(`context-doc:${user.email}:${documentId}`, "$", document),
+        redis.hset(`context-docs:${user.email}`, { [documentId]: meta }),
       ])
 
       return c.superjson({
@@ -76,8 +76,8 @@ export const docRouter = j.router({
 
     after(async () => {
       await Promise.all([
-        redis.json.set(`doc:${user.email}:${documentId}`, "$", document),
-        redis.hset(`docs:${user.email}`, { [documentId]: meta }),
+        redis.json.set(`context-doc:${user.email}:${documentId}`, "$", document),
+        redis.hset(`context-docs:${user.email}`, { [documentId]: meta }),
       ])
     })
 
@@ -99,7 +99,7 @@ export const docRouter = j.router({
       const { documentId } = input
 
       const document = await redis.json.get<Document>(
-        `doc:${user.email}:${documentId}`
+        `context-doc:${user.email}:${documentId}`
       )
 
       if (!document) {
@@ -114,7 +114,7 @@ export const docRouter = j.router({
 
   list: privateProcedure.query(async ({ c, ctx }) => {
     const { user } = ctx
-    const docs = await redis.hgetall(`docs:${user.email}`) || {}
+    const docs = await redis.hgetall(`context-docs:${user.email}`) || {}
 
     const documents: DocumentMeta[] = Object.values(docs)
       .map((doc) => doc as DocumentMeta)
@@ -134,8 +134,8 @@ export const docRouter = j.router({
       const { documentId } = input
 
       await Promise.all([
-        redis.del(`doc:${user.email}:${documentId}`),
-        redis.hdel(`docs:${user.email}`, documentId),
+        redis.del(`context-doc:${user.email}:${documentId}`),
+        redis.hdel(`context-docs:${user.email}`, documentId),
       ])
 
       return c.superjson({

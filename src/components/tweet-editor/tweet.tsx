@@ -14,15 +14,11 @@ import {
   Bold,
   Check,
   Italic,
-  Loader2,
   Smile,
-  Sparkles,
-  Trash2,
-  X,
   Twitter,
+  X
 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { useQueryState } from "nuqs"
 
 interface TweetProps {
   id: string

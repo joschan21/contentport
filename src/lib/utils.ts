@@ -19,6 +19,17 @@ export type DiffWithReplacement = {
   contextAfter?: string
 }
 
+export function diff_lineMode(text1: string, text2: string) {
+  var dmp = new diff_match_patch()
+  var a = dmp.diff_linesToChars_(text1, text2)
+  var lineText1 = a.chars1
+  var lineText2 = a.chars2
+  var lineArray = a.lineArray
+  var diffs = dmp.diff_main(lineText1, lineText2, false)
+  dmp.diff_charsToLines_(diffs, lineArray)
+  return diffs
+}
+
 export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
   const processed: DiffWithReplacement[] = []
   const category =
@@ -33,25 +44,33 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
 
     if (!current?.[1].includes("\n") && !current![1].trim()) continue
 
+    // sometimes LLM did bullshit changes to just insert a space
+    // if (
+    //   current![0] === -1 &&
+    //   next![0] === 1 &&
+    //   current![1].trim() === next![1].trim()
+    // ) {
+    //   processed.push({
+    //     id: `diff-${i}`,
+    //     type: 0 as DiffType,
+    //     text: current![1],
+    //     category,
+    //   })
+    //   i++
+    //   continue
+    // }
+
     const getContext = (diffs: Diff[], index: number): string => {
       let context = ""
       let wordCount = 0
-      let currentLine = ""
-      
-      // Find the line containing our diff
-      const currentDiff = diffs[index]
-      const currentText = currentDiff![1]
-      const currentLineStart = currentText.lastIndexOf("\n") + 1
-      const currentLineText = currentText.slice(currentLineStart)
-      
-      // Look through previous diffs until we find the start of the line
+
       for (let j = 1; j <= 3; j++) {
         const diff = diffs[index - j]
         if (diff && diff[0] === 0) {
           const text = diff[1]
           const lines = text.split("\n")
           const lastLine = lines[lines.length - 1]
-          
+
           if (lastLine?.trim()) {
             const words = lastLine.trim().split(/\s+/)
             for (let i = words.length - 1; i >= 0; i--) {
@@ -61,33 +80,23 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
               }
             }
           }
-          
-          // If we found a newline, stop looking back
-          if (text.includes("\n")) break
         }
       }
-      
+
       return wordCount === 2 ? "..." + context : context
     }
 
     const getContextAfter = (diffs: Diff[], index: number): string => {
       let context = ""
       let wordCount = 0
-      
-      // Find the line containing our diff
-      const currentDiff = diffs[index]
-      const currentText = currentDiff![1]
-      const currentLineEnd = currentText.indexOf("\n")
-      const currentLineText = currentLineEnd === -1 ? currentText : currentText.slice(0, currentLineEnd)
-      
-      // Look through next diffs until we find the end of the line
+
       for (let j = 1; j <= 3; j++) {
         const diff = diffs[index + j]
         if (diff && diff[0] === 0) {
           const text = diff[1]
           const lines = text.split("\n")
           const firstLine = lines[0]
-          
+
           if (firstLine?.trim()) {
             const words = firstLine.trim().split(/\s+/)
             for (let i = 0; i < words.length; i++) {
@@ -97,16 +106,52 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
               }
             }
           }
-          
-          // If we found a newline, stop looking forward
-          if (text.includes("\n")) break
         }
       }
-      
+
       return wordCount === 2 ? context + "..." : context
     }
 
-    if (current![0] === -1 && next && next[0] === 1) {
+    // Check if we have a sequence of diffs that should be combined
+    // Example: [-1, 'stay'], [0, ' '], [-1, 'tuned'] should become [-1, 'stay tuned']
+    // And [1, "can't wait to"], [0, ' '], [1, 'show it in action'] should become [1, "can't wait to show it in action"]
+    if (
+      current &&
+      next &&
+      next[0] === current[0] &&
+      i + 2 < diffs.length &&
+      diffs[i + 1]?.[0] === 0 &&
+      !diffs[i + 1]?.[1].includes("\n") &&
+      diffs[i + 1]?.[1].trim() === "" &&
+      diffs[i + 2]?.[0] === current[0]
+    ) {
+      // Combine the diffs
+      const combinedText = current[1] + diffs[i + 1]![1] + diffs[i + 2]![1]
+
+      if (current[0] === -1 && i + 3 < diffs.length && diffs[i + 3]?.[0] === 1) {
+        processed.push({
+          id: `diff-${i}-replacement`,
+          type: 2 as DiffType,
+          text: combinedText,
+          category,
+          replacement: diffs[i + 3]![1],
+          contextBefore: getContext(diffs, i),
+          // contextAfter: getContextAfter(diffs, i + 3),
+        })
+        i += 3 // Skip the next three diffs
+      } else {
+        // This is just an addition or deletion
+        processed.push({
+          id: `diff-${i}`,
+          type: current[0] as DiffType,
+          text: combinedText,
+          category,
+          contextBefore: getContext(diffs, i),
+          // contextAfter: getContextAfter(diffs, i + 2),
+        })
+        i += 2 // Skip the next two diffs
+      }
+    } else if (current![0] === -1 && next && next[0] === 1) {
       processed.push({
         id: `diff-${i}-replacement`,
         type: 2 as DiffType,
@@ -114,7 +159,7 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
         category,
         replacement: next![1],
         contextBefore: getContext(diffs, i),
-        contextAfter: getContextAfter(diffs, i + 1),
+        // contextAfter: getContextAfter(diffs, i + 1),
       })
       i++
     } else {
@@ -124,7 +169,7 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
         text: current![1],
         category,
         contextBefore: getContext(diffs, i),
-        contextAfter: getContextAfter(diffs, i),
+        // contextAfter: getContextAfter(diffs, i),
       })
     }
   }

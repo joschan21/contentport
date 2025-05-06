@@ -1,9 +1,5 @@
 "use client"
 
-import { LexicalComposer } from "@lexical/react/LexicalComposer"
-import { Plus } from "lucide-react"
-import { Button } from "../ui/button"
-import Tweet from "./tweet"
 import { useTweetContext } from "@/hooks/tweet-ctx"
 import {
   AdditionNode,
@@ -11,6 +7,8 @@ import {
   ReplacementNode,
   UnchangedNode,
 } from "@/lib/nodes"
+import { LexicalComposer } from "@lexical/react/LexicalComposer"
+import Tweet from "./tweet"
 
 const initialConfig = {
   namespace: "tweet-editor",

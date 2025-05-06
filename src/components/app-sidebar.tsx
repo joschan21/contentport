@@ -553,7 +553,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                                           />
                                           <div className="flex flex-col gap-2 p-2 pt-4 text-sm/6">
                                             <div className="flex justify-between">
-                                              <p>Suggested Changes:</p>
+                                              <p>Suggestions:</p>
                                             </div>
 
                                             <Improvements />

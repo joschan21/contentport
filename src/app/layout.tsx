@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 const elegant = Instrument_Serif({
   weight: "400",
   variable: "--font-elegant",
+  style: "italic",
   subsets: ["latin"],
 })
 

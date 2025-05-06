@@ -1,71 +1,64 @@
-// import "dotenv/config"
-// import { TwitterApi } from "twitter-api-v2"
+import "dotenv/config"
+import { TwitterApi } from "twitter-api-v2"
 
-// const TWITTER_AUTH_TOKEN = process.env.TWITTER_AUTH_TOKEN
+const TWITTER_AUTH_TOKEN = process.env.TWITTER_BEARER_TOKEN
 
-// interface TwitterUser {
-//   data: {
-//     id: string
-//   }
-// }
+interface Tweet {
+  text: string
+  created_at: string
+  public_metrics?: {
+    like_count: number
+  }
+}
 
-// interface Tweet {
-//   text: string
-//   created_at: string
-// }
+interface TwitterResponse {
+  data: Tweet[]
+}
 
-// interface TwitterTweets {
-//   data: Tweet[]
-// }
+interface UserResponse {
+  data: {
+    id: string
+  }
+}
 
-// const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
+async function getRecentTweets(username: string): Promise<Tweet[]> {
+  try {
+    const userData = await fetch(
+      `https://api.twitter.com/2/users/by/username/${username}`,
+      {
+        headers: { Authorization: `Bearer ${TWITTER_AUTH_TOKEN}` }
+      }
+    )
+    const user = await userData.json() as UserResponse
 
-// async function getRecentTweets(username: string) {
-//   const userData = await client.v2.userByUsername(username)
-//   console.log("user data", userData)
+    const tweetsResponse = await fetch(
+      `https://api.twitter.com/2/users/${user.data.id}/tweets?max_results=10&tweet.fields=created_at,text,public_metrics&exclude=replies,retweets`,
+      { headers: { Authorization: `Bearer ${TWITTER_AUTH_TOKEN}` } }
+    )
+    const tweets = await tweetsResponse.json() as TwitterResponse
 
-//   return
+    return tweets.data
+  } catch (err) {
+    console.error(err)
+    throw new Error("Failed to fetch tweets")
+  }
+}
 
-//   try {
-//     // Get user ID
-//     const userResponse = await fetch(
-//       `https://api.twitter.com/2/users/by/username/${username}`,
-//       {
-//         headers: { Authorization: `Bearer ${TWITTER_AUTH_TOKEN}` },
-//       }
-//     )
-//     const userData = (await userResponse.json()) as TwitterUser
+const username = "witsdev"
 
-//     console.log("userdata", userData)
-
-//     // Get tweets (excluding replies)
-//     const tweetsResponse = await fetch(
-//       `https://api.twitter.com/2/users/${userData.data.id}/tweets?max_results=30&tweet.fields=created_at,text&exclude=replies,retweets`,
-//       { headers: { Authorization: `Bearer ${TWITTER_AUTH_TOKEN}` } }
-//     )
-//     const tweetsData = (await tweetsResponse.json()) as TwitterTweets
-
-//     return tweetsData.data
-//   } catch (err) {
-//     console.error(err)
-//     throw new Error()
-//   }
-// }
-
-// const username = "upstash"
-
-// getRecentTweets(username)
-//   .then((tweets) => {
-//     console.log(`\nRecent tweets from @${username}:\n`)
-//     tweets.forEach((tweet, i) => {
-//       console.log(tweet.text)
-
-//       if (i < tweets.length - 1) {
-//         console.log("\n---\n")
-//       }
-//     })
-//   })
-//   .catch((error) => {
-//     console.error("Error:", error)
-//     process.exit(1)
-//   })
+getRecentTweets(username)
+  .then((tweets) => {
+    if (!tweets) return
+    console.log(`\nRecent tweets from @${username}:\n`)
+    tweets.forEach((tweet, i) => {
+      console.log(tweet.text)
+      console.log(`Likes: ${tweet.public_metrics?.like_count || 0}`)
+      if (i < tweets.length - 1) {
+        console.log("\n---\n")
+      }
+    })
+  })
+  .catch((error) => {
+    console.error("Error:", error)
+    process.exit(1)
+  })
