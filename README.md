@@ -10,3 +10,8 @@ style tab:
 - add new style
 - import tweets
 - custom prompt
+
+edit tool should just know about:
+- current message
+- previous suggestions
+- current tweet state

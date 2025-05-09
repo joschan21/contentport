@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    reactStrictMode: false
+  rewrites: async () => {
+    return [
+      {
+        source: "/((?!api/).*)", // Negative lookahead to exclude /api/* routes
+        destination: "/static-app-shell",
+      },
+    ]
+  },
 }
 
 export default nextConfig

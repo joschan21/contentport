@@ -2,12 +2,12 @@ import { Metadata, Viewport } from "next"
 import "./globals.css"
 import { Instrument_Serif, JetBrains_Mono } from "next/font/google"
 import { GeistSans } from "geist/font/sans"
-import { Toaster } from "sonner"
+import { Toaster } from "react-hot-toast"
 import { ClientProviders } from "@/components/providers/client-providers"
 import { DocumentProvider } from "@/hooks/document-ctx"
 
 export const metadata: Metadata = {
-  title: "JStack App",
+  title: "contentport",
   description: "Created using JStack",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 }
@@ -40,10 +40,7 @@ export default function RootLayout({
         className={`${GeistSans.className} ${elegant.variable} ${jetBrainsMono.variable} antialiased light`}
       >
         <DocumentProvider>
-          <ClientProviders>
-            <Toaster position="top-center" />
-            {children}
-          </ClientProviders>
+          <ClientProviders>{children}</ClientProviders>
         </DocumentProvider>
       </body>
     </html>

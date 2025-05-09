@@ -1,10 +1,17 @@
 "use client"
 
-import { createContext, useContext, useState, ReactNode } from "react"
+import {
+  createContext,
+  Dispatch,
+  ReactNode,
+  SetStateAction,
+  useContext,
+} from "react"
+import { useLocalStorage } from "./use-local-storage"
 
 interface DocumentContextType {
-  documentTitles: Record<string, string>
-  setDocumentTitle: (id: string, title: string) => void
+  docs: SidebarDoc[]
+  setDocs: Dispatch<SetStateAction<SidebarDoc[]>>
 }
 
 const DocumentContext = createContext<DocumentContextType | undefined>(
@@ -15,20 +22,17 @@ interface DocumentProviderProps {
   children: ReactNode
 }
 
-export function DocumentProvider({ children }: DocumentProviderProps) {
-  const [documentTitles, setDocumentTitles] = useState<Record<string, string>>(
-    {}
-  )
+export interface SidebarDoc {
+  id: string
+  title: string
+  updatedAt: Date
+}
 
-  const setDocumentTitle = (id: string, title: string) => {
-    setDocumentTitles((prev) => ({
-      ...prev,
-      [id]: title,
-    }))
-  }
+export function DocumentProvider({ children }: DocumentProviderProps) {
+  const [docs, setDocs] = useLocalStorage<SidebarDoc[]>("context-docs", [])
 
   return (
-    <DocumentContext.Provider value={{ documentTitles, setDocumentTitle }}>
+    <DocumentContext.Provider value={{ docs, setDocs }}>
       {children}
     </DocumentContext.Provider>
   )

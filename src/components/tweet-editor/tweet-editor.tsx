@@ -1,6 +1,8 @@
 "use client"
 
 import { useTweetContext } from "@/hooks/tweet-ctx"
+import { useQuery } from "@tanstack/react-query"
+import { client } from "@/lib/client"
 import {
   AdditionNode,
   DeletionNode,
@@ -9,6 +11,19 @@ import {
 } from "@/lib/nodes"
 import { LexicalComposer } from "@lexical/react/LexicalComposer"
 import Tweet from "./tweet"
+import { useLocalStorage } from "@/hooks/use-local-storage"
+
+type Style = {
+  tweets: any[]
+  prompt: string | null
+  connectedAccount?: {
+    username: string
+    name: string
+    profile_image_url: string
+    id: string
+    verified: boolean
+  }
+}
 
 const initialConfig = {
   namespace: "tweet-editor",
@@ -26,8 +41,45 @@ const initialConfig = {
   nodes: [DeletionNode, AdditionNode, UnchangedNode, ReplacementNode],
 }
 
+export type ConnectedAccount = {
+  username: string
+  name: string
+  profile_image_url: string | undefined
+  verified?: boolean
+}
+
+export const DEFAULT_CONNECTED_ACCOUNT: ConnectedAccount = {
+  username: "contentport",
+  name: "contentport",
+  profile_image_url: undefined,
+  verified: true,
+}
+
 function TweetEditorContent() {
   const { tweets, createTweet, deleteTweet } = useTweetContext()
+
+  const [connectedAccount] = useLocalStorage(
+    "connected-account",
+    DEFAULT_CONNECTED_ACCOUNT
+  )
+
+  const { data } = useQuery<ConnectedAccount>({
+    queryKey: ["connected-account"],
+    queryFn: async () => {
+      const res = await client.settings.connectedAccount.$get()
+      const { account } = await res.json()
+      return account ?? DEFAULT_CONNECTED_ACCOUNT
+    },
+    initialData: connectedAccount,
+  })
+
+  const account = {
+    avatar: data.profile_image_url,
+    avatarFallback: data.name.slice(0, 1).toUpperCase(),
+    handle: data.username,
+    name: data.name,
+    verified: data.verified,
+  }
 
   return (
     <div className="relative z-10 w-full rounded-lg p-4 font-sans">
@@ -49,12 +101,7 @@ function TweetEditorContent() {
                 key={tweet.id}
                 id={tweet.id}
                 suggestion={tweet.suggestion}
-                author={{
-                  avatar: "",
-                  avatarFallback: "J",
-                  handle: "joshtriedcoding",
-                  name: "Josh tried coding",
-                }}
+                account={account}
                 onDelete={() => deleteTweet(tweet.id)}
               />
             </LexicalComposer>

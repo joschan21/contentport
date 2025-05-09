@@ -1,16 +1,16 @@
 "use client"
 
-import { useChat } from "@ai-sdk/react"
+import { Message, useChat } from "@ai-sdk/react"
 
 import {
   ArrowUp,
-  Bot,
-  Check,
   CheckCircle2,
-  Command,
-  Feather,
+  ChevronsLeft,
+  ChevronsRight,
   Loader2,
   Plus,
+  ReplyAllIcon,
+  Settings,
   Sparkles,
   User,
   X,
@@ -23,40 +23,47 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
 import { MentionProvider, useMentionContext } from "@/hooks/mention-ctx"
 import { useTweetContext } from "@/hooks/tweet-ctx"
+import { client } from "@/lib/client"
 import { MentionPlugin } from "@/lib/mention-plugin"
 import { MentionNode } from "@/lib/nodes"
 import PlaceholderPlugin from "@/lib/placeholder-plugin"
-import { cn } from "@/lib/utils"
 import { InferInput } from "@/server"
+import { EditTweetToolResult } from "@/server/routers/chat-router"
 import { LexicalComposer } from "@lexical/react/LexicalComposer"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import { ContentEditable } from "@lexical/react/LexicalContentEditable"
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary"
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin"
 import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { HTTPException } from "hono/http-exception"
 import { $getRoot } from "lexical"
 import { nanoid } from "nanoid"
 import { useQueryState } from "nuqs"
 import { KeyboardEvent as ReactKeyboardEvent } from "react"
 import { Improvements } from "./improvements"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
+import { Input } from "./ui/input"
 import { Separator } from "./ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
-import { EditTweetToolResult } from "@/server/routers/chat-router"
+import { Tabs, TabsContent } from "./ui/tabs"
 import { TextShimmer } from "./ui/text-shimmer"
 import { Textarea } from "./ui/textarea"
-import { Input } from "./ui/input"
-import { useMutation, useQuery } from "@tanstack/react-query"
-import { client } from "@/lib/client"
-import { HTTPException } from "hono/http-exception"
-import { toast } from "sonner"
+import { authClient } from "@/lib/auth-client"
+import toast, { Toaster } from "react-hot-toast"
+import { SidebarDoc, useDocumentContext } from "@/hooks/document-ctx"
+import { useParams, useSearchParams } from "next/navigation"
+import { useLocalStorage } from "@/hooks/use-local-storage"
+import {
+  ConnectedAccount,
+  DEFAULT_CONNECTED_ACCOUNT,
+} from "./tweet-editor/tweet-editor"
+import { Icons } from "./icons"
 
 const initialConfig = {
   namespace: "context-document-editor",
@@ -75,55 +82,62 @@ const initialConfig = {
 }
 
 type ChatInput = InferInput["chat"]["generate"]
+type HandleInputChange = (
+  e:
+    | React.ChangeEvent<HTMLInputElement>
+    | React.ChangeEvent<HTMLTextAreaElement>
+) => void
+type HandleSubmit = (
+  event?: React.FormEvent<HTMLFormElement>,
+  chatRequestOptions?: any
+) => void
 
 function ChatInput({
   handleInputChange,
   handleSubmit,
-  chatId,
+  messages,
+  status,
   startNewChat,
 }: {
-  handleInputChange: (
-    e:
-      | React.ChangeEvent<HTMLInputElement>
-      | React.ChangeEvent<HTMLTextAreaElement>
-  ) => void
-  handleSubmit: (
-    event?: React.FormEvent<HTMLFormElement>,
-    chatRequestOptions?: any
-  ) => void
-  chatId: string
-  startNewChat: () => void
+  handleInputChange: HandleInputChange
+  handleSubmit: HandleSubmit
+  messages: Message[]
+  status: "submitted" | "streaming" | "ready" | "error"
+  startNewChat: () => string
 }) {
   const [editor] = useLexicalComposerContext()
+  const searchParams = useSearchParams()
+  let chatId = searchParams.get("chatId")
 
-  const { attachedDocumentIDs } = useMentionContext()
+  const { attachedDocumentIDs, clearAttachedDocuments } = useMentionContext()
   const { tweets, contents } = useTweetContext()
-  const { messages, status } = useChat({
-    id: chatId,
-    body: {
-      chatId,
-    },
-    maxSteps: 5,
-    api: "/api/chat/generate",
-  })
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    if (messages.length === 0) {
-      startNewChat()
+    if (messages.length === 0 && !chatId) {
+      chatId = startNewChat()
     }
+
+    const attachedDocuments = attachedDocumentIDs.map((id) => {
+      const item = localStorage.getItem(`doc-${id}`)
+      const parsed = JSON.parse(item!) as { title: string; content: string }
+      return { id, ...parsed }
+    })
 
     handleSubmit(e, {
       body: {
-        attachedDocumentIDs,
-        tweets: tweets.map((tweet) => ({
+        chatId,
+        attachedDocuments,
+        tweet: tweets.map((tweet) => ({
           ...tweet,
-          content: contents.current.get(tweet.id),
-        })),
+          content: contents.current.get(tweet.id) ?? "",
+        }))[0],
       },
     })
 
+    // cleanup
+    clearAttachedDocuments()
     editor.update(() => {
       const root = $getRoot()
       root.clear()
@@ -191,26 +205,37 @@ function ChatInput({
 }
 
 function TweetSuggestionLoader() {
+  const [connectedAccount] = useLocalStorage(
+    "connected-account",
+    DEFAULT_CONNECTED_ACCOUNT
+  )
+
+  const account = {
+    avatar: connectedAccount.profile_image_url,
+    avatarFallback: connectedAccount.name.slice(0, 1).toUpperCase(),
+    handle: connectedAccount.username,
+    name: connectedAccount.name,
+    verified: connectedAccount.verified,
+  }
+
   return (
     <div>
       <div className="my-3 !mt-5 rounded-lg bg-white border border-dashed border-stone-200 shadow-sm overflow-hidden">
         <div className="flex items-start gap-3 p-6">
-          <Avatar className="h-10 w-10 rounded-full border border-border/30">
-            <AvatarImage
-              src="/images/profile_picture.jpg"
-              alt="@joshtriedcoding"
-            />
-            <AvatarFallback className="bg-primary/10 text-primary text-sm/6">
-              J
-            </AvatarFallback>
+          <Avatar className="size-12 rounded-full border-2 border-white bg-white">
+            <AvatarImage src={account.avatar} alt={account.handle} />
+            <AvatarFallback>{account.avatarFallback}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="text-base leading-relaxed font-semibold">
-                Josh tried coding
+            <div className="flex items-center gap-1">
+              <span className="font-semibold text-text-gray text-base">
+                {account.name}
               </span>
-              <span className="text-sm/6 text-muted-foreground">
-                @joshtriedcoding
+              {account.verified && (
+                <Icons.verificationBadge className="h-4 w-4" />
+              )}
+              <span className="text-stone-400 text-base">
+                @{account.handle}
               </span>
             </div>
             <div className="mt-1 text-base leading-relaxed whitespace-pre-line">
@@ -264,33 +289,54 @@ const TweetCard = ({ name, username, src, text }: TweetCard) => {
 export function TweetSuggestion({
   id,
   suggestion,
+  
 }: {
   id: string
   suggestion: string
 }) {
-  const { acceptSuggestion, rejectSuggestion } = useTweetContext()
+  const { updateTweet } = useTweetContext()
+  const [connectedAccount] = useLocalStorage(
+    "connected-account",
+    DEFAULT_CONNECTED_ACCOUNT
+  )
+
+  const reapply = () => {
+    updateTweet(id, suggestion)
+  }
 
   return (
-    <div className="w-full">
-      <div className="text-left rounded-lg bg-white shadow overflow-hidden">
+    <div className="relative w-full">
+      <div className="relative text-left rounded-lg bg-white shadow overflow-hidden">
+        <div className="absolute top-5 right-5">
+          <button
+            onClick={reapply}
+            className="transition-all flex items-center gap-0.5 px-2 py-1 text-xs rounded-md bg-light-gray text-primary hover:bg-stone-200"
+          >
+            <ChevronsLeft className="size-4" />
+            <span>re-apply</span>
+          </button>
+        </div>
         <div className="flex items-start gap-3 p-6">
           <Avatar className="h-10 w-10 rounded-full border border-border/30">
             <AvatarImage
-              src="/images/profile_picture.jpg"
-              alt="@joshtriedcoding"
+              src={connectedAccount.profile_image_url}
+              alt={`@${connectedAccount.username}`}
             />
             <AvatarFallback className="bg-primary/10 text-primary text-sm/6">
-              J
+              {connectedAccount.name.slice(0, 1).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <span className="text-base leading-relaxed font-semibold">
-                Josh tried coding
+                {connectedAccount.name}
               </span>
               <span className="text-sm/6 text-muted-foreground">
-                @joshtriedcoding
+                @{connectedAccount.username}
               </span>
+              {connectedAccount.verified && (
+                <Icons.verificationBadge className="h-4 w-4" />
+              )}
             </div>
             <div className="mt-1 text-base leading-relaxed whitespace-pre-line">
               {suggestion}
@@ -298,54 +344,77 @@ export function TweetSuggestion({
           </div>
         </div>
       </div>
-      {/* <div className="flex justify-end gap-2 p-2 bg-muted/20">
-        <button
-          onClick={() => rejectSuggestion(id)}
-          className="flex items-center gap-1 font-medium bg-red-50 text-red-700 ring-1 ring-red-600/10 ring-inset text-xs px-3 py-1.5 rounded-full bg-background hover:bg-red-100 transition-colors"
-        >
-          <X className="h-3 w-3" />
-          <span>Reject</span>
-        </button>
-        <button
-          onClick={() => acceptSuggestion(id, suggestion)}
-          className="flex items-center gap-1 bg-stone-800 text-white font-medium ring-1 ring-stone-600/10 ring-inset text-xs px-3 py-1.5 rounded-full bg-background hover:bg-stone-900 transition-colors"
-        >
-          <Check className="size-3" />
-          <span>Apply</span>
-        </button>
-      </div> */}
     </div>
   )
 }
 
 export function AppSidebar({ children }: { children: React.ReactNode }) {
-  const [activeTab, setActiveTab] = useQueryState<
-    "assistant" | "writing-style"
-  >("tab", {
-    defaultValue: "assistant",
-    parse: (value) => (value === "assistant" ? "assistant" : "writing-style"),
-    serialize: (value) => value,
-  })
+  const id = useRef(nanoid())
+  const { addImprovements, rejectAllImprovements } = useTweetContext()
+
+  const [activeTab, setActiveTab] = useQueryState<"assistant" | "settings">(
+    "tab",
+    {
+      defaultValue: "assistant",
+      parse: (value) => {
+        if (value === "assistant") return "assistant"
+        return "settings"
+      },
+      serialize: (value) => value,
+    }
+  )
 
   const [chatId, setChatId] = useQueryState("chatId", {
-    defaultValue: nanoid(),
-    parse: (value) => value,
+    defaultValue: id.current,
+    parse: (value) => {
+      id.current = value
+      return value
+    },
     serialize: (value) => value,
   })
 
-  const { tweets, addImprovements } = useTweetContext()
   const { toggleSidebar } = useSidebar()
 
-  const { messages, handleInputChange, handleSubmit, setInput } = useChat({
-    id: chatId,
-    body: { chatId },
-    maxSteps: 5,
-    api: "/api/chat/generate",
+  const { data } = useQuery({
+    queryKey: ["get-chat-messages", chatId],
+    queryFn: async () => {
+      const res = await client.chat.chat_messages.$get({ chatId })
+      return await res.json()
+    },
   })
 
+  const { messages, handleInputChange, handleSubmit, setInput, status } =
+    useChat({
+      initialMessages: data?.chat?.messages,
+      id: chatId,
+      maxSteps: 5,
+      api: "/api/chat/generate",
+      // only send the last message to the server:
+      experimental_prepareRequestBody({ messages, requestBody, requestData }) {
+        console.log("body, data", requestBody, requestData)
+        return {
+          // remove trailing \n from pressing enter if there is one
+          message: {
+            ...messages[messages.length - 1],
+            content: messages[messages.length - 1]?.content.trimEnd(),
+          },
+          ...requestBody,
+        }
+      },
+      onError(err) {
+        toast.error(err.message)
+      },
+    })
+
   const startNewChat = () => {
-    setChatId(nanoid())
+    const newId = nanoid()
+    id.current = newId
+
+    setActiveTab("assistant")
+    setChatId(id.current)
     setInput("")
+
+    return id.current
   }
 
   const resultMap = new Map<string, boolean>()
@@ -360,20 +429,10 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
 
         if (!hasFired && part.toolInvocation.state === "result") {
           // tool is done generating tweet
-          const { id, improvedText, diffs } = part.toolInvocation
+          const { id, diffs } = part.toolInvocation
             .result as EditTweetToolResult
 
           addImprovements(id, diffs)
-
-          // if (part.toolInvocation.toolName === "create_tweet") {
-          //   createTweet(id)
-          //   waitForEditor(id, () => {
-          //     applyTweet(id, content)
-          //   })
-          // } else if (part.toolInvocation.toolName === "edit_tweet") {
-          //   // For edit_tweet, we just apply the changes directly
-          //   applyTweet(id, content)
-          // }
 
           resultRef.current.set(part.toolInvocation.toolCallId, true)
         }
@@ -381,26 +440,9 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     })
   }, [messages, resultRef])
 
-  const { width } = useSidebar()
-  const isNarrow = parseInt(width.replace(/[^\d.]/g, "")) * 16 < 400
-
   const [tweetLink, setTweetLink] = useState("")
   const [prompt, setPrompt] = useState("")
-
-  const { data: style, refetch } = useQuery({
-    queryKey: ["get-user-style"],
-    queryFn: async () => {
-      const res = await client.style.get.$get()
-      return await res.json()
-    },
-  })
-
-  // Initialize prompt from style data when it loads
-  useEffect(() => {
-    if (style?.prompt) {
-      setPrompt(style.prompt)
-    }
-  }, [style?.prompt])
+  const [twitterUsername, setTwitterUsername] = useState("")
 
   const { mutate: importTweets, isPending: isImporting } = useMutation({
     mutationFn: async ({ link }: { link: string }) => {
@@ -408,22 +450,39 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     },
     onSuccess: () => {
       setTweetLink("")
-      refetch()
+      refetchStyle()
     },
     onError: (error: HTTPException) => {
       toast.error(error.message)
     },
   })
 
+  const queryClient = useQueryClient()
+
   const { mutate: deleteTweet, isPending: isDeleting } = useMutation({
     mutationFn: async ({ tweetId }: { tweetId: string }) => {
       await client.style.delete.$post({ tweetId })
     },
-    onSuccess: () => {
-      refetch()
+    onMutate: async ({ tweetId }) => {
+      await queryClient.cancelQueries({ queryKey: ["account-style"] })
+      const previousStyle = queryClient.getQueryData(["account-style"])
+
+      queryClient.setQueryData(["account-style"], (oldData: any) => {
+        if (!oldData?.tweets) return oldData
+        return {
+          ...oldData,
+          tweets: oldData.tweets.filter((tweet: any) => tweet.id !== tweetId),
+        }
+      })
+
+      return { previousStyle }
     },
-    onError: (error: HTTPException) => {
+    onError: (error: HTTPException, _, context) => {
+      queryClient.setQueryData(["account-style"], context?.previousStyle)
       toast.error(error.message)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["account-style"] })
     },
   })
 
@@ -432,8 +491,56 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
       await client.style.save.$post({ prompt })
     },
     onSuccess: () => {
-      refetch()
-      toast.success("Style prompt saved successfully")
+      refetchStyle()
+      toast.success("Style saved")
+    },
+    onError: (error: HTTPException) => {
+      toast.error(error.message)
+    },
+  })
+
+  const [connectedAccount, setConnectedAccount] = useLocalStorage(
+    "connected-account",
+    DEFAULT_CONNECTED_ACCOUNT
+  )
+
+  const { data: style, refetch: refetchStyle } = useQuery({
+    queryKey: ["account-style"],
+    queryFn: async () => {
+      const res = await client.style.get.$get()
+      return await res.json()
+    },
+  })
+
+  useEffect(() => {
+    if (style?.prompt) setPrompt(style.prompt)
+  }, [style])
+
+  const { data: account } = useQuery<ConnectedAccount>({
+    queryKey: ["connected-account"],
+    queryFn: async () => {
+      const res = await client.settings.connectedAccount.$get()
+      const { account } = await res.json()
+      return account ?? DEFAULT_CONNECTED_ACCOUNT
+    },
+    initialData: connectedAccount,
+  })
+
+  useEffect(() => {
+    if (account.username) {
+      setTwitterUsername("@" + account.username)
+    }
+  }, [account])
+
+  const { mutate: connectAccount, isPending: isConnecting } = useMutation({
+    mutationFn: async ({ username }: { username: string }) => {
+      const res = await client.settings.connect.$post({ username })
+      return await res.json()
+    },
+    onSuccess: ({ data }) => {
+      queryClient.setQueryData(["connected-account"], data)
+      setConnectedAccount(data)
+      toast.success("Account connected!")
     },
     onError: (error: HTTPException) => {
       toast.error(error.message)
@@ -442,35 +549,31 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <Toaster position="top-center" />
       {children}
       <Tabs
         defaultValue="assistant"
         value={activeTab}
-        onValueChange={(tab) =>
-          setActiveTab(tab as "assistant" | "writing-style")
-        }
+        onValueChange={(tab) => setActiveTab(tab as "assistant" | "settings")}
       >
         <Sidebar side="right" collapsible="offcanvas">
           <SidebarHeader className="flex flex-col border-b border-stone-200 items-center justify-end gap-2 px-4">
             <div className="w-full flex items-center justify-between">
               <p className="text-sm/6 font-medium">
-                {activeTab === "assistant" ? "Assistant" : "Style"}
+                {activeTab === "assistant" ? "Assistant" : "Settings"}
               </p>
               <div>
-                {" "}
                 <Button
                   size="icon"
-                  variant={activeTab === "writing-style" ? "default" : "ghost"}
-                  title="Customize Writing Style"
+                  variant={activeTab === "settings" ? "default" : "ghost"}
+                  title="Settings"
                   onClick={() =>
                     setActiveTab(
-                      activeTab === "writing-style"
-                        ? "assistant"
-                        : "writing-style"
+                      activeTab === "settings" ? "assistant" : "settings"
                     )
                   }
                 >
-                  <Feather className="size-4" />
+                  <Settings className="size-4" />
                 </Button>
                 <Button
                   onClick={startNewChat}
@@ -545,7 +648,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                                       return (
                                         <div
                                           key={result.id}
-                                          className="bg-stone-100 p-2 shadow-inner rounded-lg border border-dashed border-stone-200 rounded-b-xl"
+                                          className="group bg-stone-100 p-2 shadow-inner rounded-lg border border-dashed border-stone-200 rounded-b-xl"
                                         >
                                           <TweetSuggestion
                                             id={result.id}
@@ -609,8 +712,48 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                 </div>
               </TabsContent>
 
-              <TabsContent className="h-full" value="writing-style">
+              <TabsContent className="h-full" value="settings">
                 <div className="flex flex-col h-full p-4 space-y-6">
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2 justify-start items-center">
+                        <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                          Connect Account
+                        </h3>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="w-full flex items-center space-x-2">
+                        <Input
+                          className="flex-1 w-full bg-stone-100"
+                          type="text"
+                          placeholder="@joshtriedcoding"
+                          value={twitterUsername}
+                          onChange={(e) => setTwitterUsername(e.target.value)}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            connectAccount({ username: twitterUsername })
+                          }
+                          disabled={isConnecting}
+                        >
+                          {isConnecting ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Connecting...
+                            </>
+                          ) : (
+                            "Connect"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator className="my-4" />
+
                   <div className="space-y-3">
                     <div className="flex flex-col gap-2">
                       <div className="flex gap-2 justify-start items-center">
@@ -722,7 +865,8 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                   <ChatInput
                     handleInputChange={handleInputChange}
                     handleSubmit={handleSubmit}
-                    chatId={chatId}
+                    messages={messages}
+                    status={status}
                     startNewChat={startNewChat}
                   />
                 </LexicalComposer>

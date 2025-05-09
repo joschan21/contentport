@@ -11,9 +11,25 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        elegant: ["var(--font-elegant)"]
+        elegant: ["var(--font-elegant)"],
       },
       colors: {
+        "light-gray": "#FBFAF9",
+        "text-gray": "#36322F",
+        brand: {
+          "25": "#FFF9F0",
+          "50": "#FFF4E3",
+          "100": "#FFE8C7",
+          "200": "#FFD89B",
+          "300": "#FFC66E",
+          "400": "#FFB441",
+          "500": "#F5A014",
+          "600": "#D68508",
+          "700": "#B36C06",
+          "800": "#8F5404",
+          "900": "#704103",
+          "950": "#523002",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

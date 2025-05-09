@@ -7,11 +7,10 @@ import { CustomLinkNode } from "@/lib/nodes"
 import { LinkNode } from "@lexical/link"
 import { ContextDocumentEditor } from "@/components/context-document-editor"
 import { LexicalComposer } from "@lexical/react/LexicalComposer"
-import { useParams } from "next/navigation"
+import { useParams } from "react-router"
 
-export default function ContextPage() {
-  const params = useParams()
-  const id = params.id as string
+export const ContextPage = () => {
+  const { id } = useParams()
 
   const initialConfig = {
     namespace: "context-document-editor",
@@ -37,7 +36,7 @@ export default function ContextPage() {
       {
         replace: LinkNode,
         with: (node: LinkNode) => {
-          return new CustomLinkNode(node.getTextContent());
+          return new CustomLinkNode(node.getTextContent())
         },
         withKlass: CustomLinkNode,
       },
@@ -45,9 +44,9 @@ export default function ContextPage() {
   }
 
   return (
-    <div className="relative bg-white mt-4 border border-stone-200 shadow-sm rounded-md p-5 z-10 max-w-3xl w-full h-full mx-auto">
+    <div className="relative bg-white mt-4 border border-stone-200 shadow-sm rounded-2xl p-6 z-10 max-w-3xl w-full h-full mx-auto">
       <LexicalComposer initialConfig={initialConfig}>
-        <ContextDocumentEditor documentId={id} />
+        <ContextDocumentEditor key={id!} documentId={id!} />
       </LexicalComposer>
     </div>
   )

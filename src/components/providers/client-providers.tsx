@@ -10,14 +10,7 @@ interface ProvidersProps {
 }
 
 export function ClientProviders({ children }: ProvidersProps) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 60 * 1000,
-        refetchOnWindowFocus: false,
-      },
-    },
-  })
+  const queryClient = new QueryClient()
 
   return (
     <NuqsAdapter>

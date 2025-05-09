@@ -22,6 +22,7 @@ const appRouter = j.mergeRouters(api, {
   chat: dynamic(() => import("./routers/chat-router")),
   waitlist: dynamic(() => import("./routers/waitlist-router")),
   style: dynamic(() => import("./routers/style-router")),
+  settings: dynamic(() => import("./routers/settings-router")),
 })
 
 export type AppRouter = typeof appRouter

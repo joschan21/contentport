@@ -7,6 +7,11 @@ import { redis } from "./redis"
 const database = drizzleAdapter(db, { provider: "pg" })
 
 export const auth = betterAuth({
+  user: {
+    additionalFields: {
+      plan: { type: "string", defaultValue: "free" },
+    },
+  },
   database,
   socialProviders: {
     google: {
@@ -18,7 +23,7 @@ export const auth = betterAuth({
     after: createAuthMiddleware(async (ctx) => {
       const session = ctx.context.newSession
 
-      const allowlist = await redis.smembers("allowlist")
+      const allowlist = ["neske.joscha@gmail.com", "joscha7676@gmail.com", "jcodog@cleoai.cloud", "hola@tomasholtz.com"]
 
       if (session && allowlist.includes(session.user.email)) {
         ctx.redirect("/studio")

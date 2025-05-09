@@ -22,6 +22,13 @@ type Tweet = {
 export type Style = {
   tweets: Tweet[]
   prompt: string | null
+  connectedAccount?: {
+    username: string
+    name: string
+    profile_image_url: string
+    id: string
+    verified: boolean
+  }
 }
 
 // const client = new TwitterApi({
@@ -35,6 +42,44 @@ const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
 type UserData = Awaited<ReturnType<typeof client.v2.userByUsername>>["data"]
 
 export const styleRouter = j.router({
+  connect: privateProcedure
+    .input(
+      z.object({
+        username: z.string().min(1).max(100),
+      })
+    )
+    .post(async ({ c, ctx, input }) => {
+      const { username } = input
+      const cleanUsername = username.replace("@", "")
+      const { user } = ctx
+
+      try {
+        const userData = await getUserData(cleanUsername)
+        
+        const styleKey = `style:${user.email}`
+        const currentStyle = await redis.json.get<Style>(styleKey)
+
+        await redis.json.set(styleKey, "$.connectedAccount", {
+          username: userData.username,
+          name: userData.name,
+          profile_image_url: userData.profile_image_url,
+          id: userData.id,
+          verified: userData.verified,
+        })
+
+        return c.json({
+          success: true,
+          data: userData,
+        })
+      } catch (error) {
+        if (error instanceof HTTPException) {
+          throw error
+        }
+        throw new HTTPException(500, {
+          message: "Failed to connect Twitter account",
+        })
+      }
+    }),
   get: privateProcedure.query(async ({ c, ctx }) => {
     const { user } = ctx
 
@@ -47,7 +92,7 @@ export const styleRouter = j.router({
       })
     }
 
-    return c.json({...style, tweets: style.tweets.reverse()})
+    return c.json({ ...style, tweets: (style.tweets ?? []).reverse() })
   }),
   import: privateProcedure
     .input(
@@ -177,7 +222,7 @@ export const styleRouter = j.router({
 
       const styleKey = `style:${user.email}`
 
-      if (prompt) {
+      if (typeof prompt !== "undefined") {
         await redis.json.merge(styleKey, "$", { prompt })
       }
 
@@ -188,7 +233,9 @@ export const styleRouter = j.router({
 })
 
 async function getUserData(username: string) {
-  const { data } = await client.v2.userByUsername(username)
+  const { data } = await client.v2.userByUsername(username, {
+    "user.fields": ["profile_image_url", "name", "username", "id", "verified", "verified_type"],
+  })
 
   if (!data) {
     throw new HTTPException(404, {

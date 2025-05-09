@@ -25,7 +25,18 @@ import { ListItemNode, ListNode } from "@lexical/list"
 import {} from "@lexical/plain-text"
 import { HeadingNode, QuoteNode } from "@lexical/rich-text"
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table"
-import { createDataStreamResponse, generateText, streamText, tool } from "ai"
+import {
+  appendClientMessage,
+  appendResponseMessages,
+  AssistantMessage,
+  CoreAssistantMessage,
+  CoreSystemMessage,
+  CoreUserMessage,
+  createDataStreamResponse,
+  generateText,
+  streamText,
+  tool,
+} from "ai"
 import { Diff, diff_match_patch } from "diff-match-patch"
 import "diff-match-patch-line-and-word"
 import {
@@ -40,6 +51,10 @@ import { after } from "next/server"
 import { Style } from "./style-router"
 import { google } from "@ai-sdk/google"
 import { chunkDiffs } from "../../../diff"
+import { chatLimiter } from "@/lib/chat-limiter"
+import { HTTPException } from "hono/http-exception"
+import { format, isToday, isTomorrow } from "date-fns"
+import { nanoid } from "nanoid"
 
 export type EditTweetToolResult = {
   id: string
@@ -51,11 +66,11 @@ export interface Document {
   id: string
   title: string
   content: SerializedEditorState<SerializedLexicalNode>
-  updatedAt: Date
 }
 
 const message = z.object({
-  role: z.enum(["assistant", "user", "system"]),
+  id: z.string(),
+  role: z.enum(["assistant", "user", "system", "data"]),
   content: z.string(),
 })
 
@@ -63,7 +78,7 @@ export type Message = z.infer<typeof message>
 
 const chat = z.object({
   id: z.string(),
-  attachedDocumentIDs: z.array(z.string()),
+  // attachedDocumentIDs: z.array(z.string()),
   messages: z.array(message),
 })
 
@@ -156,37 +171,56 @@ ${messages[messages.length - 1]?.content}
 
 <output>`
 
+const document = z.object({
+  id: z.string(),
+  title: z.string(),
+  content: z.string(), // serialized editor state
+})
+
 export const chatRouter = j.router({
+  chat_messages: privateProcedure
+    .input(z.object({ chatId: z.string() }))
+    .get(async ({ c, input, ctx }) => {
+      const { chatId } = input
+      const { user } = ctx
+
+      const chat = await redis.json.get<Chat>(`chat:${user.email}:${chatId}`)
+      const filtered = chat?.messages.filter(
+        (msg) => !msg.id.startsWith("doc:") && !msg.id.startsWith("meta:")
+      )
+
+      return c.json({ chat: { ...chat, messages: filtered } })
+    }),
   generate: privateProcedure
     .input(
       z.object({
         chatId: z.string(),
-        messages: z.array(message),
-        attachedDocumentIDs: z.array(z.string()).optional(),
-        tweets: z.array(tweet).optional().default([]),
+        message: message,
+        attachedDocuments: z.array(document).optional(),
+        tweet: tweet,
       })
     )
     .post(async ({ c, input, ctx }) => {
-      const { chatId, messages, attachedDocumentIDs, tweets } = input
+      const { chatId, message, attachedDocuments, tweet } = input
       const { user } = ctx
 
-      const chatExists = await redis.exists(`chat:${chatId}`)
-      let existingChat: Chat | null = null
+      const { success, reset } = await chatLimiter.limit(user.email)
 
-      if (chatExists) {
-        existingChat = await redis.json.get<Chat>(`chat:${chatId}`)
+      if (!success) {
+        const resetDate = new Date(reset)
+        let resetStr = format(resetDate, "h:mm a")
+        if (isToday(resetDate)) {
+          resetStr = `today at ${resetStr}`
+        } else if (isTomorrow(resetDate)) {
+          resetStr = `tomorrow at ${resetStr}`
+        } else {
+          resetStr = `${format(resetDate, "MMM d")} at ${resetStr}`
+        }
+        throw new HTTPException(429, {
+          message: `You've reached your daily message limit. Your limit resets ${resetStr}.`,
+        })
       }
 
-      const allAttachedDocumentIDs = existingChat
-        ? [
-            ...new Set([
-              ...existingChat.attachedDocumentIDs,
-              ...(attachedDocumentIDs || []),
-            ]),
-          ]
-        : attachedDocumentIDs || []
-
-      const documentContents: Document[] = []
       const editor = createEditor({
         nodes: [
           LineBreakNode,
@@ -212,81 +246,83 @@ export const chatRouter = j.router({
         ],
       })
 
-      // Fetch all attached documents
-      if (allAttachedDocumentIDs.length > 0) {
-        const docResults = await Promise.all(
-          allAttachedDocumentIDs.map(async (docId) => {
-            const doc = await redis.json.get<Document>(
-              `context-doc:${user.email}:${docId}`
-            )
-            if (doc) {
-              const parsedEditorState = editor.parseEditorState(doc.content)
-              const editorStateTextString = parsedEditorState.read(() =>
-                $getRoot().getTextContent()
-              )
+      const tool_chat = await redis.json.get<Chat>(
+        `chat:${user.email}:tool:${chatId}`
+      )
 
-              return {
-                id: doc.id,
-                title: doc.title,
-                content: editorStateTextString,
-                updatedAt: doc.updatedAt,
-              }
-            }
-            return null
+      let edit_tool_messages: Message[] = tool_chat?.messages ?? []
+
+      if (edit_tool_messages.length === 0) {
+        const style = await redis.json.get<Style>(`style:${user.email}`)
+        if (style) {
+          const styleMessage = editToolStyleMessage({ style })
+          edit_tool_messages = appendClientMessage({
+            messages: edit_tool_messages,
+            message: styleMessage,
           })
-        )
-
-        documentContents.push(...(docResults.filter(Boolean) as any))
+        }
       }
+
+      const chat = await redis.json.get<Chat>(`chat:${user.email}:${chatId}`)
+
+      let messages: Message[] = []
+
+      // restore chat history
+      if (chat?.messages) {
+        messages = appendClientMessage({
+          messages: chat.messages,
+          message,
+        })
+      }
+
+      // append the new message to the previous messages:
+      messages = appendClientMessage({
+        messages,
+        message,
+      })
+
+      if (attachedDocuments && attachedDocuments.length > 0) {
+        attachedDocuments.forEach(async (doc) => {
+          const parsedEditorState = editor.parseEditorState(doc.content)
+          const editorStateTextString = parsedEditorState.read(() =>
+            $getRoot().getTextContent()
+          )
+
+          const documentMessage: Message = {
+            id: `doc:${nanoid()}`,
+            content: `<document_content title="${doc.title}">${editorStateTextString}</document_content>`,
+            role: "user",
+          }
+
+          messages = appendClientMessage({
+            messages,
+            message: documentMessage,
+          })
+        })
+      }
+
+      messages = appendClientMessage({
+        messages,
+        message: {
+          id: `meta:current-tweet:${nanoid()}`,
+          content: `<system_message><important_info>This is a system message. The user did not write this message. The user is interfacing with you through contentport's visual tweet editor. The only purpose of this message is to keep you informed about the user's latest tweet editor state at all times.</important_info><current_tweet>${tweet.content}</current_tweet><system_message>`,
+          role: "user",
+        },
+      })
 
       const edit_tweet = tool({
         description: "Edit or change a tweet",
-        parameters: z.object({
-          tweetId: z.string().describe("ID of the tweet to edit/modify."),
-        }),
-        execute: async ({ tweetId }): Promise<EditTweetToolResult> => {
-          const tweetToEdit = tweets?.find((t) => t.id === tweetId)
-
-          if (!tweetToEdit) throw new Error("tweet doesnt exist.")
-
-          const style = await redis.json.get<Style>(`style:${user.email}`)
-
-          if (style) {
-            messages.unshift(editToolStyleMessage({ style }))
-          }
-
-          // Pre-process the user's message to identify which part of the tweet to edit
-          const lastMessage = messages[messages.length - 1]
-          if (!lastMessage) throw new Error("No message found")
-
-          const targetIdentifierResult = await generateText({
-            model: openai("gpt-4o"),
-            stopSequences: ["</output>"],
-            prompt: editTargetIdentifierPrompt({
-              tweet: tweetToEdit.content,
-              messages,
-            }),
+        parameters: z.object({}),
+        execute: async (): Promise<EditTweetToolResult> => {
+          edit_tool_messages = appendClientMessage({
+            messages: edit_tool_messages,
+            message: message,
           })
-
-          const targetXML = targetIdentifierResult.text.trim()
-
-          console.log("🎯🎯🎯 TARGET XML", targetXML)
-
-          const prompt = editToolPrompt({
-            tweets,
-            tweetToEdit,
-            documents: documentContents,
-            messages,
-            targetXML,
-          })
-
-          console.log("final promopt", prompt)
 
           const result = await generateText({
             model: anthropic("claude-3-opus-latest"),
             system: editToolSystemPrompt,
-            prompt,
-            stopSequences: ["</edited_tweet>"],
+            messages: edit_tool_messages,
           })
 
           let sanitizedOutput = result.text.endsWith("\n")
@@ -296,11 +332,11 @@ export const chatRouter = j.router({
           sanitizedOutput = sanitizedOutput
             .replaceAll("<edit>", "")
             .replaceAll("</edit>", "")
+            .replaceAll("<tweet_suggestion>", "")
+            .replaceAll("</tweet_suggestion>", "")
             .replaceAll("—", "-")
 
-          const dmp = new diff_match_patch()
-
-          const t1 = tweetToEdit.content
+          const t1 = tweet.content
           const t2 = sanitizedOutput
 
           const rawDiffs = diff_wordMode(t1, t2)
@@ -308,38 +344,56 @@ export const chatRouter = j.router({
 
           const processedDiffs = processDiffs(chunkedDiffs)
 
-          console.log("raw", rawDiffs)
-          console.log("processed", processedDiffs)
+          edit_tool_messages = appendClientMessage({
+            messages: edit_tool_messages,
+            message: {
+              id: nanoid(),
+              role: "assistant",
+              content: sanitizedOutput,
+            },
+          })
 
           return {
-            id: tweetToEdit.id,
+            id: tweet.id,
             improvedText: sanitizedOutput,
             diffs: processedDiffs,
           }
         },
       })
 
-      after(async () => {
-        const updatedChat: Chat = {
-          id: chatId,
-          attachedDocumentIDs: allAttachedDocumentIDs,
-          messages: existingChat
-            ? [...existingChat.messages, ...messages]
-            : messages,
-        }
+      const saveMessages = async (chat: Chat) => {
+        await redis.json.set(`chat:${user.email}:${chat.id}`, "$", chat)
+        await redis.expire(`chat:${user.email}:${chat.id}`, 60 * 10)
+      }
 
-        await redis.json.set(`chat:${chatId}`, "$", updatedChat)
-      })
+      const saveToolMessages = async (chat: Chat) => {
+        await redis.json.set(`chat:${user.email}:tool:${chat.id}`, "$", chat)
+        await redis.expire(`chat:${user.email}:tool:${chat.id}`, 60 * 10)
+      }
 
       return createDataStreamResponse({
         execute: (stream) => {
           const result = streamText({
             model: openai("gpt-4o"),
-            prompt: assistantPrompt({ messages, tweets }),
+            system: assistantPrompt({ tweet }),
+            messages: messages.filter((msg) => !msg.id.startsWith("style:")),
             tools: { edit_tweet },
-            toolCallStreaming: true,
             toolChoice: "auto",
             maxSteps: 6,
+            onFinish: async ({ response }) => {
+              await saveMessages({
+                id: chatId,
+                messages: appendResponseMessages({
+                  messages,
+                  responseMessages: response.messages,
+                }),
+              })
+
+              await saveToolMessages({
+                id: chatId,
+                messages: edit_tool_messages,
+              })
+            },
           })
 
           result.mergeIntoDataStream(stream)
@@ -347,19 +401,3 @@ export const chatRouter = j.router({
       })
     }),
 })
-
-// const create_tweet = tool({
-//   description: "Create a new tweet to create a thread",
-//   parameters: z.object({}),
-//   execute: async () => {
-//     const id = crypto.randomUUID()
-//     const newTweet: Tweet = { id, content: "" }
-
-//     const result = await edit_tweet.execute(
-//       { tweetToEdit: newTweet },
-//       { messages, toolCallId: id }
-//     )
-
-//     return result
-//   },
-// })

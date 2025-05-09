@@ -1,5 +1,3 @@
-"use client"
-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { authClient } from "@/lib/auth-client"
@@ -9,7 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { HTTPException } from "hono/http-exception"
 import Image from "next/image"
 import { useState } from "react"
-import { toast } from "sonner"
+import { toast } from "react-hot-toast"
 
 const Page = () => {
   const [email, setEmail] = useState("")

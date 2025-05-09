@@ -19,8 +19,52 @@ import React, {
   useRef,
   useState,
 } from "react"
+import toast from "react-hot-toast"
 
 type DiffType = -1 | 0 | 1
+
+interface TweetImage {
+  src: string
+  originalSrc: string
+  width: number
+  height: number
+  editorState: {
+    blob: {
+      src: string
+      w?: number
+      h?: number
+    }
+    canvasWidth: number
+    canvasHeight: number
+    outlineSize: number
+    outlineColor: string
+    options: {
+      aspectRatio: string
+      theme: string
+      customTheme: {
+        colorStart: string
+        colorEnd: string
+      }
+      rounded: number
+      roundedWrapper: string
+      shadow: number
+      noise: boolean
+      browserBar: string
+      screenshotScale: number
+      rotation: number
+      pattern: {
+        enabled: boolean
+        intensity: number
+        rotation: number
+        opacity: number
+        type: "waves" | "dots" | "stripes" | "zigzag" | "graphpaper" | "none"
+      }
+      frame: "none" | "arc" | "stack"
+      outlineSize: number
+      outlineColor: string
+    }
+  }
+}
 
 interface Tweet {
   id: string
@@ -28,6 +72,7 @@ interface Tweet {
   improvements: {
     [category: string]: DiffWithReplacement[] | undefined
   }
+  image?: TweetImage
 }
 
 // type ImprovementOutput = InferOutput["improvement"]["clarity"]
@@ -49,12 +94,21 @@ interface TweetContextType {
   editors: React.MutableRefObject<Map<string, LexicalEditor>>
   acceptImprovement: (id: string, diff: DiffWithReplacement) => void
   rejectImprovement: (id: string, diff: DiffWithReplacement) => void
-  // improvementsMutation: UseMutationResult<
-  //   ImprovementOutput,
-  //   Error,
-  //   void,
-  //   unknown
-  // >
+  setTweetImage: (id: string, image: { 
+    src: string
+    width: number
+    height: number
+    editorState: TweetImage["editorState"]
+  }) => void
+  removeTweetImage: (id: string) => void
+  editTweetImage: (id: string, image: { 
+    src: string
+    width: number
+    height: number
+    editorState: TweetImage["editorState"]
+  }) => void
+  downloadTweetImage: (id: string) => void
+  rejectAllImprovements: () => void
   contents: React.RefObject<Map<string, string>>
 }
 
@@ -138,6 +192,19 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const updateTweet = useCallback((id: string, content: string) => {
+    const editor = editors.current.get(id)
+    
+    if (editor) {
+      editor.update(() => {
+        const root = $getRoot()
+        root.clear()
+        const textNode = $createTextNode(content)
+        const p = $createParagraphNode()
+        p.append(textNode)
+        root.append(p)
+      })
+    }
+    
     setTweets((prev) =>
       prev.map((tweet) => (tweet.id === id ? { ...tweet, content } : tweet))
     )
@@ -270,9 +337,8 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
     const editor = editors.current.get(id)
     const content = contents.current.get(id)
 
-    if (!editor) throw new Error("no editor for improvement")
-    if (typeof content === "undefined")
-      throw new Error("no content for improvement")
+    if (!editor) return
+    if (typeof content === "undefined") return
 
     checkpoints.current.set(id, content)
 
@@ -413,6 +479,114 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
     }, 50)
   }, [])
 
+  const setTweetImage = useCallback((id: string, image: { 
+    src: string
+    width: number
+    height: number
+    editorState: TweetImage["editorState"]
+  }) => {
+    setTweets((prev) =>
+      prev.map((tweet) =>
+        tweet.id === id
+          ? {
+              ...tweet,
+              image: {
+                src: image.src,
+                originalSrc: image.editorState.blob.src,
+                width: image.width,
+                height: image.height,
+                editorState: image.editorState
+              },
+            }
+          : tweet
+      )
+    )
+  }, [])
+
+  const removeTweetImage = useCallback((id: string) => {
+    setTweets((prev) =>
+      prev.map((tweet) =>
+        tweet.id === id
+          ? {
+              ...tweet,
+              image: undefined,
+            }
+          : tweet
+      )
+    )
+  }, [])
+
+  const editTweetImage = useCallback((id: string, image: { 
+    src: string
+    width: number
+    height: number
+    editorState: TweetImage["editorState"]
+  }) => {
+    setTweets((prev) =>
+      prev.map((tweet) =>
+        tweet.id === id
+          ? {
+              ...tweet,
+              image: {
+                src: image.src,
+                originalSrc: tweet.image?.originalSrc || image.editorState.blob.src,
+                width: image.width,
+                height: image.height,
+                editorState: image.editorState
+              },
+            }
+          : tweet
+      )
+    )
+  }, [])
+
+  const downloadTweetImage = useCallback((id: string) => {
+    const tweet = tweets.find((t) => t.id === id)
+    if (!tweet?.image) return
+
+    const a = document.createElement("a")
+    a.href = tweet.image.src
+    a.download = `tweet-image-${id}-${new Date().toISOString()}.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }, [tweets])
+
+  // TODO: doesnt work
+  const rejectAllImprovements = useCallback(() => {
+    tweets.forEach(tweet => {
+      const id = tweet.id
+      const editor = editors.current.get(id)
+      const checkpoint = checkpoints.current.get(id)
+      
+      if (editor && checkpoint) {
+        editor.update(() => {
+          const root = $getRoot()
+          root.clear()
+          const textNode = $createTextNode(checkpoint)
+          const p = $createParagraphNode()
+          p.append(textNode)
+          root.append(p)
+        })
+      }
+      
+      Object.values(tweet.improvements).forEach(category => {
+        category?.forEach(diff => {
+          improvements.current.delete(diff.id)
+        })
+      })
+      
+      checkpoints.current.delete(id)
+    })
+
+    setTweets(prev => 
+      prev.map(tweet => ({
+        ...tweet,
+        improvements: {}
+      }))
+    )
+  }, [tweets])
+
   return (
     <TweetContext.Provider
       value={{
@@ -426,13 +600,17 @@ export function TweetProvider({ children }: { children: React.ReactNode }) {
         addTweet,
         updateTweet,
         deleteTweet,
-        // improvementsMutation,
         registerEditor,
         unregisterEditor,
         createTweet,
         waitForEditor,
         editors,
         contents,
+        setTweetImage,
+        removeTweetImage,
+        editTweetImage,
+        downloadTweetImage,
+        rejectAllImprovements,
       }}
     >
       {children}

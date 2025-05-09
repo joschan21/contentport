@@ -44,15 +44,7 @@ export function MentionPlugin() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
   const { addAttachedDocument, attachedDocumentIDs } = useMentionContext()
-  const { documentTitles } = useDocumentContext()
-
-  const { data: documentsData } = useQuery({
-    queryKey: ["documents"],
-    queryFn: async () => {
-      const res = await client.document.list.$get()
-      return await res.json()
-    },
-  })
+  const { docs } = useDocumentContext()
 
   useEffect(() => {
     setMounted(true)
@@ -67,14 +59,9 @@ export function MentionPlugin() {
         const text = selection.anchor.getNode().getTextContent()
         const lastChar = text[selection.anchor.offset - 1]
 
-        const data = documentsData?.map((doc) => ({
-          ...doc,
-          title: documentTitles[doc.id] || doc.title || "Untitled document",
-        }))
-
         if (lastChar === MENTION_TRIGGER) {
           setShowSuggestions(true)
-          setSuggestions(data || [])
+          setSuggestions(docs || [])
           setSelectedIndex(0)
           lastTriggerRef.current = selection.anchor.offset - 1
 
@@ -88,7 +75,7 @@ export function MentionPlugin() {
             lastTriggerRef.current + 1,
             selection.anchor.offset
           )
-          const filtered = (data || []).filter((doc) =>
+          const filtered = docs.filter((doc) =>
             doc.id.toLowerCase().includes(searchText.toLowerCase())
           )
           setSuggestions(filtered)
@@ -100,7 +87,7 @@ export function MentionPlugin() {
     return () => {
       removeListener()
     }
-  }, [editor, documentsData, documentTitles])
+  }, [editor, docs])
 
   // todo: small bug when deleting if mention is the only thing in the editor
   const insertMention = (
@@ -115,7 +102,7 @@ export function MentionPlugin() {
     const triggerOffset = lastTriggerRef.current ?? 0
     const beforeText = text.slice(0, triggerOffset)
 
-    const mentionNode = $createMentionNode(`@${document.title}`)
+    const mentionNode = $createMentionNode(`@${document.title || "Untitled document"}`)
     const spaceNode = $createTextNode(" ")
 
     if (beforeText) {
@@ -366,7 +353,7 @@ export function MentionPlugin() {
                     : ""
                 }`}
               >
-                {doc.title || doc.id}
+                {doc.title || "Untitled document"}
               </div>
             ))}
           </div>
