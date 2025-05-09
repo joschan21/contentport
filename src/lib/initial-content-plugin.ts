@@ -34,7 +34,12 @@ export const InitialContentPlugin = ({
             const editorState = editor.parseEditorState(content)
             if (editorState && !editorState.isEmpty()) {
               editor.setEditorState(editorState)
-            } 
+            } else if (editorState.isEmpty()) {
+              editor.update(() => {
+                const root = $getRoot()
+                root.clear()
+              })
+            }
           } catch (e) {
             console.error("Error parsing editor state:", e)
           }
