@@ -41,7 +41,7 @@ export const Settings = () => {
             <div className="mb-4">
               <Avatar className="w-24 h-24 border-4 border-white shadow-md">
                 <AvatarImage
-                  src="https://lh3.googleusercontent.com/a/ACg8ocKkSeWo1-CbG8danL-5ZB0v1HuYJ8jbJcUMiNneQsJhRfR0PG8=s96-c"
+                  src={data?.user.image ?? undefined}
                   alt={data?.user.name ?? "Profile"}
                 />
                 <AvatarFallback className="bg-gradient-to-br from-yellow-300 to-amber-400 text-white text-3xl">
