@@ -49,7 +49,7 @@ export const Settings = () => {
                 </AvatarFallback>
               </Avatar>
             </div>
-            <div className="mb-1">
+            <div className="mb-1 flex flex-col items-center">
               <p className="text-2xl font-semibold text-gray-900">
                 {data?.user.name}
               </p>
