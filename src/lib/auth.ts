@@ -23,7 +23,13 @@ export const auth = betterAuth({
     after: createAuthMiddleware(async (ctx) => {
       const session = ctx.context.newSession
 
-      const allowlist = ["neske.joscha@gmail.com", "joscha7676@gmail.com", "jcodog@cleoai.cloud", "hola@tomasholtz.com"]
+      const allowlist = [
+        "neske.joscha@gmail.com",
+        "joscha7676@gmail.com",
+        "jcodog@cleoai.cloud",
+        "hola@tomasholtz.com",
+        "jorge@heyjorge.dev",
+      ]
 
       if (session && allowlist.includes(session.user.email)) {
         ctx.redirect("/studio")
