@@ -252,7 +252,7 @@ export function ImageTool({
         opacity: 6,
         type: "stripes",
       },
-      frame: "stack",
+      frame: "arc",
       outlineSize: 0,
       outlineColor: "#292524",
     }
