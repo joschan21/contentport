@@ -2,39 +2,22 @@
 
 import type React from "react"
 
-import { PropsWithChildren, useEffect, useRef, useState } from "react"
-import domtoimage from "dom-to-image"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  ArrowUpToLine,
-  Clipboard,
-  Download,
-  Grip,
-  ImageIcon,
-  ImagePlus,
-  RefreshCw,
-  Sparkles,
-} from "lucide-react"
-import { toast } from "react-hot-toast"
-import { EnhancedSlider } from "../ui/enhanced-slider"
-import { Toggle } from "@/components/ui/toggle"
 import {
   Popover,
-  PopoverTrigger,
   PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui/popover"
+import { Toggle } from "@/components/ui/toggle"
+import { cn } from "@/lib/utils"
+import domtoimage from "dom-to-image"
+import {
+  Grip,
+  ImagePlus
+} from "lucide-react"
+import { PropsWithChildren, useEffect, useRef, useState } from "react"
+import { toast } from "react-hot-toast"
+import { EnhancedSlider } from "../ui/enhanced-slider"
 import { Separator } from "../ui/separator"
 
 interface ImageBeautifierProps {
@@ -228,7 +211,6 @@ export function ImageTool({
   const [blob, setBlob] = useState<ScreenshotBlob>({
     src: initialEditorState?.blob.src || "",
   })
-  const [bgPicker, setBGPicker] = useState(false)
   const [canvasWidth, setCanvasWidth] = useState(
     initialEditorState?.canvasWidth || 600
   )
@@ -251,26 +233,26 @@ export function ImageTool({
   const [options, setOptions] = useState<Options>(
     initialEditorState?.options || {
       aspectRatio: "aspect-auto",
-      theme: "bg-gradient-to-br from-slate-100 to-slate-200",
+      theme: "bg-gradient-to-br from-cyan-300 to-sky-400",
       customTheme: {
         colorStart: "#f3f4f6",
         colorEnd: "#e5e7eb",
       },
       rounded: 12,
       roundedWrapper: "rounded-xl",
-      shadow: 2,
-      noise: false,
+      shadow: 3,
+      noise: true,
       browserBar: "hidden",
       screenshotScale: 1,
       rotation: 0,
       pattern: {
-        enabled: false,
-        intensity: 1,
+        enabled: true,
+        intensity: 15,
         rotation: 0,
         opacity: 6,
-        type: "waves",
+        type: "stripes",
       },
-      frame: "none",
+      frame: "stack",
       outlineSize: 0,
       outlineColor: "#292524",
     }
@@ -619,7 +601,7 @@ export function ImageTool({
             {
               "items-center h-[80vh]": !Boolean(blob.src),
               "max-w-[calc(72rem-330px)] h-[80vh]": Boolean(blob.src),
-              "ring-2 ring-amber-500 ring-offset-2 bg-amber-50/50":
+              "ring-2 ring-indigo-500 ring-offset-2 bg-indigo-50/50":
                 isDragging && !blob.src,
               "bg-[image:repeating-linear-gradient(315deg,rgba(209,213,219,0.4)_0,rgba(209,213,219,0.4)_1px,_transparent_0,_transparent_50%)]":
                 !isDragging || blob.src,
@@ -816,7 +798,7 @@ export function ImageTool({
                   <div className="relative">
                     <ImagePlus
                       className={cn("size-6 text-stone-300", {
-                        "text-amber-500": isDragging,
+                        "text-indigo-500": isDragging,
                       })}
                     />
                   </div>
@@ -827,7 +809,7 @@ export function ImageTool({
                     </h3>
                     <p className="text-sm text-stone-500 max-w-sm">
                       Transform your images into{" "}
-                      <span className="text-amber-600 font-medium">
+                      <span className="text-indigo-600 font-medium">
                         clear, beautiful visuals
                       </span>
                       . <br />
@@ -1088,12 +1070,12 @@ export function ImageTool({
                           "bg-gradient-to-br from-green-300 to-emerald-400",
                           "bg-gradient-to-br from-indigo-300 to-violet-400",
                           "bg-gradient-to-br from-rose-300 to-pink-400",
-                          "bg-gradient-to-br from-amber-300 to-orange-400",
+                          "bg-gradient-to-br from-indigo-300 to-orange-400",
                           "bg-gradient-to-br from-purple-300 to-fuchsia-400",
                           "bg-gradient-to-br from-blue-300 to-indigo-400",
                           "bg-gradient-to-br from-teal-300 to-emerald-400",
                           "bg-gradient-to-br from-red-300 to-rose-400",
-                          "bg-gradient-to-br from-yellow-200 to-amber-400",
+                          "bg-gradient-to-br from-yellow-200 to-indigo-400",
 
                           "bg-white",
                           "bg-stone-800",

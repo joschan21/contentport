@@ -389,7 +389,7 @@ export default function Tweet({
                 {/* <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 rounded-full text-gray-400 hover:text-amber-500 hover:bg-amber-50"
+                className="h-7 w-7 p-0 rounded-full text-gray-400 hover:text-indigo-500 hover:bg-indigo-50"
                 onClick={handleImproveClarity}
                 disabled={improvementsMutation.isPending}
               >

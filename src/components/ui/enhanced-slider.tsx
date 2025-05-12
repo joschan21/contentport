@@ -111,15 +111,15 @@ export function EnhancedSlider({
           disabled={disabled}
         >
           <SliderPrimitive.Track className="relative h-2 w-full grow rounded-full bg-stone-200">
-            <SliderPrimitive.Range className="absolute h-full rounded-full bg-brand-500" />
+            <SliderPrimitive.Range className="absolute h-full rounded-full bg-indigo-500" />
           </SliderPrimitive.Track>
           <SliderPrimitive.Thumb
             className={cn(
-              "block size-5 rounded-sm bg-brand-500 shadow-sm",
+              "block size-5 rounded-sm bg-indigo-500 shadow-sm",
               "border-2 border-white",
               "transition-all hover:scale-110",
-              "focus-visible:outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-500",
-              "data-[dragging=true]:scale-95 data-[dragging=true]:ring-8 data-[dragging=true]:ring-brand-500/30"
+              "focus-visible:outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500",
+              "data-[dragging=true]:scale-95 data-[dragging=true]:ring-8 data-[dragging=true]:ring-indigo-500/30"
             )}
           />
         </SliderPrimitive.Root>

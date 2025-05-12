@@ -23,7 +23,7 @@ const CategoryIcon = ({ category }: { category: string }) => {
       case "tone":
         return "bg-purple-100 dark:bg-purple-900/30 text-purple-500"
       case "grammar":
-        return "bg-amber-100 dark:bg-amber-900/30 text-amber-500"
+        return "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500"
       default:
         return "bg-blue-100 dark:bg-blue-900/30 text-blue-500"
     }

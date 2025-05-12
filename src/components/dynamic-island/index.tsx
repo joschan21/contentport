@@ -389,8 +389,8 @@ export function DynamicIsland() {
 
   // Consistent styling for accept buttons
   const acceptButtonClass =
-    "w-8 h-8 rounded-full bg-amber-900/60 flex items-center justify-center hover:bg-amber-800/70 transition-colors"
-  const acceptIconClass = "text-amber-300"
+    "w-8 h-8 rounded-full bg-indigo-900/60 flex items-center justify-center hover:bg-indigo-800/70 transition-colors"
+  const acceptIconClass = "text-indigo-300"
 
   // Consistent styling for cancel buttons
   const cancelButtonClass =
@@ -548,6 +548,6 @@ export function DynamicIsland() {
 
 const RecordingIndicator = () => (
   <div className="w-4 h-4 flex items-center justify-center">
-    <motion.div className="w-2 h-2 rounded-full animate-pulse bg-amber-600" />
+    <motion.div className="w-2 h-2 rounded-full animate-pulse bg-indigo-600" />
   </div>
 )

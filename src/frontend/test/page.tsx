@@ -40,7 +40,7 @@ const Page = () => {
                   "bg-gradient-to-br from-green-300 to-emerald-400",
                   "bg-gradient-to-br from-pink-300 to-rose-200",
                   "bg-gradient-to-br from-green-300 to-lime-200",
-                  "bg-gradient-to-br from-yellow-200 to-amber-300",
+                  "bg-gradient-to-br from-yellow-200 to-indigo-300",
                   "bg-gradient-to-br from-green-200 via-blue-100 to-blue-300",
                   "bg-gradient-to-br from-indigo-300 via-blue-400 to-purple-500",
                   "bg-gradient-to-br from-red-300 via-orange-300 to-yellow-200",

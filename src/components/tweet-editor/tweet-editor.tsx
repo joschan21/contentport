@@ -87,7 +87,7 @@ function TweetEditorContent() {
         <div className="text-center py-8">
           <p className="text-gray-500">No tweets in thread.</p>
           <button
-            className="mt-4 px-4 py-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition-colors"
+            className="mt-4 px-4 py-2 bg-indigo-500 text-white rounded-full hover:bg-indigo-600 transition-colors"
             onClick={() => createTweet()}
           >
             Create new tweet

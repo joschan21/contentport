@@ -32,7 +32,7 @@ export const ContextSidebar = () => {
 //     name: "Engagement",
 //     score: 95,
 //     icon: <Zap className="size-4" />,
-//     color: "text-amber-500",
+//     color: "text-indigo-500",
 //   },
 //   {
 //     name: "Delivery",

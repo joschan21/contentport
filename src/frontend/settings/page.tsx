@@ -44,7 +44,7 @@ export const Settings = () => {
                   src={data?.user.image ?? undefined}
                   alt={data?.user.name ?? "Profile"}
                 />
-                <AvatarFallback className="bg-gradient-to-br from-yellow-300 to-amber-400 text-white text-3xl">
+                <AvatarFallback className="bg-gradient-to-br from-yellow-300 to-indigo-400 text-white text-3xl">
                   {data?.user.name?.charAt(0) ?? null}
                 </AvatarFallback>
               </Avatar>
@@ -55,7 +55,7 @@ export const Settings = () => {
               </p>
               <p className="text-sm text-gray-500">{data?.user.email}</p>
             </div>
-            <span className="inline-flex items-center rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-600/20 mb-6">
+            <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20 mb-6">
               {data?.user.plan === "free" ? "Free Plan" : null}
             </span>
           </div>
