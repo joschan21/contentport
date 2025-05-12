@@ -380,6 +380,10 @@ export const chatRouter = j.router({
         await redis.expire(`chat:${user.email}:tool:${chat.id}`, 60 * 10)
       }
 
+      after(async () => {
+        await incrementChatCount(user.email)
+      })
+
       return createDataStreamResponse({
         execute: (stream) => {
           const result = streamText({
@@ -410,3 +414,9 @@ export const chatRouter = j.router({
       })
     }),
 })
+
+async function incrementChatCount(userEmail: string) {
+  const today = format(new Date(), "yyyy-MM-dd")
+  const hashKey = `chat:count:${userEmail}`
+  await redis.hincrby(hashKey, today, 1)
+}
