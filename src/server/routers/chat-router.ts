@@ -319,6 +319,15 @@ export const chatRouter = j.router({
             message: message,
           })
 
+          edit_tool_messages = appendClientMessage({
+            messages: edit_tool_messages,
+            message: {
+              id: `meta:current-tweet:${nanoid()}`,
+              content: `<system_message><important_info>This is a system message. The user did not write this message. The user is interfacing with you through contentport's visual tweet editor. The only purpose of this message is to keep you informed about the user's latest tweet editor state at all times.</important_info><current_tweet>${tweet.content}</current_tweet><system_message>`,
+              role: "user",
+            },
+          })
+
           const result = await generateText({
             model: anthropic("claude-3-opus-latest"),
             system: editToolSystemPrompt,
