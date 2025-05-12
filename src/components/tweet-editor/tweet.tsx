@@ -246,7 +246,7 @@ export default function Tweet({
                         onClick={() => {
                           setImageDrawerOpen(true)
                         }}
-                        className="size-8 p-0 rounded-full"
+                        className="size-8 bg-stone-700 hover:bg-stone-800 p-0 rounded-full"
                       >
                         <Pencil className="h-4 w-4" />
                         <span className="sr-only">Edit image</span>
@@ -254,7 +254,7 @@ export default function Tweet({
                       <Button
                         size="sm"
                         onClick={() => downloadTweetImage(id)}
-                        className="size-8 p-0 rounded-full"
+                        className="size-8 bg-stone-700 hover:bg-stone-800 p-0 rounded-full"
                       >
                         <Download className="h-4 w-4" />
                         <span className="sr-only">Download image</span>
