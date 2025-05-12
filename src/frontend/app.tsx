@@ -5,6 +5,7 @@ import { Settings } from "./settings/page"
 import { ContextPage } from "./studio/context/[id]/page"
 import Layout from "./studio/layout"
 import { Studio } from "./studio/page"
+import { LoginPage } from "./auth/login"
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Page />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route
             path="/settings"
             element={
