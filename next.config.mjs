@@ -3,7 +3,7 @@ const nextConfig = {
   rewrites: async () => {
     return [
       {
-        source: "/((?!api/).*)", // Negative lookahead to exclude /api/* routes
+        source: "/((?!api/).*)",
         destination: "/static-app-shell",
       },
     ]

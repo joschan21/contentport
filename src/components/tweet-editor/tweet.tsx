@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import DuolingoButton from "@/components/ui/duolingo-button"
 import { useTweetContext } from "@/hooks/tweet-ctx"
 import { AdditionNode, DeletionNode, UnchangedNode } from "@/lib/nodes"
 import PlaceholderPlugin from "@/lib/placeholder-plugin"
@@ -183,7 +183,7 @@ export default function Tweet({
 
   return (
     <Drawer modal={false} open={open} onOpenChange={setOpen}>
-      <div className="relative bg-white p-6 rounded-2xl w-full shadow-sm border border-stone-200">
+      <div className="relative bg-white p-6 rounded-2xl w-full border border-stone-200 bg-clip-padding shadow-sm">
         {/* {showConnector && (
         <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-gray-200 dark:bg-stone-700 z-0"></div>
       )} */}
@@ -241,33 +241,35 @@ export default function Tweet({
                       className="absolute inset-0 w-full h-full object-cover"
                     />
                     <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        size="sm"
+                      <DuolingoButton
+                        size="icon"
+                        variant="secondary"
                         onClick={() => {
                           setImageDrawerOpen(true)
                         }}
-                        className="size-8 bg-stone-700 hover:bg-stone-800 p-0 rounded-full"
+                        className="rounded-full"
                       >
                         <Pencil className="h-4 w-4" />
                         <span className="sr-only">Edit image</span>
-                      </Button>
-                      <Button
-                        size="sm"
+                      </DuolingoButton>
+                      <DuolingoButton
+                        size="icon"
+                        variant="secondary"
                         onClick={() => downloadTweetImage(id)}
-                        className="size-8 bg-stone-700 hover:bg-stone-800 p-0 rounded-full"
+                        className="rounded-full"
                       >
                         <Download className="h-4 w-4" />
                         <span className="sr-only">Download image</span>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
+                      </DuolingoButton>
+                      <DuolingoButton
+                        size="icon"
+                        variant="secondary"
                         onClick={() => removeTweetImage(id)}
                         className="size-8 p-0 rounded-full"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4 text-red-600" />
                         <span className="sr-only">Remove image</span>
-                      </Button>
+                      </DuolingoButton>
                     </div>
                   </div>
                 </div>
@@ -275,16 +277,16 @@ export default function Tweet({
             )}
 
             <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
-              <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg">
+              <div className="flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg">
                 <DrawerTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="size-8 p-0 text-stone-800 bg-white hover:bg-stone-50 border border-stone-200 rounded-md"
+                  <DuolingoButton
+                    variant="secondary"
+                    size="icon"
+                    className="rounded-md"
                   >
-                    <ImagePlus className="h-4 w-4" />
+                    <ImagePlus className="size-4" />
                     <span className="sr-only">Add image</span>
-                  </Button>
+                  </DuolingoButton>
                 </DrawerTrigger>
                 <DrawerContent className="h-full">
                   <div className="max-w-6xl mx-auto w-full">
@@ -293,8 +295,14 @@ export default function Tweet({
                         Add image
                       </DrawerTitle>
                     </DrawerHeader>
-                    <DrawerClose className="absolute right-4 top-4 rounded-full p-2 bg-light-gray hover:bg-stone-200 transition-colors">
-                      <X className="h-4 w-4 text-stone-500" />
+                    <DrawerClose asChild>
+                      <DuolingoButton
+                        variant="secondary"
+                        size="icon"
+                        className="absolute bg-stone-100 right-4 top-4"
+                      >
+                        <X className="h-4 w-4 text-stone-500" />
+                      </DuolingoButton>
                     </DrawerClose>
                   </div>
 
@@ -312,30 +320,31 @@ export default function Tweet({
                 </DrawerContent>
 
                 <div className="w-px h-4 bg-stone-300 mx-2"></div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="size-8 p-0 text-stone-800 bg-white hover:bg-stone-50 border border-stone-200 rounded-md"
+
+                <DuolingoButton
+                  variant="secondary"
+                  size="icon"
+                  className="rounded-md"
                 >
-                  <Bold className="h-4 w-4" />
+                  <Bold className="size-4" />
                   <span className="sr-only">Bold</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="size-8 p-0 text-stone-800 bg-white hover:bg-stone-50 border border-stone-200 rounded-md"
+                </DuolingoButton>
+                <DuolingoButton
+                  variant="secondary"
+                  size="icon"
+                  className="rounded-md"
                 >
-                  <Italic className="h-4 w-4" />
+                  <Italic className="size-4" />
                   <span className="sr-only">Italic</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="size-8 p-0 text-stone-800 bg-white hover:bg-stone-50 border border-stone-200 rounded-md"
+                </DuolingoButton>
+                <DuolingoButton
+                  variant="secondary"
+                  size="icon"
+                  className="rounded-md"
                 >
-                  <Smile className="h-4 w-4" />
+                  <Smile className="size-4" />
                   <span className="sr-only">Emoji</span>
-                </Button>
+                </DuolingoButton>
 
                 <div className="w-px h-4 bg-stone-300 mx-2"></div>
 
@@ -377,39 +386,35 @@ export default function Tweet({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-0 size-7 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50"
-                  onClick={handlePostToTwitter}
-                >
-                  <Twitter className="h-4 w-4" />
-                  <span className="sr-only">Post to Twitter</span>
-                </Button>
-                {/* <Button
-                variant="ghost"
+                <DuolingoButton className="h-11" onClick={handlePostToTwitter}>
+                  <Twitter className="size-4 mr-2" />
+                  <span className="text-sm">Preview</span>
+                  <span className="sr-only">Preview on Twitter</span>
+                </DuolingoButton>
+                {/* <DuolingoButton
+                variant="secondary"
                 size="sm"
-                className="h-7 w-7 p-0 rounded-full text-gray-400 hover:text-indigo-500 hover:bg-indigo-50"
+                className="h-7 w-7 p-0 rounded-full"
                 onClick={handleImproveClarity}
                 disabled={improvementsMutation.isPending}
               >
                 {improvementsMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles className="h-4 w-4 text-indigo-600" />
                 )}
                 <span className="sr-only">Improve clarity</span>
-              </Button> */}
+              </DuolingoButton> */}
                 {/* {onDelete && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50"
+                <DuolingoButton
+                  variant="secondary"
+                  size="icon"
+                  className="h-7 w-7 p-0 rounded-full"
                   onClick={onDelete}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4 text-red-600" />
                   <span className="sr-only">Delete tweet</span>
-                </Button>
+                </DuolingoButton>
               )} */}
               </div>
             </div>
@@ -418,20 +423,24 @@ export default function Tweet({
 
         {suggestion && (
           <div className="mt-2 flex justify-end items-center gap-2 text-xs text-gray-500">
-            <button
+            <DuolingoButton
               onClick={handleRejectSuggestion}
-              className="flex items-center gap-1 px-2 py-1 rounded text-red-600 bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              variant="secondary"
+              size="sm"
+              className="flex items-center gap-1 px-2 py-1 rounded text-red-600"
             >
               <X className="h-3 w-3" />
               <span>Reject</span>
-            </button>
-            <button
+            </DuolingoButton>
+            <DuolingoButton
               onClick={handleAcceptSuggestion}
-              className="flex items-center gap-1 px-2 py-1 rounded text-stone-600 bg-stone-50 dark:hover:bg-stone-900/20 transition-colors"
+              variant="secondary"
+              size="sm"
+              className="flex items-center gap-1 px-2 py-1 rounded text-indigo-600"
             >
               <Check className="h-3 w-3" />
               <span>Apply</span>
-            </button>
+            </DuolingoButton>
           </div>
         )}
       </div>
@@ -446,8 +455,14 @@ export default function Tweet({
             <DrawerHeader className="px-0">
               <DrawerTitle className="font-medium">Edit image</DrawerTitle>
             </DrawerHeader>
-            <DrawerClose className="absolute right-4 top-4 rounded-full p-2 bg-light-gray hover:bg-stone-200 transition-colors">
-              <X className="h-4 w-4 text-stone-500" />
+            <DrawerClose asChild>
+              <DuolingoButton
+                variant="secondary"
+                size="icon"
+                className="absolute right-4 top-4 rounded-full p-2"
+              >
+                <X className="h-4 w-4 text-stone-500" />
+              </DuolingoButton>
             </DrawerClose>
           </div>
 

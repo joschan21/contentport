@@ -329,7 +329,7 @@ const SidebarTrigger = React.forwardRef<
       }}
       {...props}
     >
-      {side === "left" ? <PanelLeft /> : <PanelRight />}
+      {side === "left" ? <PanelLeft className="size-4" /> : <PanelRight className="size-4" />}
       <span className="sr-only">
         Toggle {side === "left" ? "Left" : "Right"} Sidebar
       </span>

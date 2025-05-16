@@ -4,17 +4,16 @@ import { z } from "zod"
 import { redis } from "../../lib/redis"
 import { j, privateProcedure } from "../jstack"
 
+import { chatLimiter } from "@/lib/chat-limiter"
 import {
   assistantPrompt,
-  editToolPrompt,
   editToolStyleMessage,
-  editToolSystemPrompt,
+  editToolSystemPrompt
 } from "@/lib/prompt-utils"
 import {
-  diff_lineMode,
   diff_wordMode,
   DiffWithReplacement,
-  processDiffs,
+  processDiffs
 } from "@/lib/utils"
 import { tweet } from "@/lib/validators"
 import { anthropic } from "@ai-sdk/anthropic"
@@ -22,23 +21,20 @@ import { openai } from "@ai-sdk/openai"
 import { CodeHighlightNode, CodeNode } from "@lexical/code"
 import { AutoLinkNode } from "@lexical/link"
 import { ListItemNode, ListNode } from "@lexical/list"
-import {} from "@lexical/plain-text"
+import { } from "@lexical/plain-text"
 import { HeadingNode, QuoteNode } from "@lexical/rich-text"
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table"
 import {
   appendClientMessage,
   appendResponseMessages,
-  AssistantMessage,
-  CoreAssistantMessage,
-  CoreSystemMessage,
-  CoreUserMessage,
   createDataStreamResponse,
   generateText,
   streamText,
-  tool,
+  tool
 } from "ai"
-import { Diff, diff_match_patch } from "diff-match-patch"
+import { format, isToday, isTomorrow } from "date-fns"
 import "diff-match-patch-line-and-word"
+import { HTTPException } from "hono/http-exception"
 import {
   $getRoot,
   createEditor,
@@ -47,14 +43,10 @@ import {
   SerializedLexicalNode,
   TextNode,
 } from "lexical"
-import { after } from "next/server"
-import { Style } from "./style-router"
-import { google } from "@ai-sdk/google"
-import { chunkDiffs } from "../../../diff"
-import { chatLimiter } from "@/lib/chat-limiter"
-import { HTTPException } from "hono/http-exception"
-import { format, isToday, isTomorrow } from "date-fns"
 import { nanoid } from "nanoid"
+import { after } from "next/server"
+import { chunkDiffs } from "../../../diff"
+import { Style } from "./style-router"
 
 export type EditTweetToolResult = {
   id: string
@@ -294,8 +286,8 @@ export const chatRouter = j.router({
             role: "user",
           }
 
-          messages = appendClientMessage({
-            messages,
+          edit_tool_messages = appendClientMessage({
+            messages: edit_tool_messages,
             message: documentMessage,
           })
         })
@@ -305,7 +297,13 @@ export const chatRouter = j.router({
         messages,
         message: {
           id: `meta:current-tweet:${nanoid()}`,
-          content: `<system_message><important_info>This is a system message. The user did not write this message. The user is interfacing with you through contentport's visual tweet editor. The only purpose of this message is to keep you informed about the user's latest tweet editor state at all times.</important_info><current_tweet>${tweet.content}</current_tweet><system_message>`,
+          content: `<system_attachment>
+<important_info>This is a system attachment to the user request. The purpose of this attachment is to keep you informed about the user's latest tweet editor state at all times. It might be empty or already contain text.
+</important_info>
+
+<current_tweet>${tweet.content}</current_tweet>
+
+</system_attachment>`,
           role: "user",
         },
       })
@@ -323,7 +321,7 @@ export const chatRouter = j.router({
             messages: edit_tool_messages,
             message: {
               id: `meta:current-tweet:${nanoid()}`,
-              content: `<system_message><important_info>This is a system message. The user did not write this message. The user is interfacing with you through contentport's visual tweet editor. The only purpose of this message is to keep you informed about the user's latest tweet editor state at all times.</important_info><current_tweet>${tweet.content}</current_tweet><system_message>`,
+              content: `<system_message><important_info>This is a system message. The user did not write this message. The user is interfacing with you through contentport's visual tweet editor. The only purpose of this message is to keep you informed about the user's latest tweet editor state at all times.</important_info><current_tweet>${tweet.content}</current_tweet></system_message>`,
               role: "user",
             },
           })

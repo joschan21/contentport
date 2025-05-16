@@ -2,6 +2,8 @@ import { db } from "@/db"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { createAuthMiddleware } from "better-auth/api"
+import { client } from "@/lib/client"
+import { redis } from "./redis"
 
 const database = drizzleAdapter(db, { provider: "pg" })
 
@@ -45,7 +47,19 @@ export const auth = betterAuth({
       ]
 
       if (session && allowlist.includes(session.user.email)) {
-        ctx.redirect("/studio")
+        try {
+          const account = await redis.json.get<object>(
+            `connected-account:${session.user.email}`
+          )
+
+          if (!account) {
+            ctx.redirect("/studio?onboarding=true")
+          } else {
+            ctx.redirect("/studio")
+          }
+        } catch (error) {
+          ctx.redirect("/studio?onboarding=true")
+        }
       } else {
         ctx.redirect("/")
       }

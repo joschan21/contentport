@@ -173,11 +173,11 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <SidebarTrigger className="rounded-full shadow-md border border-stone-200 p-1.5 size-10 flex items-center justify-center bg-white" />
+                  <SidebarTrigger className="border border-stone-200 shadow-lg bg-clip-padding"/>
                 </TooltipTrigger>
                 <TooltipContent
                   side="bottom"
-                  className="bg-stone-800 text-white"
+                  className="bg-stone-800 text-white font-medium"
                 >
                   Toggle Sidebar
                 </TooltipContent>

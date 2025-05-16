@@ -1,7 +1,6 @@
 import { Metadata, Viewport } from "next"
 import "./globals.css"
-import { Instrument_Serif, JetBrains_Mono } from "next/font/google"
-import { GeistSans } from "geist/font/sans"
+import { Instrument_Serif, JetBrains_Mono, Rubik } from "next/font/google"
 import { Toaster } from "react-hot-toast"
 import { ClientProviders } from "@/components/providers/client-providers"
 import { DocumentProvider } from "@/hooks/document-ctx"
@@ -25,6 +24,12 @@ const jetBrainsMono = JetBrains_Mono({
   weight: "400",
 })
 
+const rubik = Rubik({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  weight: ["400", "500", "600", "700"],
+})
+
 export const viewport: Viewport = {
   maximumScale: 1, // Disable auto-zoom on mobile Safari
 }
@@ -37,7 +42,7 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning lang="en">
       <body
-        className={`${GeistSans.className} ${elegant.variable} ${jetBrainsMono.variable} antialiased light`}
+        className={`${rubik.className} ${elegant.variable} ${jetBrainsMono.variable} antialiased light`}
       >
         <DocumentProvider>
           <ClientProviders>{children}</ClientProviders>

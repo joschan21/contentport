@@ -6,10 +6,9 @@ import {
   ArrowUp,
   CheckCircle2,
   ChevronsLeft,
-  ChevronsRight,
   Loader2,
   Plus,
-  ReplyAllIcon,
+  Save,
   Settings,
   Sparkles,
   User,
@@ -17,7 +16,6 @@ import {
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
-import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -27,15 +25,17 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { MentionProvider, useMentionContext } from "@/hooks/mention-ctx"
+import { createExampleDocument } from "@/default-context-docs"
+import { SidebarDoc } from "@/hooks/document-ctx"
+import { useMentionContext } from "@/hooks/mention-ctx"
 import { useTweetContext } from "@/hooks/tweet-ctx"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 import { client } from "@/lib/client"
 import { MentionPlugin } from "@/lib/mention-plugin"
-import { MentionNode } from "@/lib/nodes"
+import { $createMentionNode } from "@/lib/nodes"
 import PlaceholderPlugin from "@/lib/placeholder-plugin"
 import { InferInput } from "@/server"
 import { EditTweetToolResult } from "@/server/routers/chat-router"
-import { LexicalComposer } from "@lexical/react/LexicalComposer"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import { ContentEditable } from "@lexical/react/LexicalContentEditable"
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary"
@@ -43,43 +43,31 @@ import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin"
 import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { HTTPException } from "hono/http-exception"
-import { $getRoot } from "lexical"
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getRoot
+} from "lexical"
 import { nanoid } from "nanoid"
+import { useSearchParams } from "next/navigation"
 import { useQueryState } from "nuqs"
 import { KeyboardEvent as ReactKeyboardEvent } from "react"
-import { Improvements } from "./improvements"
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
-import { Input } from "./ui/input"
-import { Separator } from "./ui/separator"
-import { Tabs, TabsContent } from "./ui/tabs"
-import { TextShimmer } from "./ui/text-shimmer"
-import { Textarea } from "./ui/textarea"
-import { authClient } from "@/lib/auth-client"
 import toast, { Toaster } from "react-hot-toast"
-import { SidebarDoc, useDocumentContext } from "@/hooks/document-ctx"
-import { useParams, useSearchParams } from "next/navigation"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useLocation, useNavigate } from "react-router"
+import { Icons } from "./icons"
+import { Improvements } from "./improvements"
 import {
   ConnectedAccount,
   DEFAULT_CONNECTED_ACCOUNT,
 } from "./tweet-editor/tweet-editor"
-import { Icons } from "./icons"
-
-const initialConfig = {
-  namespace: "context-document-editor",
-  theme: {
-    text: {
-      bold: "font-bold",
-      italic: "italic",
-      underline: "underline",
-    },
-  },
-  onError: (error: Error) => {
-    console.error("[Context Document Editor Error]", error)
-  },
-  editable: true,
-  nodes: [MentionNode],
-}
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
+import DuolingoBadge from "./ui/duolingo-badge"
+import DuolingoButton from "./ui/duolingo-button"
+import DuolingoInput from "./ui/duolingo-input"
+import DuolingoTextarea from "./ui/duolingo-textarea"
+import { Separator } from "./ui/separator"
+import { Tabs, TabsContent } from "./ui/tabs"
+import { TextShimmer } from "./ui/text-shimmer"
 
 type ChatInput = InferInput["chat"]["generate"]
 type HandleInputChange = (
@@ -105,15 +93,21 @@ function ChatInput({
   status: "submitted" | "streaming" | "ready" | "error"
   startNewChat: () => string
 }) {
+  const navigate = useNavigate()
   const [editor] = useLexicalComposerContext()
   const searchParams = useSearchParams()
   let chatId = searchParams.get("chatId")
+  const location = useLocation()
 
   const { attachedDocumentIDs, clearAttachedDocuments } = useMentionContext()
   const { tweets, contents } = useTweetContext()
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    
+    if (location.pathname !== "/studio") {
+      navigate("/studio")
+    }
 
     if (messages.length === 0 && !chatId) {
       chatId = startNewChat()
@@ -185,10 +179,14 @@ function ChatInput({
         }
         ErrorBoundary={LexicalErrorBoundary}
       />
-      <PlaceholderPlugin placeholder="Write anything" />
+      <PlaceholderPlugin placeholder="What do you want to tweet?" />
       <HistoryPlugin />
       <MentionPlugin />
 
+      <DuolingoButton loading={status === "streaming" || status === "submitted"} variant="icon" size="icon" aria-label="Arrow Up">
+        <ArrowUp className="size-5" />
+      </DuolingoButton>
+      {/* 
       <button
         type="submit"
         disabled={status === "submitted" || status === "streaming"}
@@ -199,7 +197,7 @@ function ChatInput({
         ) : (
           <ArrowUp className="size-4 text-white" />
         )}
-      </button>
+      </button> */}
     </form>
   )
 }
@@ -289,7 +287,6 @@ const TweetCard = ({ name, username, src, text }: TweetCard) => {
 export function TweetSuggestion({
   id,
   suggestion,
-  
 }: {
   id: string
   suggestion: string
@@ -527,7 +524,8 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
   })
 
   useEffect(() => {
-    if (account.username) {
+    if (account && account.username) {
+      setConnectedAccount(account)
       setTwitterUsername("@" + account.username)
     }
   }, [account])
@@ -547,6 +545,50 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     },
   })
 
+  const [editor] = useLexicalComposerContext()
+  const { addAttachedDocument, clearAttachedDocuments } = useMentionContext()
+  const [contextDocs, setContextDocs] = useLocalStorage<SidebarDoc[]>(
+    "context-docs",
+    []
+  )
+
+  // Function to check if a document exists and create it if it doesn't
+  const ensureExampleDocumentExists = (docId: string) => {
+    // Check if document exists in localStorage
+    const documentExists = localStorage.getItem(`doc-` + docId)
+
+    if (!documentExists) {
+      // Create the document using our centralized helper
+      const newDoc = createExampleDocument(docId)
+
+      if (!newDoc) return false
+
+      // Add to sidebar docs if not already there
+      const existingDoc = contextDocs.find((doc) => doc.id === docId)
+      if (!existingDoc) {
+        setContextDocs((prev) => [
+          ...prev,
+          {
+            id: newDoc.id,
+            title: newDoc.title,
+            updatedAt: newDoc.updatedAt,
+          },
+        ])
+      }
+
+      // Save to localStorage
+      localStorage.setItem(
+        `doc-${docId}`,
+        JSON.stringify({
+          title: newDoc.title,
+          content: newDoc.content,
+        })
+      )
+    }
+
+    return true
+  }
+
   return (
     <>
       <Toaster position="top-center" />
@@ -557,15 +599,15 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
         onValueChange={(tab) => setActiveTab(tab as "assistant" | "settings")}
       >
         <Sidebar side="right" collapsible="offcanvas">
-          <SidebarHeader className="flex flex-col border-b border-stone-200 items-center justify-end gap-2 px-4">
+          <SidebarHeader className="flex flex-col border-b border-stone-200 bg-stone-100 items-center justify-end gap-2 px-4">
             <div className="w-full flex items-center justify-between">
               <p className="text-sm/6 font-medium">
                 {activeTab === "assistant" ? "Assistant" : "Settings"}
               </p>
-              <div>
-                <Button
+              <div className="flex gap-2">
+                <DuolingoButton
                   size="icon"
-                  variant={activeTab === "settings" ? "default" : "ghost"}
+                  variant={activeTab === "settings" ? "primary" : "secondary"}
                   title="Settings"
                   onClick={() =>
                     setActiveTab(
@@ -574,23 +616,23 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                   }
                 >
                   <Settings className="size-4" />
-                </Button>
-                <Button
+                </DuolingoButton>
+                <DuolingoButton
                   onClick={startNewChat}
                   size="icon"
-                  variant="ghost"
+                  variant="secondary"
                   title="New Chat"
                 >
                   <Plus className="size-4" />
-                </Button>
-                <Button
+                </DuolingoButton>
+                <DuolingoButton
                   onClick={toggleSidebar}
-                  variant="ghost"
+                  variant="secondary"
                   size="icon"
                   title="Close Sidebar"
                 >
                   <X className="size-4" />
-                </Button>
+                </DuolingoButton>
               </div>
             </div>
           </SidebarHeader>
@@ -700,13 +742,90 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                     ))
                   ) : (
                     <div className="flex h-full flex-1 flex-col items-center justify-center text-center p-8">
-                      <p className="text-4xl leading-relaxed">🗣️</p>
-                      <p className="text-base text-stone-800 font-medium">
-                        Start a conversation
+                      <p className="text-2xl text-stone-800 font-medium">
+                        Let's write a great tweet ✏️
                       </p>
                       <p className="text-sm/6 text-muted-foreground mt-1">
-                        Ask about your writing or request changes
+                        Reference a blog post, product update, or rough idea -
+                        I'll write the tweet.
                       </p>
+
+                      <div className="w-2/3 mt-8 mb-4 flex items-center gap-3">
+                        <div className="h-px flex-1 bg-stone-200"></div>
+                        <p className="text-xs text-stone-500">Examples</p>
+                        <div className="h-px flex-1 bg-stone-200"></div>
+                      </div>
+
+                      <div className="grid gap-2 w-full max-w-sm">
+                        <DuolingoButton
+                          className="w-full whitespace-nowrap"
+                          variant="dashedOutline"
+                          onClick={() => {
+                            const docId = "example-blog"
+
+                            ensureExampleDocumentExists(docId)
+                            clearAttachedDocuments()
+                            addAttachedDocument(docId)
+
+                            editor.update(() => {
+                              const root = $getRoot()
+
+                              const p = $createParagraphNode()
+                              p.append($createTextNode("write a tweet about "))
+                              p.append($createMentionNode("@example-blog"))
+                              p.append($createTextNode(" "))
+
+                              root.clear()
+                              root.append(p)
+
+                              // Position selection at the end
+                              p.select()
+                            })
+                            editor.focus()
+                          }}
+                          // className="w-full border text-center px-3 py-2 text-sm text-stone-700 bg-stone-100 rounded-md transition-colors"
+                        >
+                          write a short tweet about{" "}
+                          <span className="ml-1.5 text-indigo-800 bg-indigo-100 rounded-sm px-1 py-0.5">
+                            @example-blog
+                          </span>
+                        </DuolingoButton>
+                        <DuolingoButton
+                          className="w-full whitespace-nowrap"
+                          variant="dashedOutline"
+                          onClick={() => {
+                            // Use the same ID format consistently
+                            const docId = "example-product-update"
+
+                            ensureExampleDocumentExists(docId)
+                            clearAttachedDocuments()
+                            addAttachedDocument(docId)
+
+                            editor.update(() => {
+                              const root = $getRoot()
+
+                              const p = $createParagraphNode()
+                              p.append($createTextNode("announce "))
+                              p.append(
+                                $createMentionNode("@example-product-update")
+                              )
+                              p.append($createTextNode(" "))
+
+                              root.clear()
+                              root.append(p)
+
+                              // Position selection at the end
+                              p.select()
+                            })
+                            editor.focus()
+                          }}
+                        >
+                          announce{" "}
+                          <span className="ml-1.5 text-indigo-800 bg-indigo-100 rounded-sm px-1 py-0.5">
+                            @example-product-update
+                          </span>
+                        </DuolingoButton>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -724,16 +843,18 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="w-full flex items-center space-x-2">
-                        <Input
-                          className="flex-1 w-full bg-stone-100"
+                        <DuolingoInput
+                          fullWidth
+                          className="flex-1 w-full"
                           type="text"
                           placeholder="@joshtriedcoding"
                           value={twitterUsername}
                           onChange={(e) => setTwitterUsername(e.target.value)}
                         />
-                        <Button
-                          variant="outline"
+                        <DuolingoButton
+                          variant="dashedOutline"
                           size="sm"
+                          className="w-fit"
                           onClick={() =>
                             connectAccount({ username: twitterUsername })
                           }
@@ -747,7 +868,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                           ) : (
                             "Connect"
                           )}
-                        </Button>
+                        </DuolingoButton>
                       </div>
                     </div>
                   </div>
@@ -760,17 +881,18 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                         <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
                           Fine-Tune Prompt
                         </h3>
-                        <span className="text-xs px-2 py-0.5 bg-stone-200 text-stone-600 rounded-full">
+                        <DuolingoBadge variant="gray" className="px-3 text-xs">
                           Optional
-                        </span>
+                        </DuolingoBadge>
                       </div>
                       <p className="text-sm text-stone-600">
                         If the agent doesn't quite get your style, fine-tune it
                         here
                       </p>
                     </div>
-                    <Textarea
-                      className="min-h-24"
+                    <DuolingoTextarea
+                      fullWidth
+                      className="min-h-32"
                       placeholder="My tweets always use this emoji (◆) for bullet points and usually consist of a short, catchy intro hook and three bullet points. I love the 🎉 emoji"
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
@@ -786,28 +908,28 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                     <p className="text-sm text-stone-600">
                       Paste a direct link to tweets to use as a style reference
                     </p>
-                    <div className="flex items-center justify-between">
-                      <div className="w-full flex items-center space-x-2">
-                        <Input
-                          value={tweetLink}
-                          onChange={(e) => {
-                            setTweetLink(e.target.value)
-                          }}
-                          className="flex-1 w-full bg-stone-100"
-                          type="text"
-                          placeholder="https://x.com/username/status/1234567890123456789"
-                        />
-                        <Button
-                          onClick={() => {
-                            importTweets({ link: tweetLink })
-                          }}
-                          disabled={isImporting}
-                          variant="outline"
-                          size="sm"
-                        >
-                          {isImporting ? "Importing..." : "Import"}
-                        </Button>
-                      </div>
+                    <div className="w-full flex items-center space-x-2">
+                      <DuolingoInput
+                        fullWidth
+                        value={tweetLink}
+                        onChange={(e) => {
+                          setTweetLink(e.target.value)
+                        }}
+                        className="flex-1 w-full"
+                        type="text"
+                        placeholder="https://x.com/username/status/1234567890123456789"
+                      />
+                      <DuolingoButton
+                        onClick={() => {
+                          importTweets({ link: tweetLink })
+                        }}
+                        disabled={isImporting}
+                        variant="dashedOutline"
+                        className="w-fit"
+                        size="sm"
+                      >
+                        {isImporting ? "Importing..." : "Import"}
+                      </DuolingoButton>
                     </div>
 
                     <div className="flex flex-col p-4 gap-2 items-center justify-center text-center h-full border border-dashed border-gray-200 bg-stone-100 dark:border-gray-800 rounded-lg">
@@ -816,20 +938,20 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                           {style.tweets.map((tweet, index) => {
                             return (
                               <div className="relative" key={index}>
-                                <Button
-                                  variant="ghost"
-                                  className="absolute top-3 right-3 !p-1.5 aspect-square"
+                                <DuolingoButton
+                                  variant="destructive"
+                                  className="absolute top-3 right-3 w-fit p-1.5 text-white aspect-square"
                                   onClick={() =>
                                     deleteTweet({ tweetId: tweet.id })
                                   }
                                   disabled={isDeleting}
                                 >
                                   {isDeleting ? (
-                                    <Loader2 className="size-4 text-stone-500 animate-spin" />
+                                    <Loader2 className="size-4 animate-spin" />
                                   ) : (
-                                    <X className="size-4 text-stone-500" />
+                                    <X className="size-4" />
                                   )}
-                                </Button>
+                                </DuolingoButton>
                                 <TweetCard
                                   username={tweet.author.username}
                                   name={tweet.author.name}
@@ -860,22 +982,22 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
 
           {activeTab === "assistant" ? (
             <SidebarFooter className="p-3 border-t">
-              <MentionProvider>
-                <LexicalComposer initialConfig={initialConfig}>
-                  <ChatInput
-                    handleInputChange={handleInputChange}
-                    handleSubmit={handleSubmit}
-                    messages={messages}
-                    status={status}
-                    startNewChat={startNewChat}
-                  />
-                </LexicalComposer>
-              </MentionProvider>
+              <p className="text-xs text-stone-500 italic">
+                Tip: Use @ to reference context documents.
+              </p>
+
+              <ChatInput
+                handleInputChange={handleInputChange}
+                handleSubmit={handleSubmit}
+                messages={messages}
+                status={status}
+                startNewChat={startNewChat}
+              />
             </SidebarFooter>
           ) : (
             <SidebarFooter className="p-3 border-t">
-              <Button
-                className="w-full h-12"
+              <DuolingoButton
+                className="w-full"
                 onClick={() => savePrompt()}
                 disabled={isSaving}
               >
@@ -885,9 +1007,12 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                     Saving...
                   </>
                 ) : (
-                  "Save Style"
+                  <>
+                    <Save className="mr-2 size-5" />
+                    Save
+                  </>
                 )}
-              </Button>
+              </DuolingoButton>
             </SidebarFooter>
           )}
           <SidebarRail />
