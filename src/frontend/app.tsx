@@ -1,11 +1,11 @@
 import { Toaster } from "react-hot-toast"
-import { BrowserRouter, Route, Routes } from "react-router"
+import { BrowserRouter, Route, Routes, NavLink } from "react-router"
 import Page from "./page"
 import { Settings } from "./settings/page"
 import { ContextPage } from "./studio/context/[id]/page"
 import Layout from "./studio/layout"
-import { Studio } from "./studio/page"
 import { LoginPage } from "./auth/login"
+import StudioPage from "./studio/page"
 
 export default function App() {
   return (
@@ -27,7 +27,7 @@ export default function App() {
             path="/studio"
             element={
               <Layout>
-                <Studio />
+                <StudioPage />
               </Layout>
             }
           />

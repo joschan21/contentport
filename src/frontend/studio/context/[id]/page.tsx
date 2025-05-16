@@ -44,7 +44,7 @@ export const ContextPage = () => {
   }
 
   return (
-    <div className="relative bg-white mt-4 border border-stone-200 shadow-sm rounded-2xl p-6 z-10 max-w-3xl w-full h-full mx-auto">
+    <div className="relative bg-white mt-4 border border-stone-200 bg-clip-padding shadow-md rounded-sm p-6 z-10 max-w-3xl w-full h-full mx-auto">
       <LexicalComposer initialConfig={initialConfig}>
         <ContextDocumentEditor key={id!} documentId={id!} />
       </LexicalComposer>

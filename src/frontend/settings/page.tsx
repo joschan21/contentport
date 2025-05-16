@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react"
 import { NavLink } from "react-router"
 import { Progress } from "@/components/ui/progress"
 import { format, isToday, isTomorrow } from "date-fns"
+import DuolingoBadge from "@/components/ui/duolingo-badge"
 
 export const Settings = () => {
   const { data } = authClient.useSession()
@@ -55,9 +56,9 @@ export const Settings = () => {
               </p>
               <p className="text-sm text-gray-500">{data?.user.email}</p>
             </div>
-            <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20 mb-6">
+            <DuolingoBadge className="mb-6 px-3">
               {data?.user.plan === "free" ? "Free Plan" : null}
-            </span>
+            </DuolingoBadge>
           </div>
 
           {/* usage card */}

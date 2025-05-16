@@ -366,21 +366,19 @@ export function ImageTool({
     }
   }, [])
 
-  const saveImage = async () => {
+  const saveImage = async (scale = 1) => {
     try {
       const element = wrapperRef.current
       if (!element) return
 
       const savingToast = toast.loading("Exporting image...")
 
-      // Find and hide the drag handle
       const dragHandle = element.querySelector('[role="slider"]') as HTMLElement
       const originalDisplay = dragHandle?.style.display
       if (dragHandle) {
         dragHandle.style.display = "none"
       }
 
-      const scale = window.devicePixelRatio
       const data = await domtoimage.toPng(element, {
         height: element.offsetHeight * scale,
         width: element.offsetWidth * scale,
@@ -392,7 +390,6 @@ export function ImageTool({
         },
       })
 
-      // Restore the drag handle visibility
       if (dragHandle) {
         dragHandle.style.display = originalDisplay || ""
       }
@@ -400,8 +397,8 @@ export function ImageTool({
       if (onSave) {
         onSave({
           src: data,
-          width: element.offsetWidth,
-          height: element.offsetHeight,
+          width: element.offsetWidth * scale,
+          height: element.offsetHeight * scale,
           editorState: {
             blob,
             canvasWidth,
@@ -1282,7 +1279,7 @@ export function ImageTool({
             <Button
               className="w-full gap-2"
               size="lg"
-              onClick={saveImage}
+              onClick={() => saveImage(3)}
               disabled={!blob?.src}
             >
               Looks good!
@@ -1293,3 +1290,5 @@ export function ImageTool({
     </div>
   )
 }
+
+

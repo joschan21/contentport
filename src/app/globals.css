@@ -101,7 +101,7 @@ body {
 
 /* node styles */
 .mention-text {
-  @apply text-blue-800 bg-blue-100 rounded-sm px-1 py-0.5;
+  @apply text-indigo-800 bg-indigo-100 rounded-sm px-1 py-0.5;
 }
 
 .addition-node {

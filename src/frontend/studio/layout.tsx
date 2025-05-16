@@ -1,9 +1,14 @@
+"use client"
+
 import { PropsWithChildren, useEffect, useState } from "react"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { ContextSidebar } from "@/components/context-sidebar"
 import { AppSidebarInset } from "@/components/providers/app-sidebar-inset"
 import { SidebarProvider } from "@/components/ui/sidebar"
+import { MentionProvider } from "@/hooks/mention-ctx"
+import { LexicalComposer } from "@lexical/react/LexicalComposer"
+import { MentionNode } from "@/lib/nodes"
 
 function parseCookies(): Record<string, string> {
   return document.cookie
@@ -26,6 +31,22 @@ interface LayoutProps extends PropsWithChildren {
   hideAppSidebar?: boolean
 }
 
+const initialConfig = {
+  namespace: "context-document-editor",
+  theme: {
+    text: {
+      bold: "font-bold",
+      italic: "italic",
+      underline: "underline",
+    },
+  },
+  onError: (error: Error) => {
+    console.error("[Context Document Editor Error]", error)
+  },
+  editable: true,
+  nodes: [MentionNode],
+}
+
 export default function Layout({ children, hideAppSidebar }: LayoutProps) {
   const cookies = parseCookies()
   const sidebarWidth = cookies["sidebar:width"]
@@ -46,9 +67,13 @@ export default function Layout({ children, hideAppSidebar }: LayoutProps) {
       {hideAppSidebar ? (
         <AppSidebarInset>{children}</AppSidebarInset>
       ) : (
-        <AppSidebar>
-          <AppSidebarInset>{children}</AppSidebarInset>
-        </AppSidebar>
+        <MentionProvider>
+          <LexicalComposer initialConfig={initialConfig}>
+            <AppSidebar>
+              <AppSidebarInset>{children}</AppSidebarInset>
+            </AppSidebar>
+          </LexicalComposer>
+        </MentionProvider>
       )}
     </SidebarProvider>
   )

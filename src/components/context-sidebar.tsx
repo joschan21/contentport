@@ -20,6 +20,8 @@ import {
   SidebarGroup,
   SidebarHeader,
 } from "./ui/sidebar"
+import DuolingoButton from "./ui/duolingo-button"
+import DuolingoBadge from "./ui/duolingo-badge"
 
 interface DocumentListResponse {
   success: boolean
@@ -144,8 +146,8 @@ export function ContextSidebar({
   }
 
   return (
-    <div className="bg-sidebar text-sidebar-foreground w-72">
-      <div className="h-full flex flex-col fixed w-72">
+    <div className="bg-light-gray text-sidebar-foreground w-80">
+      <div className="h-full flex flex-col fixed w-80">
         <SidebarHeader className="border-b h-16 border-border/40 p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg/7 tracking-tight text-stone-800 font-medium">
@@ -155,28 +157,29 @@ export function ContextSidebar({
         </SidebarHeader>
         <SidebarContent className="p-4 space-y-6">
           <SidebarGroup>
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">
+            <h3 className="text-sm font-medium text-stone-800 mb-2">
               Main Content
             </h3>
 
             <NavLink
               to={"/studio" + getSearchString()}
-              className={`flex items-center gap-2 p-2 rounded-md ${
-                pathname === "/studio" ? "bg-muted" : "bg-muted/50"
+              className={`flex h-11 items-center gap-2 p-2 rounded-md ${
+                pathname === "/studio" ? "bg-stone-200" : "hover:bg-stone-100"
               } cursor-pointer`}
             >
               <Twitter className="size-4 text-blue-500 fill-blue-500" />
               <span className="text-sm font-medium">Tweet</span>
-              <Badge className="text-xs ml-auto font-medium">Main</Badge>
+              <DuolingoBadge className="text-xs ml-auto px-3">Main</DuolingoBadge>
             </NavLink>
           </SidebarGroup>
 
           <SidebarGroup>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-muted-foreground">
+            <div className="flex flex-col items-center justify-between mb-2">
+              <h3 className="w-full text-sm font-medium text-stone-800">
                 Context Documents
               </h3>
               <NavLink
+              className="w-full mt-2"
                 to={`/studio/context/${newId.current}${getSearchString()}`}
                 onClick={() => {
                   const newDoc: SidebarDoc = {
@@ -187,46 +190,52 @@ export function ContextSidebar({
                   setDocs((prev) => [newDoc, ...prev])
                   newId.current = crypto.randomUUID()
                 }}
-                className={cn(buttonVariants({ variant: "ghost" }), "size-6")}
               >
-                <Plus className="size-3" />
+                <DuolingoButton
+                  className="w-full h-10"
+                >
+                  <Plus className="size-4 mr-1.5" />
+                  <span className="text-sm">Add</span>
+                </DuolingoButton>
               </NavLink>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 mt-1">
               {docs.length === 0
                 ? null
                 : docs.map((doc) => (
                     <NavLink
                       key={doc.id}
                       to={`/studio/context/${doc.id}${getSearchString()}`}
-                      className={`flex items-center justify-between group p-2 rounded-md ${
+                      className={`flex h-11 items-center justify-between group p-2 rounded-md ${
                         pathname === `/studio/context/${doc.id}`
-                          ? "bg-muted"
-                          : "hover:bg-muted/50"
+                          ? "bg-stone-200"
+                          : "hover:bg-stone-100"
                       } cursor-pointer`}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 pr-1.5 break-words">
                         <FileText className="size-4 shrink-0 text-muted-foreground" />
                         <span className="text-sm font-medium">
                           {doc.title || "Untitled document"}
                         </span>
                       </div>
-                      <Button
-                        variant="ghost"
+                      <DuolingoButton
+                        variant="destructive"
                         size="icon"
-                        className="size-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="size-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
                           setDocs((prev) =>
                             prev.filter((document) => document.id !== doc.id)
                           )
-                          localStorage.removeItem(`doc-${doc.id}`)
+                          localStorage.removeItem(
+                            `doc-${doc.id.replace(/^doc-/, "")}`
+                          )
                           if (id === doc.id) navigate("/studio")
                         }}
                       >
                         <X className="size-3" />
-                      </Button>
+                      </DuolingoButton>
                     </NavLink>
                   ))}
             </div>
