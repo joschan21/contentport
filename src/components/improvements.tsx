@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "./ui/button"
+import DuolingoButton from "./ui/duolingo-button"
 
 const CategoryIcon = ({ category }: { category: string }) => {
   // Define colors for different categories
@@ -93,12 +94,12 @@ export function SuggestionCard({
           />
         </div>
         <div className="flex gap-2 ml-auto">
-          <Button onClick={onAccept} size="sm">
-            <Check className="w-4 h-4" /> Apply
-          </Button>
-          <Button onClick={onReject} variant="ghost" size="sm">
+          <DuolingoButton className="h-8" onClick={onAccept} size="sm">
+            <Check className="w-4 h-4 mr-1" /> Apply
+          </DuolingoButton>
+          <DuolingoButton className="h-8" variant="destructive" onClick={onReject} size="sm">
             <X className="w-4 h-4" /> Reject
-          </Button>
+          </DuolingoButton>
         </div>
       </div>
 
