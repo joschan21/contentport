@@ -370,12 +370,10 @@ export const chatRouter = j.router({
 
       const saveMessages = async (chat: Chat) => {
         await redis.json.set(`chat:${user.email}:${chat.id}`, "$", chat)
-        await redis.expire(`chat:${user.email}:${chat.id}`, 60 * 10)
       }
 
       const saveToolMessages = async (chat: Chat) => {
         await redis.json.set(`chat:${user.email}:tool:${chat.id}`, "$", chat)
-        await redis.expire(`chat:${user.email}:tool:${chat.id}`, 60 * 10)
       }
 
       after(async () => {
