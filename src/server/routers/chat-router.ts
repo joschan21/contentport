@@ -8,20 +8,16 @@ import { chatLimiter } from "@/lib/chat-limiter"
 import {
   assistantPrompt,
   editToolStyleMessage,
-  editToolSystemPrompt
+  editToolSystemPrompt,
 } from "@/lib/prompt-utils"
-import {
-  diff_wordMode,
-  DiffWithReplacement,
-  processDiffs
-} from "@/lib/utils"
+import { diff_wordMode, DiffWithReplacement, processDiffs } from "@/lib/utils"
 import { tweet } from "@/lib/validators"
 import { anthropic } from "@ai-sdk/anthropic"
 import { openai } from "@ai-sdk/openai"
 import { CodeHighlightNode, CodeNode } from "@lexical/code"
 import { AutoLinkNode } from "@lexical/link"
 import { ListItemNode, ListNode } from "@lexical/list"
-import { } from "@lexical/plain-text"
+import {} from "@lexical/plain-text"
 import { HeadingNode, QuoteNode } from "@lexical/rich-text"
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table"
 import {
@@ -30,7 +26,7 @@ import {
   createDataStreamResponse,
   generateText,
   streamText,
-  tool
+  tool,
 } from "ai"
 import { format, isToday, isTomorrow } from "date-fns"
 import "diff-match-patch-line-and-word"
@@ -47,6 +43,7 @@ import { nanoid } from "nanoid"
 import { after } from "next/server"
 import { chunkDiffs } from "../../../diff"
 import { Style } from "./style-router"
+import { diff_match_patch } from "diff-match-patch"
 
 export type EditTweetToolResult = {
   id: string
@@ -75,93 +72,6 @@ const chat = z.object({
 })
 
 type Chat = z.infer<typeof chat>
-
-const editTargetIdentifierPrompt = ({
-  tweet,
-  messages,
-}: {
-  tweet: string
-  messages: Message[]
-}) => `
-You are a precise and context-aware assistant working inside ContentPort — a focused studio for creating high-quality posts for Twitter. Your job is to analyze a user instruction and identify which specific section of a tweet should be edited. The tweet will be edited by a second model, but ONLY the part(s) you wrap in <edit> tags will be visible to that model.
-
-<task>
-Your job is to decide which part of the tweet should be edited / forwarded to the next model based on the user's instruction.
-
-- If the instruction suggests a full rewrite or general improvement — even implicitly (e.g. "improve this", "what do you think", "can you make it better", "clarify this", "make it hit harder") — wrap the full tweet in a single <edit> tag.
-- If the instruction clearly targets a specific part (e.g. "change the last line", "fix the first sentence", "reword the third part"), wrap only that section in <edit> tags.
-- If multiple parts are explicitly mentioned, wrap each in its own <edit> tag.
-- If the instruction is vague or unsure but suggests a desire for feedback or polishing, default to wrapping the whole tweet.
-</task>
-
-<rules>
-- Always return the full tweet, with only the part(s) to be edited wrapped in <edit> tags.
-- ALWAYS return the EXACT SAME tweet without ANY additional formatting, punctuation, ANYTHING changed but the edit tag.
-- Your ONLY job is to place the <edit>...</edit> tag(s), NEVER make ANY changes beyond that.
-- If it's a general feedback request, assume full context is needed and wrap the whole tweet in <edit>...</edit>.
-- If the instruction targets specific areas, isolate those in <edit>.
-- NEVER return ANY kind of explanations for your changes - just 1:1 the tweet with edit tag(s).
-</rules>
-
-<examples>
-
-<example>
-<tweet>I finally launched my side project. It's a small tool that helps writers stay focused.</tweet>
-<user_instruction>can you improve this?</user_instruction>
-<output><edit>I finally launched my side project. It's a small tool that helps writers stay focused.</edit></output>
-</example>
-
-<example>
-<tweet>I finally launched my side project. It's a small tool that helps writers stay focused.</tweet>
-<user_instruction>can you rework the second sentence?</user_instruction>
-<output>I finally launched my side project. <edit>It's a small tool that helps writers stay focused.</edit></output>
-</example>
-
-<example>
-<tweet>don't optimize too early.\n\nbuild the dumb version first, then make it better.</tweet>
-<user_instruction>make it sharper and punchier</user_instruction>
-<output><edit>don't optimize too early.\n\nbuild the dumb version first, then make it better</edit></output>
-</example>
-
-<example>
-<tweet>One post. Every day. For a year. That's how you get good.</tweet>
-<user_instruction>change the last part</user_instruction>
-<output>One post. Every day. For a year. <edit>That's how you get good.</edit></output>
-</example>
-
-<example>
-<tweet>Launch fast. Ship messy. Learn fast. Improve relentlessly.</tweet>
-<user_instruction>improve the second and fourth parts</user_instruction>
-<output>Launch fast. <edit>Ship messy.</edit> Learn fast. <edit>Improve relentlessly.</edit></output>
-</example>
-
-<example>
-<tweet>AI won't replace you. But someone using AI will.</tweet>
-<user_instruction>ehh this feels cliché</user_instruction>
-<output><edit>AI won't replace you. But someone using AI will.</edit></output>
-</example>
-
-<example>
-<tweet>Turned my side project into a business.\n\nTook 6 months with zero funding.\n\nJust focus.</tweet>
-<user_instruction>make the first part more inspiring</user_instruction>
-<output><edit>Turned my side project into a business.</edit>\n\nTook 6 months with zero funding.\n\nJust focus.</output>
-</example>
-
-</examples>
-
-<tweet>
-${tweet}
-</tweet>
-
-<message_history>
-${messages}
-</message_history>
-
-<user_instruction>
-${messages[messages.length - 1]?.content}
-</user_instruction>
-
-<output>`
 
 const document = z.object({
   id: z.string(),
@@ -198,7 +108,7 @@ export const chatRouter = j.router({
 
       const { success, reset } = await chatLimiter.limit(user.email)
 
-      if (!success) {
+      if (!success && process.env.NODE_ENV !== "development") {
         const resetDate = new Date(reset)
         let resetStr = format(resetDate, "h:mm a")
         if (isToday(resetDate)) {
@@ -237,6 +147,8 @@ export const chatRouter = j.router({
           AutoLinkNode,
         ],
       })
+
+      const attachment = new PromptBuilder()
 
       const tool_chat = await redis.json.get<Chat>(
         `chat:${user.email}:tool:${chatId}`
@@ -317,11 +229,63 @@ export const chatRouter = j.router({
             message: message,
           })
 
+          const lastSuggestion = await redis.get<string>(
+            `last-suggestion:${chatId}`
+          )
+
+          if (lastSuggestion) {
+            attachment.push(
+              `<important_info>
+This is a system attachment to the USER request. The purpose of this attachment is to keep you informed about the USER's latest tweet editor state at all times. It might be empty or already contain text. REMEMBER: All parts of your previous suggestion that are NOT inside of the current tweet have been explicitly REJECTED by the USER. NEVER suggest or reintroduce that text again unless the USER explicitly asks for it.
+</important_info>`
+            )
+          } else {
+            attachment.push(
+              `<important_info>
+This is a system attachment to the USER request. The purpose of this attachment is to keep you informed about the USER's latest tweet editor state at all times. It might be empty or already contain text.
+</important_info>`
+            )
+          }
+
+          attachment.push(`<current_tweet>${tweet.content}</current_tweet>`)
+
+          if (lastSuggestion) {
+            attachment.push(
+              `<your_last_suggestion>${lastSuggestion}</your_last_suggestion>`
+            )
+
+            const t1 = tweet.content
+            const t2 = lastSuggestion
+
+            const dmp = new diff_match_patch()
+            const diffs = dmp.diff_main(t2, t1)
+            dmp.diff_cleanupSemantic(diffs)
+
+            const rejectedElements = diffs
+              .filter(([action]) => action === -1)
+              .map(([_, text]) => text.trim())
+              .filter((text) => text.length > 0)
+
+            if (rejectedElements.length > 0) {
+              attachment.push(
+                `<rejected_elements>
+${rejectedElements.map((element) => `- "${element}"`).join("\n")}
+</rejected_elements>
+
+<important_note>
+The user has explicitly rejected the elements listed above. DO NOT reintroduce these elements in your suggestions unless the user specifically requests them.
+</important_note>`
+              )
+            }
+          }
+
           edit_tool_messages = appendClientMessage({
             messages: edit_tool_messages,
             message: {
               id: `meta:current-tweet:${nanoid()}`,
-              content: `<system_message><important_info>This is a system message. The user did not write this message. The user is interfacing with you through contentport's visual tweet editor. The only purpose of this message is to keep you informed about the user's latest tweet editor state at all times.</important_info><current_tweet>${tweet.content}</current_tweet></system_message>`,
+              content: `<system_attachment>
+${attachment.toString()}
+</system_attachment>`,
               role: "user",
             },
           })
@@ -337,10 +301,8 @@ export const chatRouter = j.router({
             : result.text
 
           sanitizedOutput = sanitizedOutput
-            .replaceAll("<edit>", "")
-            .replaceAll("</edit>", "")
-            .replaceAll("<tweet_suggestion>", "")
-            .replaceAll("</tweet_suggestion>", "")
+            .replaceAll("<current_tweet>", "")
+            .replaceAll("</current_tweet>", "")
             .replaceAll("—", "-")
 
           const t1 = tweet.content
@@ -359,6 +321,8 @@ export const chatRouter = j.router({
               content: sanitizedOutput,
             },
           })
+
+          await redis.set(`last-suggestion:${chatId}`, sanitizedOutput)
 
           return {
             id: tweet.id,
@@ -415,4 +379,19 @@ async function incrementChatCount(userEmail: string) {
   const today = format(new Date(), "yyyy-MM-dd")
   const hashKey = `chat:count:${userEmail}`
   await redis.hincrby(hashKey, today, 1)
+}
+
+class PromptBuilder {
+  private parts: string[] = []
+
+  push(content: string | undefined | null): this {
+    if (content?.trim()) {
+      this.parts.push(content.trim())
+    }
+    return this
+  }
+
+  toString(): string {
+    return this.parts.join("\n\n").trim()
+  }
 }
