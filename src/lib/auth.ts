@@ -64,23 +64,11 @@ export const auth = betterAuth({
         "nizabizaher@gmail.com",
         "jokirillmeerkatz@outlook.de",
         "2607jojo@gmail.com",
-        "pietro.dev.07@gmail.com"
+        "pietro.dev.07@gmail.com",
       ]
 
       if (session && allowlist.includes(session.user.email)) {
-        try {
-          const account = await redis.json.get<object>(
-            `connected-account:${session.user.email}`
-          )
-
-          if (!account) {
-            ctx.redirect("/studio?onboarding=true")
-          } else {
-            ctx.redirect("/studio")
-          }
-        } catch (error) {
-          ctx.redirect("/studio?onboarding=true")
-        }
+        ctx.redirect("/studio")
       } else {
         ctx.redirect("/")
       }
