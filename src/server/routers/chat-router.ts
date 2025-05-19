@@ -44,6 +44,8 @@ import { after } from "next/server"
 import { chunkDiffs } from "../../../diff"
 import { Style } from "./style-router"
 import { diff_match_patch } from "diff-match-patch"
+import { google } from "@ai-sdk/google"
+import { ConnectedAccount } from "@/components/tweet-editor/tweet-editor"
 
 export type EditTweetToolResult = {
   id: string
@@ -156,10 +158,17 @@ export const chatRouter = j.router({
 
       let edit_tool_messages: Message[] = tool_chat?.messages ?? []
 
+      const isFirstChatMessage =
+        edit_tool_messages.length === 0 && !Boolean(tweet.content.trim())
+
+      const account = await redis.json.get<ConnectedAccount>(
+        `connected-account:${user.email}`
+      )
+
       if (edit_tool_messages.length === 0) {
         const style = await redis.json.get<Style>(`style:${user.email}`)
         if (style) {
-          const styleMessage = editToolStyleMessage({ style })
+          const styleMessage = editToolStyleMessage({ style, account })
           edit_tool_messages = appendClientMessage({
             messages: edit_tool_messages,
             message: styleMessage,
@@ -278,6 +287,14 @@ The user has explicitly rejected the elements listed above. DO NOT reintroduce t
               )
             }
           }
+
+          if (isFirstChatMessage) {
+            attachment.push(
+              `<system_hint>The current tweet editor is empty, the user is asking you for a first draft. Keep it REALLY SHORT, NEVER exceed 160 CHARACTERS or 5 LINES OF TEXT</system_hint>`
+            )
+          }
+
+          attachment.push(`<reminder>NEVER announce the tweet you're creating, e.g. NEVER say ("Here's the edited tweet" etc.), just create the tweet. Also, remember to NEVER use ANY of the PROHIBITED WORDS.</reminder>`)
 
           edit_tool_messages = appendClientMessage({
             messages: edit_tool_messages,

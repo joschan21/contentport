@@ -6,6 +6,7 @@ import { HTTPException } from "hono/http-exception"
 import { chatLimiter } from "@/lib/chat-limiter"
 import { ConnectedAccount } from "@/components/tweet-editor/tweet-editor"
 import { Style } from "./style-router"
+import { DEFAULT_TWEETS } from "@/constants/default-tweet-preset"
 
 const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
 
@@ -99,62 +100,87 @@ export const settingsRouter = j.router({
         expansions: ["author_id"],
       })
 
-      // Add a filter to remove self-replies - check if in_reply_to_user_id exists
-      const filteredTweets = userTweets.data.data.filter(tweet => 
-        !tweet.in_reply_to_user_id && !tweet.referenced_tweets?.some(ref => ref.type === 'replied_to')
-      );
-
-      // Map tweets with their metrics and sort by likes
-      const tweetsWithStats: TweetWithStats[] = filteredTweets.map(
-        (tweet) => ({
-          id: tweet.id,
-          text: tweet.text,
-          likes: tweet.public_metrics?.like_count || 0,
-          retweets: tweet.public_metrics?.retweet_count || 0,
-          created_at: tweet.created_at || "",
-        })
-      )
-
-      // Sort by likes (most to least)
-      const sortedTweets = tweetsWithStats.sort((a, b) => b.likes - a.likes)
-
-      // Take top 20 tweets
-      const topTweets = sortedTweets.slice(0, 20)
-
-      // Format tweets for style storage
-      const author = userTweets.includes.users?.[0]
-      const formattedTweets = topTweets.map((tweet) => {
-        // Clean up tweet text by removing image links
-        const cleanedText = tweet.text
-          .replace(/https:\/\/t\.co\/\w+/g, "")
-          .trim()
-
-        return {
-          id: tweet.id,
-          text: cleanedText,
-          created_at: tweet.created_at,
-          author_id: userData.id,
-          edit_history_tweet_ids: [tweet.id],
-          author: author
-            ? {
-                username: author.username,
-                profile_image_url: author.profile_image_url,
-                name: author.name,
-              }
-            : null,
-        }
-      })
-
-      // Set the style for the user with the tweets
       const styleKey = `style:${user.email}`
-      await redis.json.set(styleKey, "$", {
-        tweets: formattedTweets.reverse(),
-        prompt: "",
-      })
+      let isPreset: boolean = false
+      let userTweetCount: number = 0
+
+      if (!userTweets.data.data) {
+        isPreset = true
+
+        await redis.json.set(styleKey, "$", {
+          tweets: DEFAULT_TWEETS,
+          prompt: "",
+        })
+      } else {
+        isPreset = false
+
+        const filteredTweets = userTweets.data.data?.filter(
+          (tweet) =>
+            !tweet.in_reply_to_user_id &&
+            !tweet.referenced_tweets?.some((ref) => ref.type === "replied_to")
+        )
+
+        const tweetsWithStats: TweetWithStats[] = filteredTweets.map(
+          (tweet) => ({
+            id: tweet.id,
+            text: tweet.text,
+            likes: tweet.public_metrics?.like_count || 0,
+            retweets: tweet.public_metrics?.retweet_count || 0,
+            created_at: tweet.created_at || "",
+          })
+        )
+
+        const sortedTweets = tweetsWithStats.sort((a, b) => b.likes - a.likes)
+
+        const topTweets = sortedTweets.slice(0, 20)
+
+        const author = userTweets.includes.users?.[0]
+        let formattedTweets = topTweets.map((tweet) => {
+          const cleanedText = tweet.text
+            .replace(/https:\/\/t\.co\/\w+/g, "")
+            .trim()
+
+          return {
+            id: tweet.id,
+            text: cleanedText,
+            created_at: tweet.created_at,
+            author_id: userData.id,
+            edit_history_tweet_ids: [tweet.id],
+            author: author
+              ? {
+                  username: author.username,
+                  profile_image_url: author.profile_image_url,
+                  name: author.name,
+                }
+              : null,
+          }
+        })
+
+        userTweetCount = formattedTweets.length
+
+        // Fill up to 20 tweets with DEFAULT_TWEETS if needed
+        if (formattedTweets.length < 20) {
+          const existingIds = new Set(formattedTweets.map((t) => t.id))
+          for (const defaultTweet of DEFAULT_TWEETS) {
+            if (formattedTweets.length >= 20) break
+            if (!existingIds.has(defaultTweet.id)) {
+              formattedTweets.push(defaultTweet)
+              existingIds.add(defaultTweet.id)
+            }
+          }
+        }
+
+        await redis.json.set(styleKey, "$", {
+          tweets: formattedTweets.reverse(),
+          prompt: "",
+        })
+      }
 
       return c.json({
         success: true,
         data: {
+          userTweetCount,
+          isPreset,
           username: userData.username,
           name: userData.name,
           profile_image_url: userData.profile_image_url,

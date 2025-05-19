@@ -25,7 +25,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { createExampleDocument } from "@/default-context-docs"
+import { createExampleDocument } from "@/constants/default-context-docs"
 import { SidebarDoc } from "@/hooks/document-ctx"
 import { useMentionContext } from "@/hooks/mention-ctx"
 import { useTweetContext } from "@/hooks/tweet-ctx"
@@ -805,7 +805,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                               const root = $getRoot()
 
                               const p = $createParagraphNode()
-                              p.append($createTextNode("announce "))
+                              p.append($createTextNode("tweet about "))
                               p.append(
                                 $createMentionNode("@example-product-update")
                               )
@@ -820,7 +820,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                             editor.focus()
                           }}
                         >
-                          announce{" "}
+                          tweet about{" "}
                           <span className="ml-1.5 text-indigo-800 bg-indigo-100 rounded-sm px-1 py-0.5">
                             @example-product-update
                           </span>

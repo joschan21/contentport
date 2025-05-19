@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import DuolingoButton from "@/components/ui/duolingo-button"
 import DuolingoInput from "@/components/ui/duolingo-input"
 import { Progress } from "@/components/ui/progress"
-import { DEFAULT_DOCS } from "@/default-context-docs"
+import { DEFAULT_DOCS } from "@/constants/default-context-docs"
 import { SidebarDoc } from "@/hooks/document-ctx"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { client } from "@/lib/client"
@@ -93,17 +93,14 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
   const createExampleDocuments = () => {
     const currentDate = new Date()
 
-    // Use the DEFAULT_DOCS to generate sidebar docs
     const sidebarDocs = DEFAULT_DOCS.map((doc) => ({
       id: doc.id,
       title: doc.title,
       updatedAt: currentDate,
     }))
 
-    // Save to sidebar docs
     setContextDocs(sidebarDocs)
 
-    // Store each document in localStorage
     DEFAULT_DOCS.forEach((doc) => {
       localStorage.setItem(
         `doc-${doc.id}`,
@@ -121,7 +118,11 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
   )
   const queryClient = useQueryClient()
 
-  const { mutate: connectAccount, isPending } = useMutation({
+  const {
+    data,
+    mutate: connectAccount,
+    isPending,
+  } = useMutation({
     mutationFn: async ({ username }: { username: string }) => {
       const res = await client.settings.onboarding.$post({ username })
       return await res.json()
@@ -348,13 +349,21 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
                   <p className="text-2xl font-semibold text-gray-900">
                     You're in! 🎉
                   </p>
-                  <p className="text-gray-600">
-                    We've imported your{" "}
-                    <span className="font-medium text-stone-800">
-                      top 20 recent tweets
-                    </span>{" "}
-                    - contentport is already learning your voice.
-                  </p>
+                  {data?.data && data?.data.userTweetCount < 20 ? (
+                    <p className="text-gray-600">
+                      We've imported your <span className="font-medium text-stone-800">best recent tweets</span> and <span className="font-medium text-stone-800">high-performing
+                      examples</span> - contentport is already learning your
+                      style.
+                    </p>
+                  ) : (
+                    <p className="text-gray-600">
+                      We've imported your{" "}
+                      <span className="font-medium text-stone-800">
+                        best {data?.data.userTweetCount ?? 20} recent tweets
+                      </span>{" "}
+                      - contentport is already learning your style.
+                    </p>
+                  )}
                 </div>
 
                 <div className="relative w-full aspect-video overflow-hidden rounded-lg bg-gray-100">
