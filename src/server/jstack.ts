@@ -53,7 +53,7 @@ const allowlist = [
   "rathoursourabh5@gmail.com",
 ]
 
-const authMiddleware = j.middleware(async ({ c, ctx, next }) => {
+const authMiddleware = j.middleware(async ({ c, next }) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
 
   if (!session) {
