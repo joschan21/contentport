@@ -308,7 +308,7 @@ ${attachment.toString()}
           })
 
           const result = await generateText({
-            model: anthropic("claude-3-opus-latest"),
+            model: anthropic("claude-4-opus-20250514"),
             system: editToolSystemPrompt,
             messages: edit_tool_messages,
           })
