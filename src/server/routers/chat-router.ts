@@ -271,12 +271,20 @@ This is a system attachment to the USER request. The purpose of this attachment 
             dmp.diff_cleanupSemantic(diffs)
 
             const rejectedElements2 = diffs.filter(([action]) => action === -1)
+            await redis.set("jo-debugging-1", rejectedElements2)
             console.log("👉👉👉 REJECTED ELEMENTS", rejectedElements2)
 
-            const rejectedElements = diffs
-              .filter(([action]) => action === -1)
-              .map(([_, text]) => text.trim())
-              .filter((text) => text.length > 0)
+            let rejectedElements: string[] = []
+
+            try {
+              rejectedElements = diffs
+                .filter(([action]) => action === -1)
+                .map(([_, text]) => text.trim())
+                .filter((text) => text.length > 0)
+            } catch (err) {
+              console.error("[CHAT ERROR]:", JSON.stringify(err))
+              await redis.set("jo-debugging-2", rejectedElements)
+            }
 
             console.log(
               "👉👉👉 REJECTED ELEMENTS AFTER PARSE",
