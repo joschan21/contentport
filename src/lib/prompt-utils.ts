@@ -190,7 +190,7 @@ For your information: In our chat, I may or may not reference documents using th
 Use the following tweets as a direct style reference for the tweet you are writing. I provided them because the I like their style. Your output should belong exactly in that same line-up style-wise. 
 
 <example_tweets>
-${tweets.map((tweet) => `<tweet>${tweet.text}</tweet>`)}
+${tweets?.map((tweet) => `<tweet>${tweet.text}</tweet>`)}
 </example_tweets>
 
 ${prompt ? promptPart : ""}
