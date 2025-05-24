@@ -270,10 +270,18 @@ This is a system attachment to the USER request. The purpose of this attachment 
             const diffs = dmp.diff_main(t2, t1)
             dmp.diff_cleanupSemantic(diffs)
 
+            const rejectedElements2 = diffs.filter(([action]) => action === -1)
+            console.log("👉👉👉 REJECTED ELEMENTS", rejectedElements2)
+
             const rejectedElements = diffs
               .filter(([action]) => action === -1)
               .map(([_, text]) => text.trim())
               .filter((text) => text.length > 0)
+
+            console.log(
+              "👉👉👉 REJECTED ELEMENTS AFTER PARSE",
+              rejectedElements
+            )
 
             if (rejectedElements.length > 0) {
               attachment.push(
