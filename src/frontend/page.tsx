@@ -50,7 +50,7 @@ const Page = () => {
 
   return (
     <section>
-      <div className="flex relative z-10 min-h-screen items-center text-base leading-relaxed justify-center bg-stone-100 p-4">
+      <div className="flex relative z-10 min-h-[80vh] items-center text-base leading-relaxed justify-center bg-stone-100 p-4">
         <Button
           onClick={handleAccess}
           variant="link"
@@ -79,11 +79,12 @@ const Page = () => {
           <div className="flex flex-1 w-full flex-col items-start justify-center space-y-8 p-8 md:w-1/2">
             <div className="space-y-4">
               <h1 className="font-elegant text-4xl tracking-tight md:text-5xl">
-                open source content creation studio
+                content studio for modern creators
               </h1>
               <p className="text-gray-600">
-                create content people care about — clear, on-brand, across every
-                platform. contentport is the best way to create content with ai.
+                create beautiful, authentic content people care about.
+                contentport is a purpose-built ai platform for writing tweets,
+                blogs and newsletters.
               </p>
             </div>
             <div className="w-full max-w-md space-y-3">
@@ -127,6 +128,20 @@ const Page = () => {
               />
             </div>
           </div>
+        </div>
+        
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+          <svg
+            className="w-6 h-6 text-stone-400"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+          </svg>
         </div>
       </div>
 
