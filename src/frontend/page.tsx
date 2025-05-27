@@ -50,7 +50,7 @@ const Page = () => {
 
   return (
     <section>
-      <div className="flex relative z-10 min-h-[80vh] items-center text-base leading-relaxed justify-center bg-stone-100 p-4">
+      <div className="flex relative z-10 min-h-screen flex-col items-center text-base leading-relaxed justify-center bg-stone-100 p-4 pt-24">
         <Button
           onClick={handleAccess}
           variant="link"
@@ -75,7 +75,7 @@ const Page = () => {
           />
         </div>
 
-        <div className="mx-auto relative z-10 flex w-full max-w-4xl flex-col items-center justify-center rounded-3xl shadow-lg border border-stone-200  bg-white md:flex-row">
+        <div className="mx-auto relative z-10 flex w-full max-w-5xl flex-col items-center justify-center rounded-3xl shadow-lg border border-stone-200  bg-white md:flex-row">
           <div className="flex flex-1 w-full flex-col items-start justify-center space-y-8 p-8 md:w-1/2">
             <div className="space-y-4">
               <h1 className="font-elegant text-4xl tracking-tight md:text-5xl">
@@ -83,8 +83,7 @@ const Page = () => {
               </h1>
               <p className="text-gray-600">
                 create beautiful, authentic content people care about.
-                contentport is a purpose-built ai platform for writing tweets,
-                blogs and newsletters.
+                contentport is a purpose-built ai platform for writing natural tweets, blogs and newsletters.
               </p>
             </div>
             <div className="w-full max-w-md space-y-3">
@@ -130,41 +129,27 @@ const Page = () => {
           </div>
         </div>
         
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <svg
-            className="w-6 h-6 text-stone-400"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-          </svg>
-        </div>
-      </div>
+        <div className="relative z-10 mt-16 w-full max-w-5xl">
+          <h2 className="mb-12 text-center font-elegant text-4xl tracking-tight md:text-5xl">
+            what people are saying
+          </h2>
 
-      <div className="bg-white py-12">
-        <h2 className="mt-4 sm:mt-16 mb-12 text-center font-elegant text-4xl tracking-tight md:text-5xl">
-          what people are saying
-        </h2>
-
-        <div className="max-w-5xl px-4 mx-auto">
-          <div>
-            <script
-              src="https://widget.senja.io/widget/6f592acf-90cf-4102-a5db-d99b2c47f98f/platform.js"
-              type="text/javascript"
-              async
-            ></script>
-            <div
-              suppressHydrationWarning
-              className="senja-embed"
-              data-id="6f592acf-90cf-4102-a5db-d99b2c47f98f"
-              data-mode="shadow"
-              data-lazyload="false"
-              style={{ display: "block", width: "100%" }}
-            ></div>
+          <div className="px-4">
+            <div>
+              <script
+                src="https://widget.senja.io/widget/6f592acf-90cf-4102-a5db-d99b2c47f98f/platform.js"
+                type="text/javascript"
+                async
+              ></script>
+              <div
+                suppressHydrationWarning
+                className="senja-embed"
+                data-id="6f592acf-90cf-4102-a5db-d99b2c47f98f"
+                data-mode="shadow"
+                data-lazyload="false"
+                style={{ display: "block", width: "100%" }}
+              ></div>
+            </div>
           </div>
         </div>
       </div>
