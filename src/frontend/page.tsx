@@ -79,12 +79,35 @@ const Page = () => {
           <div className="flex flex-1 w-full flex-col items-start justify-center space-y-8 p-8 md:w-1/2">
             <div className="space-y-4">
               <h1 className="font-elegant text-4xl tracking-tight md:text-5xl">
-                content studio for modern creators
+                content studio for <br /> developer creators
               </h1>
-              <p className="text-gray-600">
-                create beautiful, authentic content people care about.
-                contentport is a purpose-built ai platform for writing natural tweets, blogs and newsletters.
+
+              <p className="text-gray-600 leading-relaxed">
+                contentport is a purpose-built AI platform for developer
+                creators. create natural tweets & beautiful tweet visuals to grow your audience.
               </p>
+              <ul className="space-y-1 text-gray-700 mt-3">
+                <li className="flex items-center">
+                  <span className="mr-2">✅ </span>
+                  <span className="text-sm">rough idea &rarr; beautiful tweet in seconds</span>
+                </li>
+                <li className="flex items-center">
+                  <span className="mr-2">✅ </span>
+                  <span className="text-sm">100% open source</span>
+                </li>
+                <li className="flex items-center">
+                  <span className="mr-2">✅</span>
+                  <span className="text-sm">
+                    natural tweets that sound like you
+                  </span>
+                </li>
+                <li className="flex items-center">
+                  <span className="mr-2">✅</span>
+                  <span className="text-sm">
+                    built-in beautiful screenshot editor
+                  </span>
+                </li>
+              </ul>
             </div>
             <div className="w-full max-w-md space-y-3">
               <form
@@ -128,7 +151,7 @@ const Page = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="relative z-10 mt-16 w-full max-w-5xl">
           <h2 className="mb-12 text-center font-elegant text-4xl tracking-tight md:text-5xl">
             what people are saying
