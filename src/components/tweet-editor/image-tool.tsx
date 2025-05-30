@@ -150,13 +150,13 @@ const Frame = ({
       <div className="relative pointer-events-none">
         <div
           style={{
-            borderRadius: borderRadius + 10,
+            borderRadius: borderRadius + 7,
             boxShadow:
               "rgba(0, 0, 0, 0.22) 0px 18px 88px -4px, rgba(0, 0, 0, 0.22) 0px 8px 28px -6px",
             backgroundColor: "rgba(255, 255, 255, 0.314)",
             zIndex: 2,
             border: "1px solid rgba(255, 255, 255, 0.376)",
-            padding: "6px",
+            padding: "7px",
           }}
         >
           {children}
