@@ -156,7 +156,7 @@ const Frame = ({
             backgroundColor: "rgba(255, 255, 255, 0.314)",
             zIndex: 2,
             border: "1px solid rgba(255, 255, 255, 0.376)",
-            padding: "10px",
+            padding: "6px",
           }}
         >
           {children}
