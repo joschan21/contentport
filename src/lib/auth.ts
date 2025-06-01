@@ -68,7 +68,8 @@ export const auth = betterAuth({
         "lucapiccinotti.lp@gmail.com",
         "rathoursourabh5@gmail.com",
         "jonathan@fabworks.com",
-        "justin.s.ragland@gmail.com"
+        "justin.s.ragland@gmail.com",
+        "shahram.ask.546@gmail.com",
       ]
 
       if (session && allowlist.includes(session.user.email)) {
