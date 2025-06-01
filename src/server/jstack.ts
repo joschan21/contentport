@@ -51,7 +51,8 @@ const allowlist = [
   "pietro.dev.07@gmail.com",
   "lucapiccinotti.lp@gmail.com",
   "rathoursourabh5@gmail.com",
-  "jonathan@fabworks.com"
+  "jonathan@fabworks.com",
+  "justin.s.ragland@gmail.com"
 ]
 
 const authMiddleware = j.middleware(async ({ c, next }) => {
