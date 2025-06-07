@@ -6,7 +6,7 @@ import { DiffWithReplacement, processDiffs } from '@/lib/utils'
 import { Tweet } from '@/lib/validators'
 import { TestUIMessage } from '@/types/message'
 import { anthropic } from '@ai-sdk/anthropic'
-import { CoreMessage, generateText, TextPart, tool } from 'ai'
+import { CoreMessage, FilePart, generateText, ImagePart, TextPart, tool } from 'ai'
 import { diff_match_patch } from 'diff-match-patch'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
@@ -42,7 +42,7 @@ export const create_edit_tweet = ({
           redis.json.get<{ messages: TestUIMessage[] }>(redisKeys.chat),
           redis.json.get<Style>(redisKeys.style),
           redis.json.get<ConnectedAccount>(redisKeys.account),
-          redis.get<Attachments>(`unseen-attachments:${chatId}`),
+          redis.lrange<(FilePart | TextPart | ImagePart)[]>(`unseen-attachments:${chatId}`, 0, -1),
           redis.lrange<{ url: string; title: string; content: string }>(
             `website-contents:${chatId}`,
             0,
@@ -51,7 +51,7 @@ export const create_edit_tweet = ({
         ],
       )
 
-      if (unseenAttachments) {
+      if (Boolean(unseenAttachments.length)) {
         await redis.del(`unseen-attachments:${chatId}`)
       }
 
@@ -84,8 +84,7 @@ export const create_edit_tweet = ({
           ...userMessage,
           content: [
             ...userMessage.content,
-            ...(unseenAttachments?.files ?? []),
-            ...(unseenAttachments?.images ?? []),
+            ...unseenAttachments.flat(),
             ...websiteContentMessage,
           ],
         },

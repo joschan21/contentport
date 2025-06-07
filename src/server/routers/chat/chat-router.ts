@@ -173,7 +173,8 @@ export const chatRouter = j.router({
       const content = new PromptBuilder()
 
       content.add(input.message.content)
-      if (links) {
+
+      if (Boolean(links.length)) {
         content.add('Please read the following links:')
 
         links.forEach(({ link }) => {
@@ -248,10 +249,17 @@ export const chatRouter = j.router({
               )
 
               if (!hasCalledEditTweet) {
-                // save attachments as unseen
-                // e.g. a user chatted with files without creating a tweet
-                //the tweet tool wouldn't know about the attachments
-                await redis.set(`unseen-attachments:${input.chatId}`, { files, images })
+                const pipeline = redis.pipeline()
+
+                const attachments = [...files, images]
+
+                if (Boolean(attachments.length)) {
+                  attachments.forEach((attachment) => {
+                    pipeline.lpush(`unseen-attachments:${input.chatId}`, attachment)
+                  })
+                }
+
+                await pipeline.exec()
               }
 
               await incrementChatCount(user.email)
