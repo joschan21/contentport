@@ -1,4 +1,11 @@
-import { pgTable, text, timestamp, boolean, integer } from "drizzle-orm/pg-core"
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  integer,
+  json,
+} from "drizzle-orm/pg-core"
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -8,7 +15,9 @@ export const user = pgTable("user", {
   image: text("image"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
-  plan: text("plan", { enum: ["free", "pro"] }).notNull().default("free"),
+  plan: text("plan", { enum: ["free", "pro"] })
+    .notNull()
+    .default("free"),
 })
 
 export const session = pgTable("session", {

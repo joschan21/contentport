@@ -1,16 +1,11 @@
 import { useTweetContext } from "@/hooks/tweet-ctx"
 import { cn, DiffWithReplacement } from "@/lib/utils"
-import { Diff } from "diff-match-patch"
 import {
-  Sparkles,
-  MoreHorizontal,
   Check,
-  X,
-  Info,
   ChevronRight,
+  X
 } from "lucide-react"
 import { useState } from "react"
-import { Button } from "./ui/button"
 import DuolingoButton from "./ui/duolingo-button"
 
 const CategoryIcon = ({ category }: { category: string }) => {
@@ -74,7 +69,7 @@ export function SuggestionCard({
 
   return (
     <div
-      className="border bg-white rounded-md px-4 py-2"
+      className="px-3 py-2 bg-stone-50 rounded-sm"
       tabIndex={0}
       aria-label={`Suggestion: ${label}`}
       onKeyDown={(e) => {
@@ -125,8 +120,8 @@ export function SuggestionCard({
             </span>
           ) : diff.type === 1 ? (
             <span className="text-emerald-700 font-medium">
-              {diff.text.startsWith(" ") ? null : " "}
-              {diff.text}
+              {/* {diff.text.startsWith(" ") ? null : " "} */}
+              {diff.text.trim()}
             </span>
           ) : diff.type === 2 ? (
             <>
@@ -161,29 +156,28 @@ function ContextAfter({
 }
 
 export const Improvements = () => {
-  const { tweets, acceptImprovement, rejectImprovement } = useTweetContext()
+  const { tweet, acceptImprovement, rejectImprovement } = useTweetContext()
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  const allImprovements = tweets
-    .flatMap((tweet) => {
-      const improvementCategories = Object.keys(tweet.improvements || {})
-      return improvementCategories.flatMap(
-        (category) =>
-          tweet.improvements?.[category]?.map((diff, index) => ({
-            id: `${tweet.id}-${category}-${index}`,
-            tweet,
-            diff,
-            index,
-            category,
-          })) ?? []
-      )
-    })
+  const allImprovements = (() => {
+    if (!tweet || !tweet.improvements) return []
+    
+    const improvementCategories = Object.keys(tweet.improvements)
+    return improvementCategories.flatMap(
+      (category) =>
+        tweet.improvements[category]?.map((diff, index) => ({
+          id: `${tweet.id}-${category}-${index}`,
+          diff,
+          index,
+          category,
+        })) ?? []
+    )
+  })()
     .filter(
       (
         item
       ): item is {
         id: string
-        tweet: any
         diff: DiffWithReplacement
         index: number
         category: string
@@ -197,18 +191,18 @@ export const Improvements = () => {
   }
 
   const handleAcceptImprovement = (
-    tweetId: string,
     diff: DiffWithReplacement
   ) => {
-    acceptImprovement(tweetId, diff)
+    if (!tweet) return
+    acceptImprovement(tweet.id, diff)
     setExpandedId(null)
   }
 
   const handleRejectImprovement = (
-    tweetId: string,
     diff: DiffWithReplacement
   ) => {
-    rejectImprovement(tweetId, diff)
+    if (!tweet) return
+    rejectImprovement(tweet.id, diff)
     setExpandedId(null)
   }
 
@@ -217,21 +211,20 @@ export const Improvements = () => {
       <div className="h-full w-full">
         {allImprovements.length > 0 ? (
           <div className="space-y-1" >
-            {allImprovements.map(({ id, tweet, diff, category }, index) => {
-              const tweetId = tweet.id
+            {allImprovements.map(({ id, diff }, index) => {
               return (
                 <SuggestionCard
                   key={id}
                   diff={diff}
-                  onAccept={() => handleAcceptImprovement(tweetId, diff)}
-                  onReject={() => handleRejectImprovement(tweetId, diff)}
+                  onAccept={() => handleAcceptImprovement(diff)}
+                  onReject={() => handleRejectImprovement(diff)}
                   isFirst={index === 0}
                 />
               )
             })}
           </div>
         ) : (
-          <div className="flex justify-center h-full w-full text-left bg-emerald-50 ring-1 ring-emerald-600/20 ring-inset rounded-md">
+          <div className="flex justify-center h-full w-full text-left bg-emerald-50 ring-1 ring-emerald-600/20 ring-inset rounded-md shadow-[0_2px_0_#d1fae5]">
             <p className="inline-flex gap-0.5 items-center px-2 py-1 text-xs font-medium text-emerald-700 ">
               <Check className="size-3" /> All applied
             </p>

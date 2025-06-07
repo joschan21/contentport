@@ -1,53 +1,38 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import DuolingoButton from "@/components/ui/duolingo-button"
-import { useTweetContext } from "@/hooks/tweet-ctx"
-import { AdditionNode, DeletionNode, UnchangedNode } from "@/lib/nodes"
-import PlaceholderPlugin from "@/lib/placeholder-plugin"
-import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
-import { ContentEditable } from "@lexical/react/LexicalContentEditable"
-import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary"
-import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin"
-import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin"
-import { diff_match_patch } from "diff-match-patch"
-import { $createParagraphNode, $createTextNode, $getRoot } from "lexical"
-import {
-  Bold,
-  Check,
-  Download,
-  Image as ImageIcon,
-  ImagePlus,
-  Italic,
-  MoreHorizontal,
-  Pencil,
-  Smile,
-  Trash2,
-  Twitter,
-  X,
-} from "lucide-react"
-import { useEffect, useState } from "react"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import DuolingoButton from '@/components/ui/duolingo-button'
+import { useSidebarContext } from '@/hooks/sidebar-ctx'
+import { useTweetContext } from '@/hooks/tweet-ctx'
+import { client } from '@/lib/client'
+import PlaceholderPlugin from '@/lib/placeholder-plugin'
+import { InferInput, InferOutput } from '@/server'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { ContentEditable } from '@lexical/react/LexicalContentEditable'
+import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
+import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
+import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { diff_match_patch } from 'diff-match-patch'
+import { $getRoot } from 'lexical'
+import { Bold, Download, ImagePlus, Italic, Pencil, Smile, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router'
+import { Icons } from '../icons'
 import {
   Drawer,
   DrawerClose,
   DrawerContent,
-  DrawerDescription,
   DrawerHeader,
-  DrawerOverlay,
   DrawerTitle,
   DrawerTrigger,
-} from "../ui/drawer"
-import { ImageTool } from "./image-tool"
-import { Separator } from "../ui/separator"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu"
-import { Icons } from "../icons"
+} from '../ui/drawer'
+import { Separator } from '../ui/separator'
+import { ImageTool } from './image-tool'
+import { Skeleton } from '../ui/skeleton'
+import { debounce } from 'lodash'
+import { useSearchParams } from 'react-router'
 
 interface TweetProps {
-  id: string
-  suggestion: string | null
+  // suggestion: string | null
   account: {
     name: string
     handle: string
@@ -59,127 +44,289 @@ interface TweetProps {
   onAdd?: () => void
 }
 
+type SaveInput = InferInput['tweet']['save']
+type GetRecentTweetsOutput = InferOutput['tweet']['recents']['tweets']
+
 const dmp = new diff_match_patch()
 
 export default function Tweet({
-  id,
-  suggestion,
+  // suggestion,
   account,
-  onDelete,
 }: TweetProps) {
   const [editor] = useLexicalComposerContext()
   const [charCount, setCharCount] = useState(0)
   const [open, setOpen] = useState(false)
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false)
+  const [searchParams] = useSearchParams()
+  const chatId = searchParams.get('chatId')
+
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const saveInFlight = useRef(false)
+  const hasPendingChanges = useRef(false)
+
+  const pendingSaves = useRef<Array<({ assignedId }: { assignedId: string }) => void>>([])
+
+  // prevent unsaved changes
+  useEffect(() => {
+    const handleUnload = (e: BeforeUnloadEvent) => {
+      if (hasPendingChanges.current) {
+        const message = 'Changes you made may not be saved.'
+        e.preventDefault()
+        return (e.returnValue = message)
+      }
+    }
+
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [])
+
+  const { registerClearTweet } = useSidebarContext()
 
   const {
+    potentialId,
     registerEditor,
+    registerMutationReset,
     unregisterEditor,
-    acceptSuggestion,
-    rejectSuggestion,
-    contents,
-    setTweetImage,
-    removeTweetImage,
-    editTweetImage,
     downloadTweetImage,
-    tweets,
+    tweet,
   } = useTweetContext()
 
-  const tweet = tweets.find((t) => t.id === id)
+  const { id } = useParams()
+  const prevContent = useRef('')
 
-  const content = contents.current.get(id)
+  const { mutate, submittedAt, reset } = useMutation({
+    mutationFn: async ({ id, content, editorState }: SaveInput) => {
+      // prevent multiple saves at once
+      saveInFlight.current = true
+
+      // id if is "new", let server generate id
+      const payloadId = id === 'new' ? undefined : id
+
+      console.log(
+        '%c🔄 SAVING TWEET',
+        'color: #3b82f6; font-weight: bold; font-size: 14px;',
+        {
+          id: payloadId,
+          content,
+          timestamp: new Date().toISOString(),
+        },
+      )
+
+      const res = await client.tweet.save.$post({
+        id: payloadId,
+        content,
+        editorState,
+      })
+      saveInFlight.current = false
+
+      return await res.json()
+    },
+    onSuccess: ({ assignedId, tweet }) => {
+      processPendingSaves({ assignedId })
+
+      if (!id || id === 'new') {
+        if (chatId) {
+          navigate(`/studio/t/${assignedId}?chatId=${chatId}`)
+        } else {
+          navigate(`/studio/t/${assignedId}`)
+        }
+      }
+
+      // refresh "recents" in left sidebar
+      queryClient.setQueryData(['get-recent-tweets'], (old: GetRecentTweetsOutput) => {
+        const getNewData = () => {
+          const existing = old.find((t) => t.id === assignedId)
+
+          if (existing) {
+            return old.map((element) => {
+              if (element.id === assignedId && tweet)
+                return { ...element, content: tweet.content }
+              return element
+            })
+          }
+
+          if (tweet) {
+            return [tweet, ...old]
+          }
+
+          return old
+        }
+
+        const data = getNewData()
+
+        return data.filter((item) => item.id !== 'new')
+      })
+
+      queryClient.setQueryData(['tweet', assignedId], tweet)
+    },
+  })
+
+  const { data, isFetching: isLoadingTweet } = useQuery({
+    queryKey: ['tweet', id],
+    queryFn: async () => {
+      if (!id) return null
+
+      console.log(
+        '%c🔄 GETTING TWEET',
+        'color: #3b82f6; font-weight: bold; font-size: 14px;',
+        { id },
+      )
+
+      const res = await client.tweet.getTweet.$get({ id })
+      const { tweet } = await res.json()
+
+      if (!tweet) return null
+
+      return tweet
+    },
+    staleTime: Infinity,
+    enabled: !Boolean(submittedAt),
+  })
 
   useEffect(() => {
-    editor.update(() => {
-      const root = $getRoot()
-      root.clear()
-      const textNode = $createTextNode(content)
-      const p = $createParagraphNode()
-      p.append(textNode)
-      root.append(p)
-    })
-  }, [editor])
+    registerMutationReset(reset)
+  }, [reset])
 
   useEffect(() => {
-    registerEditor(id, editor)
+    if (!Boolean(submittedAt)) {
+      if (!data || !id) {
+        editor.update(() => $getRoot().clear(), { tag: 'system-update' })
+        return
+      }
 
-    return () => {
-      unregisterEditor(id)
+      const state = editor.parseEditorState(JSON.stringify(data.editorState))
+
+      if (state.isEmpty()) {
+        editor.update(() => $getRoot().clear(), { tag: 'system-update' })
+      } else {
+        console.log('yeah', data, id)
+        editor.setEditorState(state, { tag: 'system-update' })
+      }
+
+      prevContent.current = editor.read(() => $getRoot().getTextContent())
+      editor.focus()
     }
-  }, [editor, id, registerEditor, unregisterEditor])
+  }, [data, editor, submittedAt, location, id])
+
+  const queueSave = useCallback(
+    debounce(({ id, content, editorState }: SaveInput) => {
+      hasPendingChanges.current = false
+      if (saveInFlight.current === true) {
+        pendingSaves.current.push(({ assignedId }) =>
+          mutate({ id: assignedId, content, editorState }),
+        )
+      } else {
+        mutate({ id, content, editorState })
+      }
+    }, 750),
+    [mutate],
+  )
+
+  const processPendingSaves = ({ assignedId }: { assignedId: string }) => {
+    if (pendingSaves.current.length > 0 && !saveInFlight.current) {
+      const next = pendingSaves.current.shift()
+      if (next) next({ assignedId })
+    }
+  }
 
   useEffect(() => {
-    const removeListener = editor.registerUpdateListener(({ editorState }) => {
-      editorState.read(() => {
-        const text = $getRoot().getTextContent()
-        setCharCount(text.length)
-        contents.current.set(id, text)
+    registerEditor(editor)
+    registerClearTweet(() => {
+      editor.update(() => {
+        const root = $getRoot()
+        root.clear()
       })
     })
 
     return () => {
-      removeListener()
+      if (id) {
+        unregisterEditor(id)
+      }
     }
-  }, [editor, content])
+  }, [editor, registerEditor, unregisterEditor])
 
-  const handleAcceptSuggestion = () => {
-    if (suggestion) acceptSuggestion(id, suggestion)
-  }
+  const { setContent } = useTweetContext()
 
-  const handleRejectSuggestion = () => {
-    if (suggestion) rejectSuggestion(id)
-  }
+  useEffect(() => {
+    const unregister = editor.registerUpdateListener(({ editorState, tags }) => {
+      const content = editorState.read(() => $getRoot().getTextContent())
+
+      setCharCount(content.length)
+      setContent(content)
+
+      if (tags.has('system-clear')) prevContent.current = ''
+      if (tags.has('system-update')) prevContent.current = content
+
+      if (content === prevContent.current) return
+
+      hasPendingChanges.current = true
+      queueSave({ id, content, editorState })
+
+      prevContent.current = content
+    })
+
+    return () => unregister()
+  }, [editor, id, potentialId, queueSave])
 
   const handlePostToTwitter = () => {
     const tweetText = editor.read(() => $getRoot().getTextContent())
     const encodedText = encodeURIComponent(tweetText)
 
-    const sanitizedText = encodedText.endsWith("%0A")
+    const sanitizedText = encodedText.endsWith('%0A')
       ? encodedText.slice(0, -3)
       : encodedText
 
-    window.open(
-      `https://twitter.com/intent/tweet?text=${sanitizedText}`,
-      "_blank"
-    )
+    window.open(`https://twitter.com/intent/tweet?text=${sanitizedText}`, '_blank')
   }
-
-  useEffect(() => {
-    if (!suggestion) return
-
-    const content = editor.read(() => $getRoot().getTextContent())
-
-    const diffs = dmp.diff_main(content, suggestion)
-    dmp.diff_cleanupSemantic(diffs)
-
-    editor.update(() => {
-      const root = $getRoot()
-      root.clear()
-      const p = $createParagraphNode()
-
-      diffs.forEach(([type, text]) => {
-        if (type === 0) {
-          p.append(new UnchangedNode(text))
-        } else if (type === 1) {
-          p.append(new AdditionNode(text))
-        } else if (type === -1) {
-          p.append(new DeletionNode(text))
-        }
-      })
-
-      root.append(p)
-    })
-  }, [suggestion, editor])
 
   const getProgressColor = () => {
     const percentage = (charCount / 280) * 100
-    if (percentage >= 100) return "text-red-500"
-    return "text-blue-500"
+    if (percentage >= 100) return 'text-red-500'
+    return 'text-blue-500'
   }
 
   const progress = Math.min((charCount / 280) * 100, 100)
   const circumference = 2 * Math.PI * 10
   const strokeDashoffset = circumference - (progress / 100) * circumference
+
+  if (isLoadingTweet && id !== 'new') {
+    return (
+      <div className="relative bg-white p-6 rounded-2xl w-full border border-stone-200 bg-clip-padding shadow-sm">
+        <div className="flex gap-3">
+          <Skeleton className="h-12 w-12 rounded-full" />
+
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-3">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-5/6" />
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
+              <div className="flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg">
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <div className="w-px h-4 bg-stone-300 mx-2"></div>
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <div className="w-px h-4 bg-stone-300 mx-2"></div>
+                <Skeleton className="h-8 w-8 rounded-full" />
+              </div>
+
+              <Skeleton className="h-11 w-28 rounded-lg" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <Drawer modal={false} open={open} onOpenChange={setOpen}>
@@ -200,12 +347,8 @@ export default function Tweet({
                 <span className="font-semibold text-text-gray text-base">
                   {account.name}
                 </span>
-                {account.verified && (
-                  <Icons.verificationBadge className="h-4 w-4" />
-                )}
-                <span className="text-stone-400 text-base">
-                  @{account.handle}
-                </span>
+                {account.verified && <Icons.verificationBadge className="h-4 w-4" />}
+                <span className="text-stone-400 text-base">@{account.handle}</span>
               </div>
             </div>
 
@@ -255,7 +398,7 @@ export default function Tweet({
                       <DuolingoButton
                         size="icon"
                         variant="secondary"
-                        onClick={() => downloadTweetImage(id)}
+                        onClick={() => id && downloadTweetImage(id)}
                         className="rounded-full"
                       >
                         <Download className="h-4 w-4" />
@@ -264,7 +407,7 @@ export default function Tweet({
                       <DuolingoButton
                         size="icon"
                         variant="secondary"
-                        onClick={() => removeTweetImage(id)}
+                        // onClick={() => removeTweetImage(id)}
                         className="size-8 p-0 rounded-full"
                       >
                         <Trash2 className="h-4 w-4 text-red-600" />
@@ -279,11 +422,7 @@ export default function Tweet({
             <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
               <div className="flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg">
                 <DrawerTrigger asChild>
-                  <DuolingoButton
-                    variant="secondary"
-                    size="icon"
-                    className="rounded-md"
-                  >
+                  <DuolingoButton variant="secondary" size="icon" className="rounded-md">
                     <ImagePlus className="size-4" />
                     <span className="sr-only">Add image</span>
                   </DuolingoButton>
@@ -291,9 +430,7 @@ export default function Tweet({
                 <DrawerContent className="h-full">
                   <div className="max-w-6xl mx-auto w-full">
                     <DrawerHeader className="px-0">
-                      <DrawerTitle className="font-medium">
-                        Add image
-                      </DrawerTitle>
+                      <DrawerTitle className="font-medium">Add image</DrawerTitle>
                     </DrawerHeader>
                     <DrawerClose asChild>
                       <DuolingoButton
@@ -311,7 +448,7 @@ export default function Tweet({
                       <ImageTool
                         onClose={() => setOpen(false)}
                         onSave={(image) => {
-                          setTweetImage(id, image)
+                          // setTweetImage(id, image)
                           setOpen(false)
                         }}
                       />
@@ -321,27 +458,15 @@ export default function Tweet({
 
                 <div className="w-px h-4 bg-stone-300 mx-2"></div>
 
-                <DuolingoButton
-                  variant="secondary"
-                  size="icon"
-                  className="rounded-md"
-                >
+                <DuolingoButton variant="secondary" size="icon" className="rounded-md">
                   <Bold className="size-4" />
                   <span className="sr-only">Bold</span>
                 </DuolingoButton>
-                <DuolingoButton
-                  variant="secondary"
-                  size="icon"
-                  className="rounded-md"
-                >
+                <DuolingoButton variant="secondary" size="icon" className="rounded-md">
                   <Italic className="size-4" />
                   <span className="sr-only">Italic</span>
                 </DuolingoButton>
-                <DuolingoButton
-                  variant="secondary"
-                  size="icon"
-                  className="rounded-md"
-                >
+                <DuolingoButton variant="secondary" size="icon" className="rounded-md">
                   <Smile className="size-4" />
                   <span className="sr-only">Emoji</span>
                 </DuolingoButton>
@@ -376,18 +501,23 @@ export default function Tweet({
                   </div>
                   {charCount > 260 && charCount < 280 && (
                     <div
-                      className={`text-sm/6 ${280 - charCount < 1 ? "text-red-500" : "text-stone-800"} mr-3.5`}
+                      className={`text-sm/6 ${280 - charCount < 1 ? 'text-red-500' : 'text-stone-800'} mr-3.5`}
                     >
-                      <p>
-                        {280 - charCount < 20 ? 280 - charCount : charCount}
-                      </p>
+                      <p>{280 - charCount < 20 ? 280 - charCount : charCount}</p>
                     </div>
                   )}
                 </div>
+
+                {/* <div className="flex items-center gap-1 ml-2">
+                  {getSaveStatusIcon()}
+                  <span className="text-xs text-stone-500">
+                    {getSaveStatusText()}
+                  </span>
+                </div> */}
               </div>
               <div className="flex items-center gap-2">
                 <DuolingoButton className="h-11" onClick={handlePostToTwitter}>
-                  <Twitter className="size-4 mr-2" />
+                  <Icons.twitter className="size-4 mr-2" />
                   <span className="text-sm">Preview</span>
                   <span className="sr-only">Preview on Twitter</span>
                 </DuolingoButton>
@@ -420,36 +550,9 @@ export default function Tweet({
             </div>
           </div>
         </div>
-
-        {suggestion && (
-          <div className="mt-2 flex justify-end items-center gap-2 text-xs text-gray-500">
-            <DuolingoButton
-              onClick={handleRejectSuggestion}
-              variant="secondary"
-              size="sm"
-              className="flex items-center gap-1 px-2 py-1 rounded text-red-600"
-            >
-              <X className="h-3 w-3" />
-              <span>Reject</span>
-            </DuolingoButton>
-            <DuolingoButton
-              onClick={handleAcceptSuggestion}
-              variant="secondary"
-              size="sm"
-              className="flex items-center gap-1 px-2 py-1 rounded text-indigo-600"
-            >
-              <Check className="h-3 w-3" />
-              <span>Apply</span>
-            </DuolingoButton>
-          </div>
-        )}
       </div>
 
-      <Drawer
-        modal={false}
-        open={imageDrawerOpen}
-        onOpenChange={setImageDrawerOpen}
-      >
+      <Drawer modal={false} open={imageDrawerOpen} onOpenChange={setImageDrawerOpen}>
         <DrawerContent className="h-full">
           <div className="max-w-6xl mx-auto w-full">
             <DrawerHeader className="px-0">
@@ -471,7 +574,7 @@ export default function Tweet({
               <ImageTool
                 onClose={() => setImageDrawerOpen(false)}
                 onSave={(image) => {
-                  editTweetImage(id, image)
+                  // editTweetImage(id, image)
                   setImageDrawerOpen(false)
                 }}
                 initialEditorState={tweet?.image?.editorState}

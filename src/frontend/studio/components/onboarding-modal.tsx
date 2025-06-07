@@ -12,7 +12,7 @@ import { client } from "@/lib/client"
 import { cn } from "@/lib/utils"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, ArrowRight, AtSign, Loader2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, AtSign } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
@@ -131,6 +131,7 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
       queryClient.setQueryData(["connected-account"], data)
       queryClient.invalidateQueries({ queryKey: ["account-style"] })
       queryClient.invalidateQueries({ queryKey: ["get-connected-account"] })
+      queryClient.invalidateQueries({ queryKey: ["knowledge-documents"] })
       setConnectedAccount(data)
       swiperRef?.slideNext()
     },

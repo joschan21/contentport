@@ -7,6 +7,8 @@ import { chatLimiter } from "@/lib/chat-limiter"
 import { ConnectedAccount } from "@/components/tweet-editor/tweet-editor"
 import { Style } from "./style-router"
 import { DEFAULT_TWEETS } from "@/constants/default-tweet-preset"
+import { db } from "@/db"
+import { knowledgeDocument } from "@/db/schema"
 
 const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
 
@@ -77,12 +79,10 @@ export const settingsRouter = j.router({
         })
       }
 
-      // Save connected account
       await redis.json.set(`connected-account:${user.email}`, "$", {
         ...userData,
       })
 
-      // Fetch the user's latest 30 tweets
       const userTweets = await client.v2.userTimeline(userData.id, {
         max_results: 30,
         "tweet.fields": [
@@ -158,7 +158,6 @@ export const settingsRouter = j.router({
 
         userTweetCount = formattedTweets.length
 
-        // Fill up to 20 tweets with DEFAULT_TWEETS if needed
         if (formattedTweets.length < 20) {
           const existingIds = new Set(formattedTweets.map((t) => t.id))
           for (const defaultTweet of DEFAULT_TWEETS) {
@@ -175,6 +174,28 @@ export const settingsRouter = j.router({
           prompt: "",
         })
       }
+
+      await db.insert(knowledgeDocument).values([
+        {
+          userId: user.id,
+          fileName: "",
+          type: "url",
+          s3Key: "",
+          title: "Introducing Zod 4",
+          description: "An article about the Zod 4.0 release. After a year of active development: Zod 4 is now stable! It's faster, slimmer, more tsc-efficient, and implements some long-requested features.",
+          isExample: true,
+          sourceUrl: "https://zod.dev/v4",
+        },
+        {
+          userId: user.id,
+          fileName: "data-fetching.png",
+          type: "image",
+          s3Key: "knowledge/4bBacfDWPhQzOzN479b605xuippnbKzF/Lsv-t_5_EMwNXW8jptBYG.png",
+          title: "React Hooks Cheatsheet - Visual Guide",
+          isExample: true,
+          sourceUrl: "",
+        }
+      ])
 
       return c.json({
         success: true,
@@ -234,7 +255,7 @@ export const settingsRouter = j.router({
       })
     }),
 
-  connectedAccount: privateProcedure.get(async ({ c, input, ctx }) => {
+  connected_account: privateProcedure.get(async ({ c, input, ctx }) => {
     const { user } = ctx
 
     const account = await redis.json.get<ConnectedAccount>(

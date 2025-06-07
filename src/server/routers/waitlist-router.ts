@@ -10,6 +10,9 @@ const ratelimit = new Ratelimit({
 })
 
 export const waitlistRouter = j.router({
+  jo: publicProcedure.get(({ c }) => {
+    return c.json({ name: "jo" })
+  }),
   join: publicProcedure
     .input(
       z.object({

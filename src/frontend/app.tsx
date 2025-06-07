@@ -1,11 +1,13 @@
-import { Toaster } from "react-hot-toast"
-import { BrowserRouter, Route, Routes, NavLink } from "react-router"
-import Page from "./page"
-import { Settings } from "./settings/page"
-import { ContextPage } from "./studio/context/[id]/page"
-import Layout from "./studio/layout"
-import { LoginPage } from "./auth/login"
-import StudioPage from "./studio/page"
+import { Toaster } from 'react-hot-toast'
+import { BrowserRouter, Route, Routes } from 'react-router'
+import { LoginPage } from './auth/login'
+import Page from './page'
+import { Settings } from './settings/page'
+import { ContextPage } from './studio/context/[id]/page'
+import NewKnowledgePage from './studio/knowledge/new/page'
+import KnowledgePage from './studio/knowledge/page'
+import Layout from './studio/layout'
+import StudioPage from './studio/page'
 
 export default function App() {
   return (
@@ -13,6 +15,7 @@ export default function App() {
       <Toaster />
       <BrowserRouter>
         <Routes>
+          <Route path="*" element={<p>not found</p>} />
           <Route path="/" element={<Page />} />
           <Route path="/login" element={<LoginPage />} />
           <Route
@@ -20,6 +23,14 @@ export default function App() {
             element={
               <Layout hideAppSidebar>
                 <Settings />
+              </Layout>
+            }
+          />
+          <Route
+            path="/studio/t/:id"
+            element={
+              <Layout>
+                <StudioPage />
               </Layout>
             }
           />
@@ -32,15 +43,23 @@ export default function App() {
             }
           />
           <Route
-            path="/studio/context"
+            path="/studio/knowledge"
             element={
               <Layout>
-                <ContextPage />
+                <KnowledgePage />
               </Layout>
             }
           />
           <Route
-            path="/studio/context/:id"
+            path="/studio/knowledge/new"
+            element={
+              <Layout>
+                <NewKnowledgePage />
+              </Layout>
+            }
+          />
+          <Route
+            path="/studio/knowledge/:id"
             element={
               <Layout>
                 <ContextPage />

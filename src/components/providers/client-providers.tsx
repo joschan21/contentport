@@ -1,9 +1,12 @@
-"use client"
+'use client'
 
-import { NuqsAdapter } from "nuqs/adapters/next/app"
-import { ReactNode } from "react"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { TweetProvider } from "@/hooks/tweet-ctx"
+import { ChatProvider } from '@/hooks/chat-ctx'
+import { SidebarProvider } from '@/hooks/sidebar-ctx'
+import { TweetProvider } from '@/hooks/tweet-ctx'
+import { AttachmentsProvider } from '@/hooks/use-attachments'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { NuqsAdapter } from 'nuqs/adapters/next/app'
+import { ReactNode } from 'react'
 
 interface ProvidersProps {
   children: ReactNode
@@ -15,7 +18,13 @@ export function ClientProviders({ children }: ProvidersProps) {
   return (
     <NuqsAdapter>
       <QueryClientProvider client={queryClient}>
-        <TweetProvider>{children}</TweetProvider>
+        <TweetProvider>
+          <AttachmentsProvider>
+            <ChatProvider>
+              <SidebarProvider>{children}</SidebarProvider>
+            </ChatProvider>
+          </AttachmentsProvider>
+        </TweetProvider>
       </QueryClientProvider>
     </NuqsAdapter>
   )

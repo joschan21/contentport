@@ -23,8 +23,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { FolderClock, Save } from "lucide-react"
-import { SidebarTrigger } from "../ui/sidebar"
+import {
+  FolderClock,
+  Save,
+  PanelLeft,
+  ArrowLeftFromLine,
+  ArrowRightFromLine,
+} from "lucide-react"
+import { SidebarTrigger, useSidebar } from "../ui/sidebar"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import { client } from "@/lib/client"
@@ -35,6 +41,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import DuolingoButton from "../ui/duolingo-button"
 
 const mockIdeas = [
   {
@@ -64,8 +71,11 @@ const mockIdeas = [
 ]
 
 export function AppSidebarInset({ children }: { children: React.ReactNode }) {
+  const { state, toggleSidebar } = useSidebar()
+  const isCollapsed = state === "collapsed"
+
   return (
-    <SidebarInset className="overflow-x-hidden bg-stone-100 border border-gray-200">
+    <SidebarInset className="w-full flex-1 overflow-x-hidden bg-stone-100 border border-gray-200">
       {/* Dot Pattern Background */}
       <div
         className="absolute inset-0 z-0 pointer-events-none"
@@ -78,7 +88,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
           style={{
             backgroundImage: `radial-gradient(circle, #d1d5db 1.5px, transparent 1.5px)`,
             backgroundSize: "20px 20px",
-            opacity: 0.8,
+            opacity: 0.5,
           }}
         />
       </div>
@@ -173,7 +183,22 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <SidebarTrigger className="border border-stone-200 shadow-lg bg-clip-padding"/>
+                  <DuolingoButton
+                    variant="secondary"
+                    size="icon"
+                    onClick={toggleSidebar}
+                    className="group/toggle-button"
+                    // className="h-10 w-10 rounded-md border border-stone-200 shadow-lg bg-white hover:bg-accent/50 transition-colors flex items-center justify-center group/toggle-button flex-shrink-0"
+                  >
+                    <PanelLeft className="h-4 w-4 transition-all duration-200 group-hover/toggle-button:opacity-0 group-hover/toggle-button:scale-75" />
+                    <div className="absolute transition-all duration-200 opacity-0 scale-75 group-hover/toggle-button:opacity-100 group-hover/toggle-button:scale-100">
+                      {isCollapsed ? (
+                        <ArrowLeftFromLine className="h-4 w-4" />
+                      ) : (
+                        <ArrowRightFromLine className="h-4 w-4" />
+                      )}
+                    </div>
+                  </DuolingoButton>
                 </TooltipTrigger>
                 <TooltipContent
                   side="bottom"

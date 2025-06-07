@@ -26,12 +26,12 @@ const SIDEBAR_COOKIE_NAME = "sidebar:state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
-const SIDEBAR_WIDTH_ICON = "3rem";
+const SIDEBAR_WIDTH_ICON = "4rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 //* new constants for sidebar resizing
 const MIN_SIDEBAR_WIDTH = "12rem";
-const MAX_SIDEBAR_WIDTH = "40rem";
+const MAX_SIDEBAR_WIDTH = "56rem";
 
 type SidebarContext = {
   state: "expanded" | "collapsed";

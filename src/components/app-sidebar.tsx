@@ -1,21 +1,23 @@
-"use client"
+'use client'
 
-import { Message, useChat } from "@ai-sdk/react"
-
+import { Message, MessageContent } from '@/components/ui/message'
+import { useChat } from '@/hooks/chat-ctx'
 import {
   ArrowUp,
-  CheckCircle2,
+  Check,
   ChevronsLeft,
+  Eye,
   Loader2,
+  Paperclip,
   Plus,
   Save,
   Settings,
   Sparkles,
-  User,
   X,
-} from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+} from 'lucide-react'
+import { useContext, useEffect, useRef, useState } from 'react'
 
+import { Loader } from '@/components/ui/loader'
 import {
   Sidebar,
   SidebarContent,
@@ -24,188 +26,217 @@ import {
   SidebarHeader,
   SidebarRail,
   useSidebar,
-} from "@/components/ui/sidebar"
-import { createExampleDocument } from "@/constants/default-context-docs"
-import { SidebarDoc } from "@/hooks/document-ctx"
-import { useMentionContext } from "@/hooks/mention-ctx"
-import { useTweetContext } from "@/hooks/tweet-ctx"
-import { useLocalStorage } from "@/hooks/use-local-storage"
-import { client } from "@/lib/client"
-import { MentionPlugin } from "@/lib/mention-plugin"
-import { $createMentionNode } from "@/lib/nodes"
-import PlaceholderPlugin from "@/lib/placeholder-plugin"
-import { InferInput } from "@/server"
-import { EditTweetToolResult } from "@/server/routers/chat-router"
-import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
-import { ContentEditable } from "@lexical/react/LexicalContentEditable"
-import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary"
-import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin"
-import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { HTTPException } from "hono/http-exception"
-import {
-  $createParagraphNode,
-  $createTextNode,
-  $getRoot
-} from "lexical"
-import { nanoid } from "nanoid"
-import { useSearchParams } from "next/navigation"
-import { useQueryState } from "nuqs"
-import { KeyboardEvent as ReactKeyboardEvent } from "react"
-import toast, { Toaster } from "react-hot-toast"
-import { useLocation, useNavigate } from "react-router"
-import { Icons } from "./icons"
-import { Improvements } from "./improvements"
-import {
-  ConnectedAccount,
-  DEFAULT_CONNECTED_ACCOUNT,
-} from "./tweet-editor/tweet-editor"
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
-import DuolingoBadge from "./ui/duolingo-badge"
-import DuolingoButton from "./ui/duolingo-button"
-import DuolingoInput from "./ui/duolingo-input"
-import DuolingoTextarea from "./ui/duolingo-textarea"
-import { Separator } from "./ui/separator"
-import { Tabs, TabsContent } from "./ui/tabs"
-import { TextShimmer } from "./ui/text-shimmer"
+} from '@/components/ui/sidebar'
+import { useTweetContext } from '@/hooks/tweet-ctx'
+import { useAttachments } from '@/hooks/use-attachments'
+import { useLocalStorage } from '@/hooks/use-local-storage'
+import { client } from '@/lib/client'
+import PlaceholderPlugin from '@/lib/placeholder-plugin'
+import { InferInput } from '@/server'
+import { EditTweetToolResult } from '@/server/routers/chat/chat-router'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { ContentEditable } from '@lexical/react/LexicalContentEditable'
+import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
+import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
+import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { UIMessage } from 'ai'
+import { HTTPException } from 'hono/http-exception'
+import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import { nanoid } from 'nanoid'
+import { useSearchParams } from 'react-router'
+import { useQueryState } from 'nuqs'
+import { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import toast, { Toaster } from 'react-hot-toast'
+import { useLocation, useNavigate } from 'react-router'
+import { AttachmentItem } from './attachment-item'
+import { Icons } from './icons'
+import { Improvements } from './improvements'
+import { KnowledgeSelector, SelectedKnowledgeDocument } from './knowledge-selector'
+import { ConnectedAccount, DEFAULT_CONNECTED_ACCOUNT } from './tweet-editor/tweet-editor'
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
+import DuolingoBadge from './ui/duolingo-badge'
+import DuolingoButton from './ui/duolingo-button'
+import DuolingoInput from './ui/duolingo-input'
+import DuolingoTextarea from './ui/duolingo-textarea'
+import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-upload'
+import { Separator } from './ui/separator'
+import { Tabs, TabsContent } from './ui/tabs'
+import { TextShimmer } from './ui/text-shimmer'
 
-type ChatInput = InferInput["chat"]["generate"]
-type HandleInputChange = (
-  e:
-    | React.ChangeEvent<HTMLInputElement>
-    | React.ChangeEvent<HTMLTextAreaElement>
-) => void
-type HandleSubmit = (
-  event?: React.FormEvent<HTMLFormElement>,
-  chatRequestOptions?: any
-) => void
+type ChatInput = InferInput['chat']['generate']
 
-function ChatInput({
-  handleInputChange,
-  handleSubmit,
-  messages,
-  status,
-  startNewChat,
-}: {
-  handleInputChange: HandleInputChange
-  handleSubmit: HandleSubmit
-  messages: Message[]
-  status: "submitted" | "streaming" | "ready" | "error"
-  startNewChat: () => string
-}) {
+function ChatInput() {
   const navigate = useNavigate()
   const [editor] = useLexicalComposerContext()
-  const searchParams = useSearchParams()
-  let chatId = searchParams.get("chatId")
+  const [searchParams] = useSearchParams()
+  const chatId = searchParams.get('chatId')
   const location = useLocation()
+  const { startNewChat } = useChat()
 
-  const { attachedDocumentIDs, clearAttachedDocuments } = useMentionContext()
-  const { tweets, contents } = useTweetContext()
+  const { handleInputChange, input, messages, status, append } = useChat()
+
+  const { attachments, addChatAttachment, removeAttachment, hasUploading } =
+    useAttachments()
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    
-    if (location.pathname !== "/studio") {
-      navigate("/studio")
+
+    if (hasUploading) {
+      toast.error('Please wait for file uploads to complete')
+      return
+    }
+
+    if (location.pathname.includes('/studio/knowledge')) {
+      navigate('/studio')
     }
 
     if (messages.length === 0 && !chatId) {
-      chatId = startNewChat()
+      startNewChat({ newId: nanoid() })
     }
 
-    const attachedDocuments = attachedDocumentIDs.map((id) => {
-      const item = localStorage.getItem(`doc-${id}`)
-      const parsed = JSON.parse(item!) as { title: string; content: string }
-      return { id, ...parsed }
-    })
-
-    handleSubmit(e, {
-      body: {
-        chatId,
-        attachedDocuments,
-        tweet: tweets.map((tweet) => ({
-          ...tweet,
-          content: contents.current.get(tweet.id) ?? "",
-        }))[0],
-      },
+    append({
+      content: input,
+      role: 'user',
+      metadata: { attachments },
     })
 
     // cleanup
-    clearAttachedDocuments()
+    attachments.forEach((attachment) => {
+      removeAttachment(attachment)
+    })
+
     editor.update(() => {
       const root = $getRoot()
       root.clear()
     })
   }
 
-  const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      e.stopPropagation()
-      onSubmit(e as any)
-    }
-  }
-
   useEffect(() => {
-    const removeUpdateListener = editor.registerUpdateListener(
-      ({ editorState }) => {
-        editorState.read(() => {
-          const root = $getRoot()
-          const text = root.getTextContent()
-          handleInputChange({
-            target: { value: text },
-          } as React.ChangeEvent<HTMLInputElement>)
-        })
-      }
-    )
+    const removeUpdateListener = editor.registerUpdateListener(({ editorState }) => {
+      editorState.read(() => {
+        const root = $getRoot()
+        const text = root.getTextContent()
+
+        handleInputChange({
+          target: { value: text },
+        } as React.ChangeEvent<HTMLInputElement>)
+      })
+    })
 
     return () => {
       removeUpdateListener()
     }
   }, [editor, handleInputChange])
 
-  return (
-    <form
-      onSubmit={onSubmit}
-      className="flex items-center rounded-lg border bg-white p-2"
-    >
-      <PlainTextPlugin
-        contentEditable={
-          <ContentEditable
-            autoFocus
-            className="w-full px-2 py-1 outline-none"
-            onKeyDown={handleKeyDown}
-          />
-        }
-        ErrorBoundary={LexicalErrorBoundary}
-      />
-      <PlaceholderPlugin placeholder="What do you want to tweet?" />
-      <HistoryPlugin />
-      <MentionPlugin />
+  const handleFilesAdded = (files: File[]) => files.forEach(addChatAttachment)
 
-      <DuolingoButton loading={status === "streaming" || status === "submitted"} variant="icon" size="icon" aria-label="Arrow Up">
-        <ArrowUp className="size-5" />
-      </DuolingoButton>
-      {/* 
-      <button
-        type="submit"
-        disabled={status === "submitted" || status === "streaming"}
-        className="size-8 shrink-0 disabled:opacity-50 bg-stone-800 hover:bg-stone-700 rounded-full flex items-center justify-center"
+  return (
+    <FileUpload onFilesAdded={handleFilesAdded}>
+      <div className="mb-2 flex gap-2 items-center">
+        {attachments.map((attachment, i) => {
+          const onRemove = () => removeAttachment({ id: attachment.id })
+          return (
+            <AttachmentItem
+              onRemove={onRemove}
+              key={attachment.id}
+              attachment={attachment}
+            />
+          )
+        })}
+      </div>
+
+      <ChatInputInner onSubmit={onSubmit} />
+    </FileUpload>
+  )
+}
+
+function ChatInputInner({
+  onSubmit,
+}: {
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+}) {
+  const context = useContext(FileUploadContext)
+  const isDragging = context?.isDragging ?? false
+
+  const { addKnowledgeAttachment, hasUploading } = useAttachments()
+
+  const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (hasUploading) return
+
+      onSubmit(e as any)
+    }
+  }
+
+  const handleAddKnowledgeDoc = (doc: SelectedKnowledgeDocument) => {
+    addKnowledgeAttachment(doc)
+  }
+
+  return (
+    <div className="space-y-3">
+      <div
+        className={`relative transition-all duration-200 ${
+          isDragging ? 'ring-2 rounded-xl ring-indigo-600 ring-offset-2' : ''
+        }`}
       >
-        {status === "submitted" || status === "streaming" ? (
-          <Loader2 className="size-4 text-white animate-spin" />
-        ) : (
-          <ArrowUp className="size-4 text-white" />
+        {isDragging && (
+          <div className="absolute inset-0 flex items-center justify-center bg-indigo-50/50 backdrop-blur-sm rounded-xl z-10">
+            <p className="text-indigo-600 font-medium">Drop files here to add to chat</p>
+          </div>
         )}
-      </button> */}
-    </form>
+
+        <form onSubmit={onSubmit} className="relative">
+          <div className="rounded-xl bg-white border-2 border-gray-200 shadow-[0_2px_0_#E5E7EB] font-medium transition-all duration-200 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-600">
+            <PlainTextPlugin
+              contentEditable={
+                <ContentEditable
+                  autoFocus
+                  className="w-full px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
+                  onKeyDown={handleKeyDown}
+                  style={{ minHeight: '4.5rem' }}
+                />
+              }
+              ErrorBoundary={LexicalErrorBoundary}
+            />
+            <PlaceholderPlugin placeholder="What do you want to tweet?" />
+            <HistoryPlugin />
+
+            <div className="flex items-center justify-between px-3 pb-3">
+              <div className="flex gap-1.5 items-center">
+                <FileUploadTrigger asChild>
+                  <DuolingoButton type="button" variant="secondary" size="icon">
+                    <Paperclip className="text-stone-600 size-5" />
+                  </DuolingoButton>
+                </FileUploadTrigger>
+
+                <KnowledgeSelector onSelectDocument={handleAddKnowledgeDoc} />
+              </div>
+
+              <DuolingoButton
+                loading={status === 'streaming' || status === 'submitted'}
+                disabled={hasUploading}
+                variant="icon"
+                size="icon"
+                aria-label="Send message"
+              >
+                <ArrowUp className="size-5" />
+              </DuolingoButton>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
 function TweetSuggestionLoader() {
   const [connectedAccount] = useLocalStorage(
-    "connected-account",
-    DEFAULT_CONNECTED_ACCOUNT
+    'connected-account',
+    DEFAULT_CONNECTED_ACCOUNT,
   )
 
   const account = {
@@ -229,22 +260,74 @@ function TweetSuggestionLoader() {
               <span className="font-semibold text-text-gray text-base">
                 {account.name}
               </span>
-              {account.verified && (
-                <Icons.verificationBadge className="h-4 w-4" />
-              )}
-              <span className="text-stone-400 text-base">
-                @{account.handle}
-              </span>
+              {account.verified && <Icons.verificationBadge className="h-4 w-4" />}
+              <span className="text-stone-400 text-base">@{account.handle}</span>
             </div>
             <div className="mt-1 text-base leading-relaxed whitespace-pre-line">
-              <TextShimmer
-                className=" [--base-gradient-color:#78716c]"
-                duration={0.7}
-              >
+              <TextShimmer className=" [--base-gradient-color:#78716c]" duration={0.7}>
                 Creating...
               </TextShimmer>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function ReadLinkLoader({
+  url,
+  title,
+  status = 'pending',
+}: {
+  url: string
+  title: string
+  status: 'success' | 'pending'
+}) {
+  const { width } = useSidebar()
+  const remToPx = (value: string) => parseFloat(value.replace('rem', '')) * 16
+
+  return (
+    <div className="w-full overflow-hidden">
+      <div className="mb-3 w-full rounded-lg bg-white border border-black border-opacity-10 shadow-sm bg-clip-padding overflow-hidden">
+        <div className="flex flex-col gap-0 px-6 py-3 min-w-0">
+          {status === 'success' ? (
+            <div className="flex mb-1 items-center gap-1.5">
+              <Check className="size-4 text-indigo-600 flex-shrink-0" />
+              <p className="text-sm text-indigo-600">Read</p>
+            </div>
+          ) : (
+            <div className="flex mb-1 items-center gap-1.5">
+              <Eye className="size-4 text-stone-500 flex-shrink-0" />
+              <TextShimmer
+                className="text-sm [--base-gradient-color:#78716c]"
+                duration={0.7}
+              >
+                Reading...
+              </TextShimmer>
+            </div>
+          )}
+
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-base font-medium text-stone-900 hover:underline truncate block"
+            title={title}
+            style={{ maxWidth: remToPx(width) - 128 }}
+          >
+            {title}
+          </a>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-stone-500 hover:underline mt-0.5 truncate block"
+            title={url}
+            style={{ maxWidth: remToPx(width) - 128 }}
+          >
+            {url}
+          </a>
         </div>
       </div>
     </div>
@@ -272,9 +355,7 @@ const TweetCard = ({ name, username, src, text }: TweetCard) => {
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <span className="text-base font-semibold">{name}</span>
-              <span className="text-sm/6 text-muted-foreground">
-                @{username}
-              </span>
+              <span className="text-sm/6 text-muted-foreground">@{username}</span>
             </div>
             <div className="mt-1 text-base whitespace-pre-line">{text}</div>
           </div>
@@ -284,26 +365,20 @@ const TweetCard = ({ name, username, src, text }: TweetCard) => {
   )
 }
 
-export function TweetSuggestion({
-  id,
-  suggestion,
-}: {
-  id: string
-  suggestion: string
-}) {
+export function TweetSuggestion({ id, suggestion }: { id: string; suggestion: string }) {
   const { updateTweet } = useTweetContext()
   const [connectedAccount] = useLocalStorage(
-    "connected-account",
-    DEFAULT_CONNECTED_ACCOUNT
+    'connected-account',
+    DEFAULT_CONNECTED_ACCOUNT,
   )
 
   const reapply = () => {
-    updateTweet(id, suggestion)
+    updateTweet(suggestion)
   }
 
   return (
     <div className="relative w-full">
-      <div className="relative text-left rounded-lg bg-white shadow overflow-hidden">
+      <div className="relative text-left rounded-[calc(6px)] bg-white shadow overflow-hidden">
         <div className="absolute top-5 right-5">
           <button
             onClick={reapply}
@@ -346,88 +421,37 @@ export function TweetSuggestion({
 }
 
 export function AppSidebar({ children }: { children: React.ReactNode }) {
-  const id = useRef(nanoid())
   const { addImprovements, rejectAllImprovements } = useTweetContext()
-
-  const [activeTab, setActiveTab] = useQueryState<"assistant" | "settings">(
-    "tab",
-    {
-      defaultValue: "assistant",
-      parse: (value) => {
-        if (value === "assistant") return "assistant"
-        return "settings"
-      },
-      serialize: (value) => value,
-    }
-  )
-
-  const [chatId, setChatId] = useQueryState("chatId", {
-    defaultValue: id.current,
-    parse: (value) => {
-      id.current = value
-      return value
-    },
-    serialize: (value) => value,
-  })
-
   const { toggleSidebar } = useSidebar()
-
-  const { data } = useQuery({
-    queryKey: ["get-chat-messages", chatId],
-    queryFn: async () => {
-      const res = await client.chat.chat_messages.$get({ chatId })
-      return await res.json()
-    },
-  })
-
-  const { messages, handleInputChange, handleSubmit, setInput, status } =
-    useChat({
-      initialMessages: data?.chat?.messages,
-      id: chatId,
-      maxSteps: 5,
-      api: "/api/chat/generate",
-      // only send the last message to the server:
-      experimental_prepareRequestBody({ messages, requestBody, requestData }) {
-        console.log("body, data", requestBody, requestData)
-        return {
-          // remove trailing \n from pressing enter if there is one
-          message: {
-            ...messages[messages.length - 1],
-            content: messages[messages.length - 1]?.content.trimEnd(),
-          },
-          ...requestBody,
-        }
-      },
-      onError(err) {
-        toast.error(err.message)
-      },
-    })
-
-  const startNewChat = () => {
-    const newId = nanoid()
-    id.current = newId
-
-    setActiveTab("assistant")
-    setChatId(id.current)
-    setInput("")
-
-    return id.current
-  }
+  const { messages, status, startNewChat } = useChat()
+  const { addKnowledgeAttachment, attachments, removeAttachment } = useAttachments()
 
   const resultMap = new Map<string, boolean>()
   const resultRef = useRef(resultMap)
+
+  const [activeTab, setActiveTab] = useQueryState<'assistant' | 'settings'>('tab', {
+    defaultValue: 'assistant',
+    parse: (value) => {
+      if (value === 'assistant') return 'assistant'
+      return 'settings'
+    },
+    serialize: (value) => value,
+  })
 
   useEffect(() => {
     const lastMessage = messages[messages.length - 1]
 
     lastMessage?.parts.forEach((part) => {
-      if (part.type === "tool-invocation") {
+      if (part.type === 'tool-invocation') {
         const hasFired = resultRef.current.get(part.toolInvocation.toolCallId)
 
-        if (!hasFired && part.toolInvocation.state === "result") {
+        if (
+          !hasFired &&
+          part.toolInvocation.state === 'result' &&
+          part.toolInvocation.toolName === 'edit_tweet'
+        ) {
           // tool is done generating tweet
-          const { id, diffs } = part.toolInvocation
-            .result as EditTweetToolResult
+          const { id, diffs } = part.toolInvocation.result as EditTweetToolResult
 
           addImprovements(id, diffs)
 
@@ -437,16 +461,16 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     })
   }, [messages, resultRef])
 
-  const [tweetLink, setTweetLink] = useState("")
-  const [prompt, setPrompt] = useState("")
-  const [twitterUsername, setTwitterUsername] = useState("")
+  const [tweetLink, setTweetLink] = useState('')
+  const [prompt, setPrompt] = useState('')
+  const [twitterUsername, setTwitterUsername] = useState('')
 
   const { mutate: importTweets, isPending: isImporting } = useMutation({
     mutationFn: async ({ link }: { link: string }) => {
       await client.style.import.$post({ link })
     },
     onSuccess: () => {
-      setTweetLink("")
+      setTweetLink('')
       refetchStyle()
     },
     onError: (error: HTTPException) => {
@@ -461,10 +485,10 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
       await client.style.delete.$post({ tweetId })
     },
     onMutate: async ({ tweetId }) => {
-      await queryClient.cancelQueries({ queryKey: ["account-style"] })
-      const previousStyle = queryClient.getQueryData(["account-style"])
+      await queryClient.cancelQueries({ queryKey: ['account-style'] })
+      const previousStyle = queryClient.getQueryData(['account-style'])
 
-      queryClient.setQueryData(["account-style"], (oldData: any) => {
+      queryClient.setQueryData(['account-style'], (oldData: any) => {
         if (!oldData?.tweets) return oldData
         return {
           ...oldData,
@@ -475,11 +499,11 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
       return { previousStyle }
     },
     onError: (error: HTTPException, _, context) => {
-      queryClient.setQueryData(["account-style"], context?.previousStyle)
+      queryClient.setQueryData(['account-style'], context?.previousStyle)
       toast.error(error.message)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["account-style"] })
+      queryClient.invalidateQueries({ queryKey: ['account-style'] })
     },
   })
 
@@ -489,7 +513,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     },
     onSuccess: () => {
       refetchStyle()
-      toast.success("Style saved")
+      toast.success('Style saved')
     },
     onError: (error: HTTPException) => {
       toast.error(error.message)
@@ -497,12 +521,12 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
   })
 
   const [connectedAccount, setConnectedAccount] = useLocalStorage(
-    "connected-account",
-    DEFAULT_CONNECTED_ACCOUNT
+    'connected-account',
+    DEFAULT_CONNECTED_ACCOUNT,
   )
 
   const { data: style, refetch: refetchStyle } = useQuery({
-    queryKey: ["account-style"],
+    queryKey: ['account-style'],
     queryFn: async () => {
       const res = await client.style.get.$get()
       return await res.json()
@@ -514,19 +538,20 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
   }, [style])
 
   const { data: account } = useQuery<ConnectedAccount>({
-    queryKey: ["connected-account"],
+    queryKey: ['get-connected-account'],
     queryFn: async () => {
-      const res = await client.settings.connectedAccount.$get()
+      const res = await client.settings.connected_account.$get()
       const { account } = await res.json()
       return account ?? DEFAULT_CONNECTED_ACCOUNT
     },
     initialData: connectedAccount,
+    refetchOnWindowFocus: false,
   })
 
   useEffect(() => {
     if (account && account.username) {
       setConnectedAccount(account)
-      setTwitterUsername("@" + account.username)
+      setTwitterUsername('@' + account.username)
     }
   }, [account])
 
@@ -536,9 +561,9 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
       return await res.json()
     },
     onSuccess: ({ data }) => {
-      queryClient.setQueryData(["connected-account"], data)
+      queryClient.setQueryData(['connected-account'], data)
       setConnectedAccount(data)
-      toast.success("Account connected!")
+      toast.success('Account connected!')
     },
     onError: (error: HTTPException) => {
       toast.error(error.message)
@@ -546,47 +571,91 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
   })
 
   const [editor] = useLexicalComposerContext()
-  const { addAttachedDocument, clearAttachedDocuments } = useMentionContext()
-  const [contextDocs, setContextDocs] = useLocalStorage<SidebarDoc[]>(
-    "context-docs",
-    []
-  )
 
-  // Function to check if a document exists and create it if it doesn't
-  const ensureExampleDocumentExists = (docId: string) => {
-    // Check if document exists in localStorage
-    const documentExists = localStorage.getItem(`doc-` + docId)
+  const { data: knowledgeData } = useQuery({
+    queryKey: ['knowledge-documents'],
+    queryFn: async () => {
+      const res = await client.knowledge.list.$get()
+      return await res.json()
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  })
 
-    if (!documentExists) {
-      // Create the document using our centralized helper
-      const newDoc = createExampleDocument(docId)
+  const exampleDocuments = knowledgeData?.documents?.filter(doc => doc.isExample) || []
 
-      if (!newDoc) return false
+  const renderPart = (
+    part: UIMessage['parts'][number],
+    index: number,
+  ): React.ReactNode => {
+    switch (part.type) {
+      case 'text':
+        if (Array.isArray(part.text)) {
+          return (
+            <div key={index} className="space-y-2">
+              {part.text.map((nestedPart: any, nestedIndex: number) =>
+                renderPart(nestedPart, nestedIndex),
+              )}
+            </div>
+          )
+        }
+        return (
+          <MessageContent
+            markdown
+            key={index}
+            className="text-base py-0.5 leading-7 text-stone-800"
+          >
+            {part.text}
+          </MessageContent>
+        )
+      case 'step-start':
+        return index > 0 ? <Separator key={index} className="!my-4" /> : null
+      case 'tool-invocation':
+        switch (part.toolInvocation.state) {
+          case 'partial-call':
+          case 'call':
+            return part.toolInvocation.toolName === 'read_website_content' ? (
+              <ReadLinkLoader
+                status="pending"
+                title="Reading link..."
+                key={index}
+                url={part.toolInvocation.args?.website_url}
+              />
+            ) : (
+              <TweetSuggestionLoader key={index} />
+            )
+          case 'result':
+            if (part.toolInvocation.toolName === 'read_website_content') {
+              return (
+                <ReadLinkLoader
+                  status="success"
+                  key={index}
+                  title={part.toolInvocation.result.title}
+                  url={part.toolInvocation.args?.website_url}
+                />
+              )
+            }
 
-      // Add to sidebar docs if not already there
-      const existingDoc = contextDocs.find((doc) => doc.id === docId)
-      if (!existingDoc) {
-        setContextDocs((prev) => [
-          ...prev,
-          {
-            id: newDoc.id,
-            title: newDoc.title,
-            updatedAt: newDoc.updatedAt,
-          },
-        ])
-      }
+            if (part.toolInvocation.toolName === 'edit_tweet') {
+              const result = part.toolInvocation.result
+              return (
+                <div
+                  key={result.id}
+                  className="bg-white shadow-[0_2px_0_#E5E7EB] rounded-lg p-3 border border-gray-200"
+                >
+                  <div className="flex flex-col gap-2 text-sm/6">
+                    <Improvements />
+                  </div>
+                </div>
+              )
+            }
 
-      // Save to localStorage
-      localStorage.setItem(
-        `doc-${docId}`,
-        JSON.stringify({
-          title: newDoc.title,
-          content: newDoc.content,
-        })
-      )
+          default:
+            return null
+        }
+      default:
+        return null
     }
-
-    return true
   }
 
   return (
@@ -596,29 +665,27 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
       <Tabs
         defaultValue="assistant"
         value={activeTab}
-        onValueChange={(tab) => setActiveTab(tab as "assistant" | "settings")}
+        onValueChange={(tab) => setActiveTab(tab as 'assistant' | 'settings')}
       >
         <Sidebar side="right" collapsible="offcanvas">
           <SidebarHeader className="flex flex-col border-b border-stone-200 bg-stone-100 items-center justify-end gap-2 px-4">
             <div className="w-full flex items-center justify-between">
               <p className="text-sm/6 font-medium">
-                {activeTab === "assistant" ? "Assistant" : "Settings"}
+                {activeTab === 'assistant' ? 'Assistant' : 'Settings'}
               </p>
               <div className="flex gap-2">
                 <DuolingoButton
                   size="icon"
-                  variant={activeTab === "settings" ? "primary" : "secondary"}
+                  variant={activeTab === 'settings' ? 'primary' : 'secondary'}
                   title="Settings"
                   onClick={() =>
-                    setActiveTab(
-                      activeTab === "settings" ? "assistant" : "settings"
-                    )
+                    setActiveTab(activeTab === 'settings' ? 'assistant' : 'settings')
                   }
                 >
                   <Settings className="size-4" />
                 </DuolingoButton>
                 <DuolingoButton
-                  onClick={startNewChat}
+                  onClick={() => startNewChat({ newId: nanoid() })}
                   size="icon"
                   variant="secondary"
                   title="New Chat"
@@ -639,115 +706,88 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
           <SidebarContent className="h-full p-4 !mb-8">
             <SidebarGroup className="h-full">
               <TabsContent className="h-full" value="assistant">
-                <div className="flex flex-col-reverse space-y-reverse space-y-4 h-full overflow-y-auto">
+                <div className="flex flex-col-reverse space-y-reverse space-y-3 h-full overflow-y-auto">
                   {messages.length > 0 ? (
-                    [...messages].reverse().map((message) => (
-                      <div
-                        key={message.id}
-                        className={`w-full text-left p-4 rounded-2xl relative ${
-                          message.role === "assistant" ? "" : "bg-stone-200/75"
-                        }`}
-                      >
-                        <div className="flex items-start gap-2 mb-2">
-                          {message.role === "assistant" ? (
-                            <Sparkles className="size-3.5 text-primary" />
-                          ) : (
-                            <User className="size-3.5 text-primary" />
-                          )}
-                          <span className="text-xs font-medium text-primary/80">
-                            {message.role === "assistant" ? "Assistant" : "You"}
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {message.parts.map((part, index) => {
-                            switch (part.type) {
-                              case "text":
-                                return (
-                                  <p
-                                    key={index}
-                                    className="text-base leading-relaxed text-stone-800"
-                                  >
-                                    {part.text}
-                                  </p>
-                                )
-                              case "step-start":
-                                return index > 0 ? (
-                                  <Separator key={index} className="!my-5" />
-                                ) : null
-                              case "tool-invocation":
-                                switch (part.toolInvocation.state) {
-                                  case "partial-call":
-                                  case "call":
-                                    return <TweetSuggestionLoader key={index} />
-                                  case "result":
-                                    if (
-                                      part.toolInvocation.toolName ===
-                                        "edit_tweet" ||
-                                      part.toolInvocation.toolName ===
-                                        "create_tweet"
-                                    ) {
-                                      const result = part.toolInvocation.result
-                                      return (
-                                        <div
-                                          key={result.id}
-                                          className="group bg-stone-100 p-2 shadow-inner rounded-lg border border-dashed border-stone-200 rounded-b-xl"
-                                        >
-                                          <TweetSuggestion
-                                            id={result.id}
-                                            suggestion={result.improvedText}
-                                          />
-                                          <div className="flex flex-col gap-2 p-2 pt-4 text-sm/6">
-                                            <div className="flex justify-between">
-                                              <p>Suggestions:</p>
-                                            </div>
+                    (() => {
+                      const reversed = [...messages].reverse()
+                      let lastUserIdx = reversed.findIndex((m) => m.role === 'user')
+                      if (lastUserIdx === -1) lastUserIdx = 0
+                      const hasAssistantAfterUser = reversed
+                        .slice(0, lastUserIdx)
+                        .some((m) => m.role === 'assistant')
+                      const showTyping = status === 'submitted' && !hasAssistantAfterUser
+                      const renderList = [...reversed]
+                      if (showTyping) {
+                        renderList.splice(lastUserIdx, 0, {
+                          id: '__typing__',
+                          role: 'assistant',
+                          parts: [],
+                          // @ts-expect-error
+                          typingLoader: true,
+                        })
+                      }
+                      return renderList.map((message, i) => {
+                        // @ts-expect-error unknown property
+                        if (message.typingLoader) {
+                          return (
+                            <Message key="__typing__">
+                              <div className="flex items-start gap-3">
+                                <div className="space-y-2 flex-1">
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <Loader variant="typing" size="md" />
+                                  </div>
+                                </div>
+                              </div>
+                            </Message>
+                          )
+                        }
 
-                                            <Improvements />
-                                          </div>
-                                        </div>
-                                      )
-                                    }
-                                    return (
-                                      <div
-                                        key={index}
-                                        className="bg-gradient-to-br from-emerald-50/50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/30 border border-emerald-200/30 dark:border-emerald-700/30 p-3 rounded-lg"
-                                      >
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
-                                          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                                            Tool result:{" "}
-                                            {part.toolInvocation.toolName}
-                                          </p>
-                                        </div>
-                                        <div className="text-sm bg-white/50 dark:bg-black/20 p-2 rounded">
-                                          {typeof part.toolInvocation.result ===
-                                          "object"
-                                            ? JSON.stringify(
-                                                part.toolInvocation.result,
-                                                null,
-                                                2
-                                              )
-                                            : part.toolInvocation.result}
-                                        </div>
-                                      </div>
-                                    )
-                                  default:
-                                    return null
-                                }
-                              default:
-                                return null
-                            }
-                          })}
-                        </div>
-                      </div>
-                    ))
+                        return (
+                          <div key={i} className="flex flex-col gap-2">
+                            <div className="flex gap-2 items-center">
+                              {message.metadata?.attachments?.map((attachment) => {
+                                return (
+                                  <AttachmentItem
+                                    key={attachment.id}
+                                    attachment={attachment}
+                                  />
+                                )
+                              })}
+                            </div>
+
+                            <Message
+                              className={` ${
+                                message.role === 'assistant'
+                                  ? ''
+                                  : 'bg-stone-200 w-fit pr-6'
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                {message.role === 'user' && (
+                                  <Avatar className="size-7 flex items-center justify-center bg-stone-800 rounded-full flex-shrink-0">
+                                    <p className="text-white text-[12px] font-medium">
+                                      {connectedAccount.name.slice(0, 1).toUpperCase()}
+                                    </p>
+                                  </Avatar>
+                                )}
+                                <div className="space-y-2 flex-1">
+                                  {message.parts.map((part, index) => {
+                                    return renderPart(part, index)
+                                  })}
+                                </div>
+                              </div>
+                            </Message>
+                          </div>
+                        )
+                      })
+                    })()
                   ) : (
                     <div className="flex h-full flex-1 flex-col items-center justify-center text-center p-8">
                       <p className="text-2xl text-stone-800 font-medium">
                         Let's write a great tweet ✏️
                       </p>
                       <p className="text-sm/6 text-muted-foreground mt-1">
-                        Reference a blog post, product update, or rough idea -
-                        I'll write the tweet.
+                        Paste a link, image, or rough idea
                       </p>
 
                       <div className="w-2/3 mt-8 mb-4 flex items-center gap-3">
@@ -756,74 +796,80 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                         <div className="h-px flex-1 bg-stone-200"></div>
                       </div>
 
-                      <div className="grid gap-2 w-full max-w-sm">
+                      <div className="grid gap-2 w-full max-w-lg">
                         <DuolingoButton
-                          className="w-full whitespace-nowrap"
+                          className="w-full"
                           variant="dashedOutline"
                           onClick={() => {
-                            const docId = "example-blog"
-
-                            ensureExampleDocumentExists(docId)
-                            clearAttachedDocuments()
-                            addAttachedDocument(docId)
-
-                            editor.update(() => {
-                              const root = $getRoot()
-
-                              const p = $createParagraphNode()
-                              p.append($createTextNode("write a tweet about "))
-                              p.append($createMentionNode("@example-blog"))
-                              p.append($createTextNode(" "))
-
-                              root.clear()
-                              root.append(p)
-
-                              // Position selection at the end
-                              p.select()
+                            // Clear existing attachments
+                            attachments.forEach((attachment) => {
+                              removeAttachment({ id: attachment.id })
                             })
-                            editor.focus()
+                            
+                            const blogDoc = exampleDocuments.find(doc => 
+                              doc.title?.includes('Zod') || doc.type === 'url'
+                            )
+                            
+                            if (blogDoc) {
+                              addKnowledgeAttachment(blogDoc)
+                              
+                              editor.update(() => {
+                                const root = $getRoot()
+                                const p = $createParagraphNode()
+                                p.append($createTextNode('write a tweet about this article'))
+                                root.clear()
+                                root.append(p)
+                                p.select()
+                              })
+                              editor.focus()
+                            } else {
+                              toast.error('Example blog article not found. Try adding your own content!')
+                            }
                           }}
-                          // className="w-full border text-center px-3 py-2 text-sm text-stone-700 bg-stone-100 rounded-md transition-colors"
                         >
-                          write a short tweet about{" "}
-                          <span className="ml-1.5 text-indigo-800 bg-indigo-100 rounded-sm px-1 py-0.5">
-                            @example-blog
-                          </span>
+                          <div className="flex flex-wrap justify-center items-center gap-1">
+                            <span>tweet about</span>
+                            <span className="text-rose-950 bg-rose-50 rounded-sm px-1 py-0.5">
+                              🧠 example-blog-article
+                            </span>
+                          </div>
                         </DuolingoButton>
                         <DuolingoButton
-                          className="w-full whitespace-nowrap"
+                          className="w-full"
                           variant="dashedOutline"
                           onClick={() => {
-                            // Use the same ID format consistently
-                            const docId = "example-product-update"
-
-                            ensureExampleDocumentExists(docId)
-                            clearAttachedDocuments()
-                            addAttachedDocument(docId)
-
-                            editor.update(() => {
-                              const root = $getRoot()
-
-                              const p = $createParagraphNode()
-                              p.append($createTextNode("tweet about "))
-                              p.append(
-                                $createMentionNode("@example-product-update")
-                              )
-                              p.append($createTextNode(" "))
-
-                              root.clear()
-                              root.append(p)
-
-                              // Position selection at the end
-                              p.select()
+                            // Clear existing attachments
+                            attachments.forEach((attachment) => {
+                              removeAttachment({ id: attachment.id })
                             })
-                            editor.focus()
+                            
+                            const imageDoc = exampleDocuments.find(doc => 
+                              doc.title?.includes('React') || doc.type === 'image'
+                            )
+                            
+                            if (imageDoc) {
+                              addKnowledgeAttachment(imageDoc)
+                              
+                              editor.update(() => {
+                                const root = $getRoot()
+                                const p = $createParagraphNode()
+                                p.append($createTextNode('tweet i just learned about this'))
+                                root.clear()
+                                root.append(p)
+                                p.select()
+                              })
+                              editor.focus()
+                            } else {
+                              toast.error('Example code image not found. Try uploading your own image!')
+                            }
                           }}
                         >
-                          tweet about{" "}
-                          <span className="ml-1.5 text-indigo-800 bg-indigo-100 rounded-sm px-1 py-0.5">
-                            @example-product-update
-                          </span>
+                          <div className="flex flex-wrap justify-center items-center gap-1">
+                            <span>tweet i just learned about</span>
+                            <span className="text-rose-950 bg-rose-50 rounded-sm px-1 py-0.5">
+                              🧠 example-code-image
+                            </span>
+                          </div>
                         </DuolingoButton>
                       </div>
                     </div>
@@ -855,9 +901,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                           variant="dashedOutline"
                           size="sm"
                           className="w-fit"
-                          onClick={() =>
-                            connectAccount({ username: twitterUsername })
-                          }
+                          onClick={() => connectAccount({ username: twitterUsername })}
                           disabled={isConnecting}
                         >
                           {isConnecting ? (
@@ -866,7 +910,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                               Connecting...
                             </>
                           ) : (
-                            "Connect"
+                            'Connect'
                           )}
                         </DuolingoButton>
                       </div>
@@ -886,8 +930,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                         </DuolingoBadge>
                       </div>
                       <p className="text-sm text-stone-600">
-                        If the agent doesn't quite get your style, fine-tune it
-                        here
+                        If the agent doesn't quite get your style, fine-tune it here
                       </p>
                     </div>
                     <DuolingoTextarea
@@ -928,7 +971,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                         className="w-fit"
                         size="sm"
                       >
-                        {isImporting ? "Importing..." : "Import"}
+                        {isImporting ? 'Importing...' : 'Import'}
                       </DuolingoButton>
                     </div>
 
@@ -941,9 +984,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                                 <DuolingoButton
                                   variant="destructive"
                                   className="absolute top-3 right-3 w-fit p-1.5 text-white aspect-square"
-                                  onClick={() =>
-                                    deleteTweet({ tweetId: tweet.id })
-                                  }
+                                  onClick={() => deleteTweet({ tweetId: tweet.id })}
                                   disabled={isDeleting}
                                 >
                                   {isDeleting ? (
@@ -980,19 +1021,9 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
             </SidebarGroup>
           </SidebarContent>
 
-          {activeTab === "assistant" ? (
+          {activeTab === 'assistant' ? (
             <SidebarFooter className="p-3 border-t">
-              <p className="text-xs text-stone-500 italic">
-                Tip: Use @ to reference context documents.
-              </p>
-
-              <ChatInput
-                handleInputChange={handleInputChange}
-                handleSubmit={handleSubmit}
-                messages={messages}
-                status={status}
-                startNewChat={startNewChat}
-              />
+              <ChatInput />
             </SidebarFooter>
           ) : (
             <SidebarFooter className="p-3 border-t">

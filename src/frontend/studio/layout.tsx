@@ -1,14 +1,16 @@
 "use client"
 
-import { PropsWithChildren, useEffect, useState } from "react"
+import { PropsWithChildren } from "react"
 
 import { AppSidebar } from "@/components/app-sidebar"
-import { ContextSidebar } from "@/components/context-sidebar"
+import { LeftSidebar } from "@/components/context-sidebar"
 import { AppSidebarInset } from "@/components/providers/app-sidebar-inset"
-import { SidebarProvider } from "@/components/ui/sidebar"
+import {
+  SidebarProvider
+} from "@/components/ui/sidebar"
 import { MentionProvider } from "@/hooks/mention-ctx"
-import { LexicalComposer } from "@lexical/react/LexicalComposer"
 import { MentionNode } from "@/lib/nodes"
+import { LexicalComposer } from "@lexical/react/LexicalComposer"
 
 function parseCookies(): Record<string, string> {
   return document.cookie
@@ -59,23 +61,28 @@ export default function Layout({ children, hideAppSidebar }: LayoutProps) {
   }
 
   return (
-    <SidebarProvider
-      defaultOpen={defaultOpen}
-      defaultWidth={sidebarWidth || "32rem"}
-    >
-      <ContextSidebar />
-      {hideAppSidebar ? (
-        <AppSidebarInset>{children}</AppSidebarInset>
-      ) : (
-        <MentionProvider>
-          <LexicalComposer initialConfig={initialConfig}>
-            <AppSidebar>
-              <AppSidebarInset>{children}</AppSidebarInset>
-            </AppSidebar>
-          </LexicalComposer>
-        </MentionProvider>
-      )}
-    </SidebarProvider>
+    <div className="flex">
+      <SidebarProvider className="w-fit">
+        <LeftSidebar />
+      </SidebarProvider>
+
+      <SidebarProvider
+        defaultOpen={defaultOpen}
+        defaultWidth={sidebarWidth || "32rem"}
+      >
+        {hideAppSidebar ? (
+          <AppSidebarInset>{children}</AppSidebarInset>
+        ) : (
+          <MentionProvider>
+            <LexicalComposer initialConfig={initialConfig}>
+              <AppSidebar>
+                <AppSidebarInset>{children}</AppSidebarInset>
+              </AppSidebar>
+            </LexicalComposer>
+          </MentionProvider>
+        )}
+      </SidebarProvider>
+    </div>
   )
 }
 

@@ -20,7 +20,7 @@ export const InitialContentPlugin = ({
         return
       }
 
-      const parsedValue = JSON.parse(storedValue)
+      const parsedValue = JSON.parse(storedValue) as any
       const content = parsedValue?.content
 
       if (!content) {

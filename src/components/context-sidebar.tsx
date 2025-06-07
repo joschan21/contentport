@@ -1,292 +1,324 @@
-"use client"
+'use client'
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { SidebarDoc, useDocumentContext } from "@/hooks/document-ctx"
-import { useTweetContext } from "@/hooks/tweet-ctx"
-import { authClient } from "@/lib/auth-client"
-import { cn } from "@/lib/utils"
-import { useQueryClient } from "@tanstack/react-query"
-import { FileText, Plus, Twitter, X } from "lucide-react"
-import Link from "next/link"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useRef } from "react"
-import { NavLink, useLocation, useNavigate, useParams } from "react-router"
+import { buttonVariants } from '@/components/ui/button'
+import { useSidebarContext } from '@/hooks/sidebar-ctx'
+import { useTweetContext } from '@/hooks/tweet-ctx'
+import { client } from '@/lib/client'
+import { cn } from '@/lib/utils'
+import { InferOutput } from '@/server'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  ArrowLeftFromLine,
+  ArrowRightFromLine,
+  CircleEllipsis,
+  PanelLeft,
+  Plus,
+  X,
+} from 'lucide-react'
+import { useSearchParams } from 'react-router'
+import toast from 'react-hot-toast'
+import { NavLink, useLocation, useNavigate } from 'react-router'
+import DuolingoButton from './ui/duolingo-button'
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarHeader,
-} from "./ui/sidebar"
-import DuolingoButton from "./ui/duolingo-button"
-import DuolingoBadge from "./ui/duolingo-badge"
+  useSidebar,
+} from './ui/sidebar'
+import { useState } from 'react'
+import { authClient } from '@/lib/auth-client'
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 
-interface DocumentListResponse {
-  success: boolean
-  documents: Array<{
-    id: string
-    title: string
-    updatedAt: Date
-  }>
-}
+type GetRecentTweetsOutput = InferOutput['tweet']['recents']['tweets']
 
-export function ContextSidebar({
-  ...props
-}: React.ComponentProps<typeof Sidebar>) {
-  const { id } = useParams()
-  const router = useRouter()
-  const pathname = usePathname()
+export const LeftSidebar = () => {
+  const { state } = useSidebar()
+  const { triggerNewChat } = useSidebarContext()
   const queryClient = useQueryClient()
-  const { data } = authClient.useSession()
-  const { docs, setDocs } = useDocumentContext()
-
-  const { tweets } = useTweetContext()
-
-  // const createDocument = useMutation({
-  //   mutationFn: async () => {
-  //     const res = await client.document.create.$post()
-  //     return res.json()
-  //   },
-  //   onMutate: async () => {
-  //     const doc = {
-  //       id: crypto.randomUUID(),
-  //       title: "",
-  //       updatedAt: new Date(),
-  //     }
-
-  //     await queryClient.setQueryData(["documents"], (old: Document[] = []) => {
-  //       return [doc, ...old]
-  //     })
-
-  //     console.log("PUSH 2")
-  //     router.push(`/studio/context/${doc.id}`)
-
-  //     return { id: doc.id }
-  //   },
-  //   onSuccess: (data, _, context) => {
-  //     console.log("PUSH 3")
-  //     router.push(`/studio/context/${data.documentId}`)
-  //     if (context?.id) {
-  //       queryClient.setQueryData(["documents"], (old: Document[] = []) => {
-  //         return old.map((doc) =>
-  //           doc.id === context.id ? { ...doc, id: data.documentId } : doc
-  //         )
-  //       })
-  //     }
-  //   },
-  //   onError: (_, __, context) => {
-  //     if (context?.id) {
-  //       queryClient.setQueryData(["documents"], (old: Document[] = []) => {
-  //         return old.filter((doc) => doc.id !== context.id)
-  //       })
-  //     }
-  //   },
-  // })
-
-  // const deleteDocument = useMutation({
-  //   mutationFn: async (documentId: string) => {
-  //     const res = await client.document.delete.$post({ documentId })
-  //     return res.json()
-  //   },
-  //   onMutate: async (documentId) => {
-  //     await queryClient.setQueryData(["documents"], (old: Document[] = []) => {
-  //       return old.filter((doc) => doc.id !== documentId)
-  //     })
-  //     return { documentId }
-  //   },
-  //   onError: (_, __, context) => {
-  //     if (context?.documentId) {
-  //       queryClient.setQueryData(["documents"], (old: Document[] = []) => {
-  //         const deletedDoc = contextDocs.find(
-  //           (doc) => doc.id === context.documentId
-  //         )
-  //         if (deletedDoc) {
-  //           return [...old, deletedDoc]
-  //         }
-  //         return old
-  //       })
-  //     }
-  //   },
-  // })
-
-  // const addDocument = () => {
-  //   // createDocument.mutate()
-  // }
-
-  // const removeDocument = (id: string) => {
-  //   if (pathname === `/studio/context/${id}`) {
-  //     console.log("PUSH 1")
-  //     router.push("/studio")
-  //   }
-  //   deleteDocument.mutate(id)
-  // }
-
-  // const contextDocs = documentsData?.filter((doc) => doc.id !== "main") ?? []
-
-  // const prefetchDocument = (id: string) => {
-  //   queryClient.prefetchQuery({
-  //     queryKey: ["document", id],
-  //     queryFn: async () => {
-  //       const res = await client.document.get.$get({
-  //         documentId: id,
-  //       })
-  //       return res.json()
-  //     },
-  //   })
-  // }
-
-  const newId = useRef(crypto.randomUUID())
   const navigate = useNavigate()
-  const searchParams = useSearchParams()
+  const { clearTweet, refreshPotentialId, mutationReset } = useTweetContext()
+  const location = useLocation()
+  const { data } = authClient.useSession()
+
+  const [searchParams] = useSearchParams()
 
   const getSearchString = () => {
-    return searchParams ? `?${searchParams.toString()}` : ""
+    return searchParams.toString() ? `?${searchParams.toString()}` : ''
+  }
+
+  const isCollapsed = state === 'collapsed'
+
+  const { toggleSidebar } = useSidebar()
+
+  const { data: recentTweets, isPending } = useQuery({
+    queryKey: ['get-recent-tweets'],
+    queryFn: async () => {
+      const res = await client.tweet.recents.$get()
+      const { tweets } = await res.json()
+
+      return tweets
+    },
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+
+  const { mutate: deleteTweet, isPending: isDeleting } = useMutation({
+    mutationFn: async (tweetId: string) => {
+      const res = await client.tweet.delete.$post({ id: tweetId })
+      return res.json()
+    },
+    onMutate: async (tweetId) => {
+      queryClient.setQueryData(['get-recent-tweets'], (old: any) => {
+        if (Array.isArray(old)) {
+          return old.filter((tweet: any) => tweet.id !== tweetId)
+        }
+        return old
+      })
+
+      if (location.pathname.includes(tweetId)) {
+        navigate('/studio')
+      }
+    },
+    onError: (err) => {
+      console.error(err)
+      toast.error('Failed to delete tweet')
+    },
+  })
+
+  const refresh = async () => {
+    clearTweet()
+    refreshPotentialId()
+    mutationReset()
+    triggerNewChat()
+
+    if (!recentTweets || recentTweets?.every((t) => t.id !== 'new')) {
+      queryClient.setQueryData(
+        ['get-recent-tweets'],
+        (old: GetRecentTweetsOutput | undefined) => {
+          const filtered = old?.filter((t) => t.id !== 'new')
+          if (filtered) {
+            return [{ id: 'new', content: 'New Tweet' }, ...filtered]
+          } else {
+            return [{ id: 'new', content: 'New Tweet' }]
+          }
+        },
+      )
+    }
   }
 
   return (
-    <div className="bg-light-gray text-sidebar-foreground w-80">
-      <div className="h-full flex flex-col fixed w-80">
-        <SidebarHeader className="border-b h-16 border-border/40 p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg/7 tracking-tight text-stone-800 font-medium">
-              Documents
-            </h2>
-          </div>
-        </SidebarHeader>
-        <SidebarContent className="p-4 space-y-6">
-          <SidebarGroup>
-            <h3 className="text-sm font-medium text-stone-800 mb-2">
-              Main Content
-            </h3>
+    <Sidebar collapsible="icon" side="left" className="border-r border-border/40">
+      <SidebarHeader className="border-b border-border/40 p-4">
+        <div className="flex items-center justify-start gap-2">
+          <button
+            onClick={toggleSidebar}
+            className="h-8 w-8 rounded-md hover:bg-accent/50 transition-colors flex items-center justify-center group/toggle-button flex-shrink-0"
+          >
+            <PanelLeft className="h-4 w-4 transition-all duration-200 group-hover/toggle-button:opacity-0 group-hover/toggle-button:scale-75" />
+            <div className="absolute transition-all duration-200 opacity-0 scale-75 group-hover/toggle-button:opacity-100 group-hover/toggle-button:scale-100">
+              {isCollapsed ? (
+                <ArrowRightFromLine className="h-4 w-4" />
+              ) : (
+                <ArrowLeftFromLine className="h-4 w-4" />
+              )}
+            </div>
+          </button>
+          <p
+            className={cn(
+              'text-sm/6 text-stone-800 transition-all duration-200 ease-out',
+              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+            )}
+          >
+            contentport.
+          </p>
+        </div>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <div className="flex flex-col gap-2">
+            <NavLink onClick={refresh} to="/studio/t/new">
+              <DuolingoButton
+                size="sm"
+                className="w-full flex gap-1.5 justify-start items-center h-10"
+              >
+                <Plus className="size-4 shrink-0" />
+                <span
+                  className={cn(
+                    'transition-all opacity-0 duration-200 ease-out delay-200',
+                    isCollapsed ? 'opacity-0 w-0 overflow-hidden hidden' : 'opacity-100',
+                  )}
+                >
+                  New Tweet
+                </span>
+              </DuolingoButton>
+            </NavLink>
 
             <NavLink
-              to={"/studio" + getSearchString()}
-              className={`flex h-11 items-center gap-2 p-2 rounded-md ${
-                pathname === "/studio" ? "bg-stone-200" : "hover:bg-stone-100"
-              } cursor-pointer`}
+              to={`/studio/knowledge${getSearchString()}`}
+              className={({ isActive }) =>
+                cn(
+                  buttonVariants({
+                    variant: 'ghost',
+                    className: 'justify-start gap-2 px-3 py-2',
+                  }),
+                  isActive && 'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
+                )
+              }
             >
-              <Twitter className="size-4 text-blue-500 fill-blue-500" />
-              <span className="text-sm font-medium">Tweet</span>
-              <DuolingoBadge className="text-xs ml-auto px-3">Main</DuolingoBadge>
-            </NavLink>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <div className="flex flex-col items-center justify-between mb-2">
-              <h3 className="w-full text-sm font-medium text-stone-800">
-                Context Documents
-              </h3>
-              <NavLink
-              className="w-full mt-2"
-                to={`/studio/context/${newId.current}${getSearchString()}`}
-                onClick={() => {
-                  const newDoc: SidebarDoc = {
-                    id: newId.current,
-                    title: "",
-                    updatedAt: new Date(),
-                  }
-                  setDocs((prev) => [newDoc, ...prev])
-                  newId.current = crypto.randomUUID()
-                }}
+              <div className="size-6 flex items-center justify-center flex-shrink-0">
+                🧠
+              </div>
+              <span
+                className={cn(
+                  'transition-all duration-200 ease-out',
+                  isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+                )}
               >
-                <DuolingoButton
-                  className="w-full h-10"
-                >
-                  <Plus className="size-4 mr-1.5" />
-                  <span className="text-sm">Add</span>
-                </DuolingoButton>
-              </NavLink>
+                Knowledge Base
+              </span>
+            </NavLink>
+          </div>
+        </SidebarGroup>
+
+        <div
+          className={cn(
+            'transition-all duration-200 ease-out overflow-hidden',
+            isCollapsed ? 'opacity-0 max-h-0' : 'opacity-100 max-h-[1000px]',
+          )}
+        >
+          <SidebarGroup>
+            <div className="px-3 py-2">
+              <h3 className="text-xs text-stone-600">Recents</h3>
             </div>
-            <div className="space-y-2 mt-1">
-              {docs.length === 0
-                ? null
-                : docs.map((doc) => (
-                    <NavLink
-                      key={doc.id}
-                      to={`/studio/context/${doc.id}${getSearchString()}`}
-                      className={`flex h-11 items-center justify-between group p-2 rounded-md ${
-                        pathname === `/studio/context/${doc.id}`
-                          ? "bg-stone-200"
-                          : "hover:bg-stone-100"
-                      } cursor-pointer`}
-                    >
-                      <div className="flex items-center gap-2 pr-1.5 break-words">
-                        <FileText className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="text-sm font-medium">
-                          {doc.title || "Untitled document"}
-                        </span>
-                      </div>
-                      <DuolingoButton
-                        variant="destructive"
-                        size="icon"
-                        className="size-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          setDocs((prev) =>
-                            prev.filter((document) => document.id !== doc.id)
+
+            <div className="flex flex-col gap-1">
+              {recentTweets && recentTweets.length > 0 ? (
+                <>
+                  {recentTweets.slice(0, 5).map((tweet) => {
+                    return (
+                      <NavLink
+                        onClick={() => {
+                          console.log('resetting mutation')
+                          mutationReset()
+                        }}
+                        key={tweet.id}
+                        to={{
+                          pathname: `/studio/t/${tweet.id}`,
+                        }}
+                        className={() => {
+                          const isActive = location.pathname.includes(tweet.id)
+                          return cn(
+                            buttonVariants({
+                              variant: 'ghost',
+                              size: 'sm',
+                              className:
+                                'justify-between group/tweet gap-2 px-3 py-2 h-auto',
+                            }),
+                            isActive && 'bg-stone-200 hover:bg-stone-200',
                           )
-                          localStorage.removeItem(
-                            `doc-${doc.id.replace(/^doc-/, "")}`
-                          )
-                          if (id === doc.id) navigate("/studio")
                         }}
                       >
-                        <X className="size-3" />
-                      </DuolingoButton>
-                    </NavLink>
-                  ))}
+                        <div className="flex gap-1.5 items-center truncate">
+                          <span className="truncate text-xs">
+                            {tweet.content || 'New Tweet'}
+                          </span>
+                        </div>
+                        <DuolingoButton
+                          variant="destructive"
+                          size="icon"
+                          className="size-6 shrink-0 opacity-0 group-hover/tweet:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            deleteTweet(tweet.id)
+                          }}
+                        >
+                          <X className="size-3" />
+                        </DuolingoButton>
+                      </NavLink>
+                    )
+                  })}
+
+                  {recentTweets && recentTweets.length > 5 && (
+                    <button
+                      disabled
+                      // to={`/studio/tweets${getSearchString()}`}
+                      className={cn(
+                        buttonVariants({
+                          variant: 'ghost',
+                          size: 'sm',
+                          className: 'justify-start px-3 py-2',
+                        }),
+                        'text-xs text-muted-foreground',
+                      )}
+                    >
+                      <CircleEllipsis className="size-4 mr-1" />
+                      All tweets (soon)
+                    </button>
+                  )}
+                </>
+              ) : isPending ? null : (
+                <div className="px-3 py-4 text-center">
+                  <p className="text-xs text-stone-500">No tweets yet</p>
+                </div>
+              )}
             </div>
           </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter className="border-t border-border/40 p-4">
+        </div>
+      </SidebarContent>
+
+      <SidebarFooter className="border-t border-border/40 p-4">
+        <div
+          className={cn(
+            'transition-all duration-200 ease-out overflow-hidden',
+            isCollapsed ? 'opacity-0 max-h-0' : 'opacity-100 max-h-[1000px]',
+          )}
+        >
           <div className="flex flex-col gap-2">
             {data?.user && (
               <NavLink
                 to={`/settings${getSearchString()}`}
                 className={cn(
                   buttonVariants({
-                    variant: "outline",
-                    className:
-                      "flex items-center gap-2 justify-start px-3 py-2",
+                    variant: 'outline',
+                    className: 'flex items-center gap-2 justify-start px-3 py-2',
                   }),
-                  "h-16"
+                  'h-16',
                 )}
               >
                 <Avatar className="size-9 border-2 border-white shadow-md">
                   <AvatarImage
                     src={data.user.image || undefined}
-                    alt={data.user.name ?? "Profile"}
+                    alt={data.user.name ?? 'Profile'}
                   />
-                  <AvatarFallback>
-                    {data.user.name?.charAt(0) ?? null}
-                  </AvatarFallback>
+                  <AvatarFallback>{data.user.name?.charAt(0) ?? null}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col items-start min-w-0">
                   <span className="truncate text-sm font-medium text-stone-800">
-                    {data.user.name ?? "Account"}
+                    {data.user.name ?? 'Account'}
                   </span>
                   {data.user.plan && (
                     <span className="truncate text-xs text-muted-foreground">
-                      {data.user.plan === "free" ? "Free" : null}
+                      {data.user.plan === 'free' ? 'Free' : null}
                     </span>
                   )}
                 </div>
               </NavLink>
             )}
-            <Link
+            <a
               href="https://docs.google.com/forms/d/e/1FAIpQLSdCtO75IY051uoGcxBQ_vK3uNnNnokb_Z8VTrp5JZJnzUI02g/viewform?usp=dialog"
-              className={buttonVariants({ variant: "outline" })}
+              className={buttonVariants({ variant: 'outline' })}
               target="_blank"
               rel="noopener noreferrer"
             >
               Feedback 🫶
-            </Link>
+            </a>
           </div>
-        </SidebarFooter>
-      </div>
-    </div>
+        </div>
+      </SidebarFooter>
+    </Sidebar>
   )
 }

@@ -265,6 +265,7 @@ export function ImageTool({
   useEffect(() => {
     const preset = localStorage.getItem("options")
     if (preset) {
+      // @ts-ignore
       setOptions(JSON.parse(preset))
     }
   }, [])
