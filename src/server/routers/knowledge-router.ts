@@ -102,67 +102,40 @@ export const knowledgeRouter = j.router({
     .mutation(async ({ c, ctx, input }) => {
       const { user } = ctx
 
-      if (!process.env.FIRECRAWL_API_KEY) {
-        throw new HTTPException(500, {
-          message: 'Firecrawl API key not configured',
+      const result = await firecrawl.scrapeUrl(input.url)
+
+      if (!result.success) {
+        throw new HTTPException(400, {
+          message: `Failed to fetch URL: ${result.error || 'Unknown error'}`,
         })
       }
 
-      try {
-        const result = await firecrawl.scrapeUrl(input.url, {
-          formats: ['markdown'],
+      const title = result.metadata?.title || new URL(input.url).hostname
+
+      const [document] = await db
+        .insert(knowledgeDocument)
+        .values({
+          fileName: '',
+          s3Key: '',
+          type: 'url',
+          userId: user.id,
+          description: result.metadata?.description,
+          title,
+          sourceUrl: input.url,
         })
+        .returning()
 
-        if (!result.success) {
-          throw new HTTPException(400, {
-            message: `Failed to fetch URL: ${result.error || 'Unknown error'}`,
-          })
-        }
-
-        const title = result.metadata?.title || new URL(input.url).hostname
-        const content = result.markdown || ''
-
-        if (!content) {
-          throw new HTTPException(400, {
-            message: 'No content could be extracted from the URL',
-          })
-        }
-
-        const [document] = await db
-          .insert(knowledgeDocument)
-          .values({
-            fileName: '',
-            s3Key: '',
-            type: 'url',
-            userId: user.id,
-            description: result.metadata?.description,
-            title,
-            sourceUrl: input.url,
-          })
-          .returning()
-
-        if (!document) {
-          throw new HTTPException(500, {
-            message: 'Failed to create document',
-          })
-        }
-
-        return c.json({
-          success: true,
-          documentId: document.id,
-          title: title,
-          url: input.url,
-        })
-      } catch (error) {
-        console.error('Error importing URL:', error)
-
-        if (error instanceof HTTPException) {
-          throw error
-        }
-
+      if (!document) {
         throw new HTTPException(500, {
-          message: 'Failed to import URL. Please try again later.',
+          message: 'Failed to create document',
         })
       }
+
+      return c.json({
+        success: true,
+        documentId: document.id,
+        title: title,
+        url: input.url,
+      })
     }),
 })

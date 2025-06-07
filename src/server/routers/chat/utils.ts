@@ -3,16 +3,33 @@ import { Attachment } from './chat-router'
 import { BUCKET_NAME, FILE_TYPE_MAP, s3Client } from '@/lib/s3'
 import mammoth from 'mammoth'
 import { FilePart, ImagePart, TextPart } from 'ai'
+import { db } from '@/db'
+import { knowledgeDocument } from '@/db/schema'
+import { eq } from 'drizzle-orm'
 
 export const parseAttachments = async ({
   attachments,
 }: {
   attachments?: Attachment[]
 }) => {
-  const validAttachments = attachments?.filter((a) => Boolean(a.fileKey)) ?? []
+  const validAttachments =
+    attachments?.filter((a) => Boolean(a.fileKey) || Boolean(a.type === 'url')) ?? []
 
   const attachmentContents = await Promise.all(
     validAttachments.map(async (attachment) => {
+      if (attachment.type === 'url') {
+        const { id } = attachment
+        const [document] = await db
+          .select()
+          .from(knowledgeDocument)
+          .where(eq(knowledgeDocument.id, id))
+
+
+        if (document && document.sourceUrl) {
+          return { type: 'link' as const, link: document.sourceUrl }
+        }
+      }
+
       const command = new HeadObjectCommand({
         Bucket: BUCKET_NAME,
         Key: attachment.fileKey,
@@ -43,9 +60,12 @@ export const parseAttachments = async ({
   )
 
   const images = attachmentContents.filter(Boolean).filter((a) => a.type === 'image')
-  const files = attachmentContents.filter(Boolean).filter((a) => a.type !== 'image')
+  const files = attachmentContents
+    .filter(Boolean)
+    .filter((a) => a.type !== 'image' && a.type !== 'link')
+  const links = attachmentContents.filter(Boolean).filter((a) => a.type === 'link')
 
-  return { images, files }
+  return { images, files, links }
 }
 
 export class PromptBuilder {

@@ -100,9 +100,6 @@ export const create_edit_tweet = ({
       const improvedText = sanitizeTweetOutput(result.text)
       const diffs = diff(tweet.content, improvedText)
 
-      console.log('tweet content', `"${tweet.content}"`);
-      console.log('DIFFS', diffs);
-
       await Promise.all([
         redis.set(`last-suggestion:${chatId}`, improvedText),
         redis.json.set(redisKeys.chat, '$', {

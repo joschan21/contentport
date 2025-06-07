@@ -19,7 +19,7 @@ import { redis } from '../../../lib/redis'
 import { j, privateProcedure } from '../../jstack'
 import { create_edit_tweet } from './edit-tweet'
 import { create_read_website_content } from './read-website-content'
-import { parseAttachments } from './utils'
+import { parseAttachments, PromptBuilder } from './utils'
 
 // ==================== Types ====================
 
@@ -146,7 +146,7 @@ export const chatRouter = j.router({
         `chat:${user.email}:${input.chatId}`,
       )
 
-      const { files, images } = await parseAttachments({ attachments })
+      const { files, images, links } = await parseAttachments({ attachments })
 
       /**
        * conversation message construction
@@ -170,6 +170,17 @@ export const chatRouter = j.router({
 </system_attachment>`,
       }
 
+      const content = new PromptBuilder()
+
+      content.add(input.message.content)
+      if (links) {
+        content.add('Please read the following links:')
+
+        links.forEach(({ link }) => {
+          content.add(`<link>${link}</link>`)
+        })
+      }
+
       const userMessage: TestUIMessage = {
         id: nanoid(),
         role: input.message.role,
@@ -177,7 +188,7 @@ export const chatRouter = j.router({
         content: [
           {
             type: 'text',
-            text: input.message.content,
+            text: content.build(),
           },
           ...files,
           ...images,

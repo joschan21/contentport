@@ -103,7 +103,6 @@ interface DocumentReferenceProps {
 }
 
 function DocumentAttachment({ attachment, onRemove, className }: DocumentReferenceProps) {
-  console.log('ATC', attachment);
   return (
     <div
       className={cn(
@@ -115,10 +114,14 @@ function DocumentAttachment({ attachment, onRemove, className }: DocumentReferen
         to={`/studio/knowledge/${attachment.id}`}
         className="flex items-center gap-2"
       >
-        <span className="text-base">{attachment.variant === "knowledge" ? "🧠" : "📎"}</span>
-        {"title" in attachment ? <span className="text-sm text-stone-700 font-medium max-w-[120px] truncate">
-          {attachment.title}
-        </span> : null}
+        <span className="text-base">
+          {attachment.variant === 'knowledge' ? '🧠' : '📎'}
+        </span>
+        {'title' in attachment ? (
+          <span className="text-sm text-stone-700 font-medium max-w-[120px] truncate">
+            {attachment.title}
+          </span>
+        ) : null}
       </NavLink>
       {onRemove && (
         <button onClick={onRemove} className="hover:bg-stone-300 rounded-full p-1 ml-1">
@@ -146,12 +149,17 @@ function ImageAttachment({ attachment, onRemove, className }: ImageReferenceProp
 
   const isUploading = 'uploadProgress' in attachment && !attachment.isUploadDone
   const uploadProgress = 'uploadProgress' in attachment ? attachment.uploadProgress : 0
-  
+
   const circumference = 2 * Math.PI * 12
   const strokeDashoffset = circumference - (uploadProgress / 100) * circumference
 
   return (
-    <div className={cn('flex flex-col gap-2 bg-stone-200 rounded-lg size-20 relative', className)}>
+    <div
+      className={cn(
+        'flex flex-col gap-2 bg-stone-200 rounded-lg size-20 relative',
+        className,
+      )}
+    >
       <div className="relative">
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
           <DialogTrigger asChild>
