@@ -28,7 +28,7 @@ import {
 import { Separator } from '../ui/separator'
 import { ImageTool } from './image-tool'
 import { Skeleton } from '../ui/skeleton'
-import { debounce } from 'lodash'
+import debounce from "lodash.debounce"
 import { useSearchParams } from 'react-router'
 
 interface TweetProps {
