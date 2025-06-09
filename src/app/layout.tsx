@@ -42,9 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${rubik.className} ${elegant.variable} ${jetBrainsMono.variable} antialiased light`}
       >
         <Suspense>
-          <DocumentProvider>
-            <ClientProviders>{children}</ClientProviders>
-          </DocumentProvider>
+          <DocumentProvider>{children}</DocumentProvider>
         </Suspense>
       </body>
     </html>

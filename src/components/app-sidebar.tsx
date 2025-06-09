@@ -42,13 +42,17 @@ import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { UIMessage } from 'ai'
 import { HTTPException } from 'hono/http-exception'
-import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getRoot,
+  COMMAND_PRIORITY_HIGH,
+  KEY_ENTER_COMMAND,
+} from 'lexical'
 import { nanoid } from 'nanoid'
-import { useSearchParams } from 'react-router'
 import { useQueryState } from 'nuqs'
-import { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import toast, { Toaster } from 'react-hot-toast'
-import { useLocation, useNavigate } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { AttachmentItem } from './attachment-item'
 import { Icons } from './icons'
 import { Improvements } from './improvements'
@@ -69,10 +73,8 @@ type ChatInput = InferInput['chat']['generate']
 function ChatInput() {
   const navigate = useNavigate()
   const [editor] = useLexicalComposerContext()
-  const [searchParams] = useSearchParams()
-  const chatId = searchParams.get('chatId')
   const location = useLocation()
-  const { startNewChat } = useChat()
+  const { chatId, startNewChat } = useChat()
 
   const { handleInputChange, input, messages, status, append } = useChat()
 
@@ -87,10 +89,15 @@ function ChatInput() {
       return
     }
 
+    if (!input.trim()) {
+      console.log('no input lol ')
+      return
+    }
+
     if (location.pathname.includes('/studio/knowledge')) {
       navigate('/studio')
     }
-
+    
     if (messages.length === 0 && !chatId) {
       startNewChat({ newId: nanoid() })
     }
@@ -156,21 +163,32 @@ function ChatInputInner({
 }: {
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
 }) {
+  const [editor] = useLexicalComposerContext()
   const context = useContext(FileUploadContext)
   const isDragging = context?.isDragging ?? false
 
   const { addKnowledgeAttachment, hasUploading } = useAttachments()
 
-  const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      e.stopPropagation()
+  useEffect(() => {
+    const removeCommand = editor.registerCommand(
+      KEY_ENTER_COMMAND,
+      (event: KeyboardEvent | null) => {
+        if (event && !event.shiftKey) {
+          event.preventDefault()
+          if (hasUploading) return true
 
-      if (hasUploading) return
+          onSubmit(event as any)
+          return true
+        }
+        return false
+      },
+      COMMAND_PRIORITY_HIGH,
+    )
 
-      onSubmit(e as any)
+    return () => {
+      removeCommand()
     }
-  }
+  }, [editor, onSubmit, hasUploading])
 
   const handleAddKnowledgeDoc = (doc: SelectedKnowledgeDocument) => {
     addKnowledgeAttachment(doc)
@@ -196,7 +214,6 @@ function ChatInputInner({
                 <ContentEditable
                   autoFocus
                   className="w-full px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
-                  onKeyDown={handleKeyDown}
                   style={{ minHeight: '4.5rem' }}
                 />
               }
@@ -421,10 +438,11 @@ export function TweetSuggestion({ id, suggestion }: { id: string; suggestion: st
 }
 
 export function AppSidebar({ children }: { children: React.ReactNode }) {
-  const { addImprovements, rejectAllImprovements } = useTweetContext()
+  const { addImprovements, queueImprovements } = useTweetContext()
   const { toggleSidebar } = useSidebar()
   const { messages, status, startNewChat } = useChat()
   const { addKnowledgeAttachment, attachments, removeAttachment } = useAttachments()
+  const { id } = useParams()
 
   const resultMap = new Map<string, boolean>()
   const resultRef = useRef(resultMap)
@@ -451,15 +469,20 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
           part.toolInvocation.toolName === 'edit_tweet'
         ) {
           // tool is done generating tweet
-          const { id, diffs } = part.toolInvocation.result as EditTweetToolResult
+          const { id: triggeredForTweetId, diffs } = part.toolInvocation
+            .result as EditTweetToolResult
 
-          addImprovements(id, diffs)
+          if (id === triggeredForTweetId) {
+            addImprovements(triggeredForTweetId, diffs)
+          } else {
+            queueImprovements(triggeredForTweetId, diffs)
+          }
 
           resultRef.current.set(part.toolInvocation.toolCallId, true)
         }
       }
     })
-  }, [messages, resultRef])
+  }, [messages, resultRef, id])
 
   const [tweetLink, setTweetLink] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -582,7 +605,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     gcTime: 10 * 60 * 1000,
   })
 
-  const exampleDocuments = knowledgeData?.documents?.filter(doc => doc.isExample) || []
+  const exampleDocuments = knowledgeData?.documents?.filter((doc) => doc.isExample) || []
 
   const renderPart = (
     part: UIMessage['parts'][number],
@@ -805,25 +828,29 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                             attachments.forEach((attachment) => {
                               removeAttachment({ id: attachment.id })
                             })
-                            
-                            const blogDoc = exampleDocuments.find(doc => 
-                              doc.title?.includes('Zod') || doc.type === 'url'
+
+                            const blogDoc = exampleDocuments.find(
+                              (doc) => doc.title?.includes('Zod') || doc.type === 'url',
                             )
-                            
+
                             if (blogDoc) {
                               addKnowledgeAttachment(blogDoc)
-                              
+
                               editor.update(() => {
                                 const root = $getRoot()
                                 const p = $createParagraphNode()
-                                p.append($createTextNode('write a tweet about this article'))
+                                p.append(
+                                  $createTextNode('write a tweet about this article'),
+                                )
                                 root.clear()
                                 root.append(p)
                                 p.select()
                               })
                               editor.focus()
                             } else {
-                              toast.error('Example blog article not found. Try adding your own content!')
+                              toast.error(
+                                'Example blog article not found. Try adding your own content!',
+                              )
                             }
                           }}
                         >
@@ -842,25 +869,30 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                             attachments.forEach((attachment) => {
                               removeAttachment({ id: attachment.id })
                             })
-                            
-                            const imageDoc = exampleDocuments.find(doc => 
-                              doc.title?.includes('React') || doc.type === 'image'
+
+                            const imageDoc = exampleDocuments.find(
+                              (doc) =>
+                                doc.title?.includes('React') || doc.type === 'image',
                             )
-                            
+
                             if (imageDoc) {
                               addKnowledgeAttachment(imageDoc)
-                              
+
                               editor.update(() => {
                                 const root = $getRoot()
                                 const p = $createParagraphNode()
-                                p.append($createTextNode('tweet i just learned about this'))
+                                p.append(
+                                  $createTextNode('tweet i just learned about this'),
+                                )
                                 root.clear()
                                 root.append(p)
                                 p.select()
                               })
                               editor.focus()
                             } else {
-                              toast.error('Example code image not found. Try uploading your own image!')
+                              toast.error(
+                                'Example code image not found. Try uploading your own image!',
+                              )
                             }
                           }}
                         >
