@@ -1,36 +1,12 @@
-import { anthropic } from "@ai-sdk/anthropic"
-import { generateObject, generateText } from "ai"
-import { Diff, diff_match_patch } from "diff-match-patch"
-import { z } from "zod"
-import { j, publicProcedure } from "../jstack"
-import { tweet } from "@/lib/validators"
-import { DiffWithReplacement, processDiffs } from "@/lib/utils"
+import { DiffWithReplacement, processDiffs } from '@/lib/utils'
+import { tweet } from '@/lib/validators'
+import { anthropic } from '@ai-sdk/anthropic'
+import { generateText } from 'ai'
+import { diff_match_patch } from 'diff-match-patch'
+import { z } from 'zod'
+import { j, publicProcedure } from '../jstack'
 
 const dmp = new diff_match_patch()
-
-
-
-const mockDiffs: DiffWithReplacement[] = [
-  {
-    id: "diff-1",
-    type: 2,
-    text: "asd",
-    replacement: "This is the replacement",
-    category: "clarity",
-  },
-  {
-    id: "diff-2",
-    type: 0,
-    text: " my content",
-    category: "Unchanged",
-  },
-  {
-    id: "diff-3",
-    type: 1,
-    text: "stuff to add",
-    category: "ADd stuff",
-  },
-]
 
 export const improvementRouter = j.router({
   clarity: publicProcedure
@@ -45,8 +21,8 @@ export const improvementRouter = j.router({
 
       for (const tweet of tweets) {
         const { text } = await generateText({
-          model: anthropic("claude-3-opus-latest"),
-          stopSequences: ["</improved_text>"],
+          model: anthropic('claude-3-opus-latest'),
+          stopSequences: ['</improved_text>'],
           system: `You are Grammarly for checking tweet clarity.
 
 Keep the original tone of the author (e.g. casual, professional, lowercase, etc.), and optimize the following tweet for clarity and smooth reading. Make it easy to read and scan without losing information.
@@ -195,7 +171,7 @@ ${tweet.content}
 
         const rawDiffs = dmp.diff_main(tweet.content, text)
         dmp.diff_cleanupSemantic(rawDiffs)
-        const processedDiffs = processDiffs(rawDiffs)
+        const processedDiffs = processDiffs(tweet.id, rawDiffs)
 
         results.push({
           id: tweet.id,

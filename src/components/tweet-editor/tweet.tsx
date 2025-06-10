@@ -297,7 +297,7 @@ export default function Tweet({
       ? encodedText.slice(0, -3)
       : encodedText
 
-    window.open(`https://twitter.com/intent/tweet?text=${sanitizedText}`, '_blank')
+    window.open(`https://x.com/intent/tweet?text=${sanitizedText}`, '_blank')
   }
 
   const getProgressColor = () => {
