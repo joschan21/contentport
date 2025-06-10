@@ -1,13 +1,14 @@
-import { createContext, PropsWithChildren, useContext, useEffect, useRef } from 'react'
-import { useChat as aisdk_useChat, UseChatOptions } from '@ai-sdk/react'
+import { client } from '@/lib/client'
 import { ChatMessage } from '@/server/routers/chat/chat-router'
+import { TestUIMessage } from '@/types/message'
+import { useChat as aisdk_useChat } from '@ai-sdk/react'
+import { useQuery } from '@tanstack/react-query'
 import { nanoid } from 'nanoid'
 import { useQueryState } from 'nuqs'
-import { useQuery } from '@tanstack/react-query'
-import { client } from '@/lib/client'
+import { createContext, PropsWithChildren, useContext, useRef } from 'react'
+import { useParams } from 'next/navigation'
 import { useTweetContext } from './tweet-ctx'
-import { TestUIMessage } from '@/types/message'
-import { useSidebarContext } from './sidebar-ctx'
+import { useLocation } from 'react-router'
 
 interface StartNewChatOpts {
   newId?: string
@@ -17,12 +18,17 @@ type TChatContext = Omit<ReturnType<typeof aisdk_useChat>, 'append'> & {
   messages: ChatMessage[]
   append: (message: Partial<ChatMessage>) => void
   startNewChat: (opts?: StartNewChatOpts) => void
+  chatId: string
 }
 
 const ChatContext = createContext<TChatContext | null>(null)
 
 export const ChatProvider = ({ children }: PropsWithChildren) => {
   const id = useRef(nanoid())
+  const { id: tweetId } = useParams()
+  const location = useLocation()
+  const pathnameId = location.pathname.match(/\/studio\/t\/([^/]+)/)?.[1]
+
   const { contentRef } = useTweetContext()
 
   const [chatId, setChatId] = useQueryState('chatId', {
@@ -51,8 +57,6 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
     },
   })
 
-  const { tweet } = useTweetContext()
-
   const result = aisdk_useChat({
     initialMessages: data?.messages ?? [],
     id: chatId,
@@ -71,14 +75,14 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
         } satisfies TestUIMessage,
         chatId: id.current,
         // do not transmit image
-        tweet: { ...tweet, image: undefined, content: contentRef.current },
+        tweet: { id: pathnameId || tweetId, content: contentRef.current },
         ...requestBody,
       }
     },
   })
 
   return (
-    <ChatContext.Provider value={{ ...result, startNewChat } as TChatContext}>
+    <ChatContext.Provider value={{ ...result, startNewChat, chatId } as TChatContext}>
       {children}
     </ChatContext.Provider>
   )

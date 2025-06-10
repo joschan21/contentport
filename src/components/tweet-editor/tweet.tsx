@@ -28,8 +28,9 @@ import {
 import { Separator } from '../ui/separator'
 import { ImageTool } from './image-tool'
 import { Skeleton } from '../ui/skeleton'
-import debounce from "lodash.debounce"
+import debounce from 'lodash.debounce'
 import { useSearchParams } from 'react-router'
+import { hasAutoParseableInput } from 'openai/lib/parser.mjs'
 
 interface TweetProps {
   // suggestion: string | null
@@ -47,8 +48,6 @@ interface TweetProps {
 type SaveInput = InferInput['tweet']['save']
 type GetRecentTweetsOutput = InferOutput['tweet']['recents']['tweets']
 
-const dmp = new diff_match_patch()
-
 export default function Tweet({
   // suggestion,
   account,
@@ -59,12 +58,14 @@ export default function Tweet({
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false)
   const [searchParams] = useSearchParams()
   const chatId = searchParams.get('chatId')
+  const { id } = useParams()
 
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const saveInFlight = useRef(false)
   const hasPendingChanges = useRef(false)
+  const { queuedImprovements, addImprovements } = useTweetContext()
 
   const pendingSaves = useRef<Array<({ assignedId }: { assignedId: string }) => void>>([])
 
@@ -93,7 +94,6 @@ export default function Tweet({
     tweet,
   } = useTweetContext()
 
-  const { id } = useParams()
   const prevContent = useRef('')
 
   const { mutate, submittedAt, reset } = useMutation({
@@ -189,6 +189,8 @@ export default function Tweet({
     registerMutationReset(reset)
   }, [reset])
 
+  const prevId = useRef('')
+
   useEffect(() => {
     if (!Boolean(submittedAt)) {
       if (!data || !id) {
@@ -196,19 +198,35 @@ export default function Tweet({
         return
       }
 
+      const queue = queuedImprovements[id]
+
+      console.log('fucking queue', id, queuedImprovements, queue)
+
+      if (queue) {
+        addImprovements(id, queue, editor)
+        prevId.current = id
+        return
+        console.log('DONE IMPROVEMENTS')
+      }
+
+      if (id === prevId.current) return
+
       const state = editor.parseEditorState(JSON.stringify(data.editorState))
 
       if (state.isEmpty()) {
         editor.update(() => $getRoot().clear(), { tag: 'system-update' })
       } else {
-        console.log('yeah', data, id)
         editor.setEditorState(state, { tag: 'system-update' })
       }
 
+      console.log('SET EDITOR AGAIN', id, prevId.current)
+
       prevContent.current = editor.read(() => $getRoot().getTextContent())
       editor.focus()
+
+      prevId.current = id
     }
-  }, [data, editor, submittedAt, location, id])
+  }, [data, editor, submittedAt, prevId, queuedImprovements, id])
 
   const queueSave = useCallback(
     debounce(({ id, content, editorState }: SaveInput) => {
@@ -232,7 +250,7 @@ export default function Tweet({
   }
 
   useEffect(() => {
-    registerEditor(editor)
+    if(id) registerEditor(id, editor)
     registerClearTweet(() => {
       editor.update(() => {
         const root = $getRoot()
@@ -240,12 +258,13 @@ export default function Tweet({
       })
     })
 
-    return () => {
-      if (id) {
-        unregisterEditor(id)
-      }
-    }
-  }, [editor, registerEditor, unregisterEditor])
+    // return () => {
+    //   if (id) {
+    //     console.log('unregistering', id)
+    //     unregisterEditor(id)
+    //   }
+    // }
+  }, [editor, id, registerEditor, unregisterEditor])
 
   const { setContent } = useTweetContext()
 
@@ -278,7 +297,7 @@ export default function Tweet({
       ? encodedText.slice(0, -3)
       : encodedText
 
-    window.open(`https://twitter.com/intent/tweet?text=${sanitizedText}`, '_blank')
+    window.open(`https://x.com/intent/tweet?text=${sanitizedText}`, '_blank')
   }
 
   const getProgressColor = () => {

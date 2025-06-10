@@ -153,6 +153,8 @@ export function KnowledgeSelector({ onSelectDocument }: KnowledgeSelectorProps) 
                               <Icons.docx className="size-7 -ml-[1px]" />
                             ) : doc.type === 'txt' ? (
                               <Icons.txt className="size-7 -ml-[1px]" />
+                            ) : doc.type === 'url' ? (
+                              <span className='text-xl'>🔗</span>
                             ) : null}
                           </div>
                           <div className="flex-1 min-w-0">

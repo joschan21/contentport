@@ -9,6 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 type DiffType = -1 | 0 | 1 | 2
 
 export type DiffWithReplacement = {
+  tweetId: string
   id: string
   type: DiffType
   text: string
@@ -30,7 +31,7 @@ export function diff_lineMode(text1: string, text2: string) {
   return diffs
 }
 
-export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
+export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacement[] => {
   const processed: DiffWithReplacement[] = []
   const category =
     diffs.length === 1 && diffs.every((d) => d[0] === 1)
@@ -86,31 +87,31 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
       return wordCount === 2 ? "..." + context : context
     }
 
-    const getContextAfter = (diffs: Diff[], index: number): string => {
-      let context = ""
-      let wordCount = 0
+    // const getContextAfter = (diffs: Diff[], index: number): string => {
+    //   let context = ""
+    //   let wordCount = 0
 
-      for (let j = 1; j <= 3; j++) {
-        const diff = diffs[index + j]
-        if (diff && diff[0] === 0) {
-          const text = diff[1]
-          const lines = text.split("\n")
-          const firstLine = lines[0]
+    //   for (let j = 1; j <= 3; j++) {
+    //     const diff = diffs[index + j]
+    //     if (diff && diff[0] === 0) {
+    //       const text = diff[1]
+    //       const lines = text.split("\n")
+    //       const firstLine = lines[0]
 
-          if (firstLine?.trim()) {
-            const words = firstLine.trim().split(/\s+/)
-            for (let i = 0; i < words.length; i++) {
-              if (wordCount < 2) {
-                context += (context ? " " : "") + words[i]
-                wordCount++
-              }
-            }
-          }
-        }
-      }
+    //       if (firstLine?.trim()) {
+    //         const words = firstLine.trim().split(/\s+/)
+    //         for (let i = 0; i < words.length; i++) {
+    //           if (wordCount < 2) {
+    //             context += (context ? " " : "") + words[i]
+    //             wordCount++
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
 
-      return wordCount === 2 ? context + "..." : context
-    }
+    //   return wordCount === 2 ? context + "..." : context
+    // }
 
     // Check if we have a sequence of diffs that should be combined
     // Example: [-1, 'stay'], [0, ' '], [-1, 'tuned'] should become [-1, 'stay tuned']
@@ -130,6 +131,7 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
 
       if (current[0] === -1 && i + 3 < diffs.length && diffs[i + 3]?.[0] === 1) {
         processed.push({
+          tweetId,
           id: `diff-${i}-replacement`,
           type: 2 as DiffType,
           text: combinedText,
@@ -142,6 +144,7 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
       } else {
         // This is just an addition or deletion
         processed.push({
+          tweetId,
           id: `diff-${i}`,
           type: current[0] as DiffType,
           text: combinedText,
@@ -153,6 +156,7 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
       }
     } else if (current![0] === -1 && next && next[0] === 1) {
       processed.push({
+        tweetId,
         id: `diff-${i}-replacement`,
         type: 2 as DiffType,
         text: current![1],
@@ -164,6 +168,7 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
       i++
     } else {
       processed.push({
+        tweetId,
         id: `diff-${i}`,
         type: current![0] as DiffType,
         text: current![1],

@@ -30,6 +30,7 @@ import {
 import { useState } from 'react'
 import { authClient } from '@/lib/auth-client'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
+import { useChat } from '@/hooks/chat-ctx'
 
 type GetRecentTweetsOutput = InferOutput['tweet']['recents']['tweets']
 
@@ -38,15 +39,13 @@ export const LeftSidebar = () => {
   const { triggerNewChat } = useSidebarContext()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { clearTweet, refreshPotentialId, mutationReset } = useTweetContext()
+  const { clearTweet, refreshPotentialId, mutationReset, queuedImprovements } =
+    useTweetContext()
   const location = useLocation()
   const { data } = authClient.useSession()
 
   const [searchParams] = useSearchParams()
-
-  const getSearchString = () => {
-    return searchParams.toString() ? `?${searchParams.toString()}` : ''
-  }
+  const { chatId } = useChat()
 
   const isCollapsed = state === 'collapsed'
 
@@ -157,7 +156,10 @@ export const LeftSidebar = () => {
             </NavLink>
 
             <NavLink
-              to={`/studio/knowledge${getSearchString()}`}
+              to={{
+                pathname: '/studio/knowledge',
+                search: chatId ? `?chatId=${chatId}` : undefined,
+              }}
               className={({ isActive }) =>
                 cn(
                   buttonVariants({
@@ -201,12 +203,12 @@ export const LeftSidebar = () => {
                     return (
                       <NavLink
                         onClick={() => {
-                          console.log('resetting mutation')
                           mutationReset()
                         }}
                         key={tweet.id}
                         to={{
                           pathname: `/studio/t/${tweet.id}`,
+                          search: chatId ? `?chatId=${chatId}` : undefined,
                         }}
                         className={() => {
                           const isActive = location.pathname.includes(tweet.id)
@@ -225,6 +227,9 @@ export const LeftSidebar = () => {
                           <span className="truncate text-xs">
                             {tweet.content || 'New Tweet'}
                           </span>
+                          {queuedImprovements[tweet.id] && (
+                            <div className="ml-1 size-2 rounded-full bg-blue-500 flex-shrink-0" />
+                          )}
                         </div>
                         <DuolingoButton
                           variant="destructive"
@@ -280,7 +285,10 @@ export const LeftSidebar = () => {
           <div className="flex flex-col gap-2">
             {data?.user && (
               <NavLink
-                to={`/settings${getSearchString()}`}
+                to={{
+                  pathname: `/settings`,
+                  search: chatId ? `?chatId=${chatId}` : undefined,
+                }}
                 className={cn(
                   buttonVariants({
                     variant: 'outline',

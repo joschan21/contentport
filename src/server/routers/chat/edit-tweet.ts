@@ -12,9 +12,7 @@ import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { chunkDiffs } from '../../../../diff'
 import { Style } from '../style-router'
-import { parseAttachments, PromptBuilder } from './utils'
-
-type Attachments = Awaited<ReturnType<typeof parseAttachments>>
+import { PromptBuilder } from './utils'
 
 interface CreateEditTweetArgs {
   chatId: string
@@ -42,7 +40,11 @@ export const create_edit_tweet = ({
           redis.json.get<{ messages: TestUIMessage[] }>(redisKeys.chat),
           redis.json.get<Style>(redisKeys.style),
           redis.json.get<ConnectedAccount>(redisKeys.account),
-          redis.lrange<(FilePart | TextPart | ImagePart)[]>(`unseen-attachments:${chatId}`, 0, -1),
+          redis.lrange<(FilePart | TextPart | ImagePart)[]>(
+            `unseen-attachments:${chatId}`,
+            0,
+            -1,
+          ),
           redis.lrange<{ url: string; title: string; content: string }>(
             `website-contents:${chatId}`,
             0,
@@ -97,7 +99,7 @@ export const create_edit_tweet = ({
       })
 
       const improvedText = sanitizeTweetOutput(result.text)
-      const diffs = diff(tweet.content, improvedText)
+      const diffs = diff(tweet.id, tweet.content, improvedText)
 
       await Promise.all([
         redis.set(`last-suggestion:${chatId}`, improvedText),
@@ -123,10 +125,10 @@ function append(messages: TestUIMessage[], message: TestUIMessage) {
   return messages
 }
 
-function diff(currentContent: string, newContent: string): DiffWithReplacement[] {
+function diff(tweetId: string, currentContent: string, newContent: string): DiffWithReplacement[] {
   const rawDiffs = diff_wordMode(currentContent, newContent)
   const chunkedDiffs = chunkDiffs(rawDiffs)
-  return processDiffs(chunkedDiffs)
+  return processDiffs(tweetId, chunkedDiffs)
 }
 
 function sanitizeTweetOutput(text: string): string {
