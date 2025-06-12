@@ -5,8 +5,11 @@ import { client } from '@/lib/client'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { OnboardingModal } from './components/onboarding-modal'
+import { useParams } from 'react-router'
+import { useTweets } from '@/hooks/use-tweets'
 
 export default function StudioPage() {
+  const { tweetId } = useTweets()
   const [isOpen, setIsOpen] = useState(false)
 
   const { data: account, isSuccess } = useQuery({
@@ -26,11 +29,13 @@ export default function StudioPage() {
     }
   }, [account, isSuccess])
 
+  // if (id === 'new') return <p>new tweet</p>
+
   return (
     <>
       {isOpen ? <OnboardingModal onOpenChange={setIsOpen} /> : null}
       <div className="max-w-xl w-full mx-auto">
-        <TweetEditor />
+        <TweetEditor tweetId={tweetId} />
       </div>
     </>
   )

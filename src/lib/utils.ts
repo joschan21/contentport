@@ -1,6 +1,7 @@
-import { clsx, type ClassValue } from "clsx"
-import { Diff, diff_match_patch } from "diff-match-patch"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from 'clsx'
+import { Diff, diff_match_patch } from 'diff-match-patch'
+import { createSerializer, parseAsString } from 'nuqs'
+import { twMerge } from 'tailwind-merge'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -35,15 +36,15 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
   const processed: DiffWithReplacement[] = []
   const category =
     diffs.length === 1 && diffs.every((d) => d[0] === 1)
-      ? "write-initial-content"
-      : "clarity"
+      ? 'write-initial-content'
+      : 'clarity'
 
   for (let i = 0; i < diffs.length; i++) {
     const current = diffs[i]
     const next = diffs[i + 1]
     const prev = diffs[i - 1]
 
-    if (!current?.[1].includes("\n") && !current![1].trim()) continue
+    if (!current?.[1].includes('\n') && !current![1].trim()) continue
 
     // sometimes LLM did bullshit changes to just insert a space
     // if (
@@ -62,21 +63,21 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
     // }
 
     const getContext = (diffs: Diff[], index: number): string => {
-      let context = ""
+      let context = ''
       let wordCount = 0
 
       for (let j = 1; j <= 3; j++) {
         const diff = diffs[index - j]
         if (diff && diff[0] === 0) {
           const text = diff[1]
-          const lines = text.split("\n")
+          const lines = text.split('\n')
           const lastLine = lines[lines.length - 1]
 
           if (lastLine?.trim()) {
             const words = lastLine.trim().split(/\s+/)
             for (let i = words.length - 1; i >= 0; i--) {
               if (wordCount < 2) {
-                context = words[i] + (context ? " " + context : "")
+                context = words[i] + (context ? ' ' + context : '')
                 wordCount++
               }
             }
@@ -84,34 +85,34 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
         }
       }
 
-      return wordCount === 2 ? "..." + context : context
+      return wordCount === 2 ? '...' + context : context
     }
 
-    // const getContextAfter = (diffs: Diff[], index: number): string => {
-    //   let context = ""
-    //   let wordCount = 0
+    const getContextAfter = (diffs: Diff[], index: number): string => {
+      let context = ""
+      let wordCount = 0
 
-    //   for (let j = 1; j <= 3; j++) {
-    //     const diff = diffs[index + j]
-    //     if (diff && diff[0] === 0) {
-    //       const text = diff[1]
-    //       const lines = text.split("\n")
-    //       const firstLine = lines[0]
+      for (let j = 1; j <= 3; j++) {
+        const diff = diffs[index + j]
+        if (diff && diff[0] === 0) {
+          const text = diff[1]
+          const lines = text.split("\n")
+          const firstLine = lines[0]
 
-    //       if (firstLine?.trim()) {
-    //         const words = firstLine.trim().split(/\s+/)
-    //         for (let i = 0; i < words.length; i++) {
-    //           if (wordCount < 2) {
-    //             context += (context ? " " : "") + words[i]
-    //             wordCount++
-    //           }
-    //         }
-    //       }
-    //     }
-    //   }
+          if (firstLine?.trim()) {
+            const words = firstLine.trim().split(/\s+/)
+            for (let i = 0; i < words.length; i++) {
+              if (wordCount < 2) {
+                context += (context ? " " : "") + words[i]
+                wordCount++
+              }
+            }
+          }
+        }
+      }
 
-    //   return wordCount === 2 ? context + "..." : context
-    // }
+      return wordCount === 2 ? context + "..." : context
+    }
 
     // Check if we have a sequence of diffs that should be combined
     // Example: [-1, 'stay'], [0, ' '], [-1, 'tuned'] should become [-1, 'stay tuned']
@@ -122,8 +123,8 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
       next[0] === current[0] &&
       i + 2 < diffs.length &&
       diffs[i + 1]?.[0] === 0 &&
-      !diffs[i + 1]?.[1].includes("\n") &&
-      diffs[i + 1]?.[1].trim() === "" &&
+      !diffs[i + 1]?.[1].includes('\n') &&
+      diffs[i + 1]?.[1].trim() === '' &&
       diffs[i + 2]?.[0] === current[0]
     ) {
       // Combine the diffs
@@ -138,7 +139,7 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
           category,
           replacement: diffs[i + 3]![1],
           contextBefore: getContext(diffs, i),
-          // contextAfter: getContextAfter(diffs, i + 3),
+          contextAfter: getContextAfter(diffs, i + 3),
         })
         i += 3 // Skip the next three diffs
       } else {
@@ -150,7 +151,7 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
           text: combinedText,
           category,
           contextBefore: getContext(diffs, i),
-          // contextAfter: getContextAfter(diffs, i + 2),
+          contextAfter: getContextAfter(diffs, i + 2),
         })
         i += 2 // Skip the next two diffs
       }
@@ -163,7 +164,7 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
         category,
         replacement: next![1],
         contextBefore: getContext(diffs, i),
-        // contextAfter: getContextAfter(diffs, i + 1),
+        contextAfter: getContextAfter(diffs, i + 1),
       })
       i++
     } else {
@@ -174,7 +175,7 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
         text: current![1],
         category,
         contextBefore: getContext(diffs, i),
-        // contextAfter: getContextAfter(diffs, i),
+        contextAfter: getContextAfter(diffs, i),
       })
     }
   }
@@ -189,7 +190,7 @@ function diff_wordsToChars_(text1: string, text2: string) {
   function diff_textToWords(text: string): string {
     let wordStart = 0
     let wordEnd = -1
-    let chars = ""
+    let chars = ''
     while (wordStart < text.length) {
       // Find the next run of whitespace
       const whitespaceMatch = text.slice(wordStart).match(/^\s+/)

@@ -1,3 +1,4 @@
+import {xai} from "@ai-sdk/xai"
 import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
 import { diff_wordMode } from '@/lib/diff-utils'
 import { editToolStyleMessage, editToolSystemPrompt } from '@/lib/prompt-utils'
@@ -13,6 +14,8 @@ import { z } from 'zod'
 import { chunkDiffs } from '../../../../diff'
 import { Style } from '../style-router'
 import { PromptBuilder } from './utils'
+import { openai } from '@ai-sdk/openai'
+import { google } from "@ai-sdk/google"
 
 interface CreateEditTweetArgs {
   chatId: string
@@ -93,6 +96,9 @@ export const create_edit_tweet = ({
       ]
 
       const result = await generateText({
+        // model: openai("gpt-4o"),
+        // model: google("gemini-2.5-pro-preview-05-06"),
+        // model: xai("grok-3-latest"),
         model: anthropic('claude-4-opus-20250514'),
         system: editToolSystemPrompt,
         messages: messages as CoreMessage[],
@@ -114,6 +120,7 @@ export const create_edit_tweet = ({
 
       return {
         id: tweet.id,
+        isNew: "isNew" in tweet && Boolean(tweet.isNew),
         improvedText,
         diffs,
       }

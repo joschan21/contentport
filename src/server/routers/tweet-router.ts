@@ -20,13 +20,15 @@ export const tweetRouter = j.router({
   }),
 
   getTweet: privateProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ tweetId: z.string().nullable() }))
     .get(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { id } = input
+      const { tweetId } = input
+
+      if (!tweetId) return c.superjson({ tweet: null })
 
       const tweet = await db.query.tweets.findFirst({
-        where: and(eq(tweets.id, id), eq(tweets.userId, user.id)),
+        where: and(eq(tweets.id, tweetId), eq(tweets.userId, user.id)),
       })
 
       return c.superjson({ tweet: tweet ?? null })
@@ -54,29 +56,27 @@ export const tweetRouter = j.router({
   save: privateProcedure
     .input(
       z.object({
-        id: z.string().nanoid().optional(),
+        tweetId: z.string().nanoid().nullable(),
         content: z.string(),
-        editorState: z.any(),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { id, content, editorState } = input
+      const { tweetId, content } = input
 
       let assignedId: string | undefined = undefined
       let tweet: TweetQuery | undefined = undefined
 
-      if (id) {
-        assignedId = id
+      if (tweetId) {
+        assignedId = tweetId
 
         const [result] = await db
           .update(tweets)
           .set({
             content,
-            editorState,
             updatedAt: new Date(),
           })
-          .where(and(eq(tweets.id, id), eq(tweets.userId, user.id)))
+          .where(and(eq(tweets.id, tweetId), eq(tweets.userId, user.id)))
           .returning()
 
         tweet = result
@@ -89,7 +89,6 @@ export const tweetRouter = j.router({
             id: assignedId,
             userId: user.id,
             content,
-            editorState,
           })
           .returning()
 

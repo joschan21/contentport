@@ -1,38 +1,9 @@
-import { useTweetContext } from '@/hooks/tweet-ctx'
+import { useTweetNavigation } from '@/hooks/use-tweet-navigation'
+import { useTweets } from '@/hooks/use-tweets'
 import { cn, DiffWithReplacement } from '@/lib/utils'
 import { Check, ChevronRight, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import DuolingoButton from './ui/duolingo-button'
-import { useChat } from '@/hooks/chat-ctx'
-import { useNavigate } from 'react-router'
-
-const CategoryIcon = ({ category }: { category: string }) => {
-  // Define colors for different categories
-  const getCategoryColors = (category: string) => {
-    switch (category) {
-      case 'clarity':
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-500'
-      case 'write-initial-tweet':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-500'
-      case 'tone':
-        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-500'
-      case 'grammar':
-        return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500'
-      default:
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-500'
-    }
-  }
-
-  const colors = getCategoryColors(category)
-
-  return (
-    <div
-      className={`size-4 rounded-full ${colors.split(' ')[0]} flex items-center justify-center`}
-    >
-      <div className={`size-2 rounded-full ${colors.split(' ')[2]}`} />
-    </div>
-  )
-}
 
 const CATEGORY_LABELS: Record<string, string> = {
   'write-initial-content': 'Initial Content',
@@ -49,6 +20,7 @@ const ACTION_ICONS: Record<string, React.ReactNode> = {
 
 type SuggestionCardProps = {
   diff: DiffWithReplacement
+  expanded: boolean
   onAccept: () => void
   onReject: () => void
 }
@@ -57,16 +29,20 @@ export function SuggestionCard({
   diff,
   onAccept,
   onReject,
-  isFirst = false,
+  expanded = false,
 }: SuggestionCardProps & { isFirst?: boolean }) {
   const label = CATEGORY_LABELS[diff.category] || diff.category
   const actionLabel = diff.type === -1 ? 'Remove' : diff.type === 1 ? 'Add' : 'Replace'
   const icon = ACTION_ICONS[actionLabel]
-  const [isExpanded, setIsExpanded] = useState(isFirst)
+  const [isExpanded, setIsExpanded] = useState(expanded)
+
+  useEffect(() => {
+    setIsExpanded(expanded)
+  }, [expanded])
 
   return (
     <div
-      className="px-3 py-2 bg-stone-50 rounded-sm"
+      className="px-3 py-2 bg-white border border-stone-200 bg-clip-padding rounded-lg"
       tabIndex={0}
       aria-label={`Suggestion: ${label}`}
       onKeyDown={(e) => {
@@ -80,7 +56,7 @@ export function SuggestionCard({
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <span className="text-sm mr-2">{icon}</span>
-          <span className="text-stone-700 text-sm">{actionLabel} content</span>
+          <span className="text-stone-700 text-sm">{actionLabel}</span>
           <ChevronRight
             className={`w-4 h-4 ml-2 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
           />
@@ -151,86 +127,56 @@ function ContextAfter({ diff, text }: { diff: DiffWithReplacement; text: string 
   return <span className="text-stone-700">{text}</span>
 }
 
-export const Improvements = () => {
-  const { tweet, acceptImprovement, rejectImprovement } = useTweetContext()
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const { chatId } = useChat()
-  const navigate = useNavigate()
+export const Improvements = ({ empty }: { empty?: boolean }) => {
+  const { tweetId, setTweetId, improvements, acceptImprovement, rejectImprovement } =
+    useTweets()
+  const { navigateToTweet } = useTweetNavigation()
 
-  const allImprovements = (() => {
-    if (!tweet || !tweet.improvements) return []
-
-    const improvementCategories = Object.keys(tweet.improvements)
-    return improvementCategories.flatMap(
-      (category) =>
-        tweet.improvements[category]?.map((diff, index) => ({
-          id: `${tweet.id}-${category}-${index}`,
-          diff,
-          index,
-          category,
-        })) ?? [],
-    )
-  })().filter(
-    (
-      item,
-    ): item is {
-      id: string
-      diff: DiffWithReplacement
-      index: number
-      category: string
-    } =>
-      item.diff !== undefined &&
-      (item.diff.type === 2 || item.diff.type === -1 || item.diff.type === 1),
-  )
-
-  if (allImprovements.length > 0 && !expandedId) {
-    setExpandedId(allImprovements[0]!.id)
-  }
+  const visibleImprovements = empty ? [] : improvements.filter((i) => i.type !== 0)
 
   const handleAcceptImprovement = async (diff: DiffWithReplacement) => {
-    if (!tweet) return
-
-    if (diff.tweetId !== chatId) {
-      await navigate({
-        pathname: `/studio/t/${diff.tweetId}`,
-        search: chatId ? `?chatId=${chatId}` : undefined,
-      })
-    }
-
-    acceptImprovement(tweet.id, diff)
-    setExpandedId(null)
+    acceptImprovement(diff)
   }
 
   const handleRejectImprovement = (diff: DiffWithReplacement) => {
-    if (!tweet) return
-    rejectImprovement(tweet.id, diff)
-    setExpandedId(null)
+    rejectImprovement(diff)
   }
+
+  if (visibleImprovements.length === 0) return null
 
   return (
     <div className="relative w-full">
       <div className="h-full w-full">
-        {allImprovements.length > 0 ? (
+        {visibleImprovements && visibleImprovements.length ? (
           <div className="space-y-1">
-            {allImprovements.map(({ id, diff }, index) => {
+            <p className='text-sm/7 font-medium text-black'>Improvements</p>
+            {visibleImprovements.map((diff, index) => {
               return (
                 <SuggestionCard
-                  key={id}
+                  key={diff.id}
                   diff={diff}
-                  onAccept={() => handleAcceptImprovement(diff)}
-                  onReject={() => handleRejectImprovement(diff)}
-                  isFirst={index === 0}
+                  expanded={index === 0}
+                  onAccept={() => {
+                    // accepting while viewing a different tweet
+                    if (diff.tweetId !== tweetId) {
+                      navigateToTweet(diff.tweetId)
+                    }
+
+                    handleAcceptImprovement(diff)
+                  }}
+                  onReject={() => {
+                    // rejecting while viewing a different tweet
+                    if (diff.tweetId !== tweetId) {
+                      setTweetId(diff.tweetId)
+                    }
+
+                    handleRejectImprovement(diff)
+                  }}
                 />
               )
             })}
           </div>
-        ) : (
-          <div className="flex justify-center h-full w-full text-left bg-emerald-50 ring-1 ring-emerald-600/20 ring-inset rounded-md shadow-[0_2px_0_#d1fae5]">
-            <p className="inline-flex gap-0.5 items-center px-2 py-1 text-xs font-medium text-emerald-700 ">
-              <Check className="size-3" /> All applied
-            </p>
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   )

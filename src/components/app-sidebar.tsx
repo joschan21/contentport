@@ -1,7 +1,7 @@
 'use client'
 
 import { Message, MessageContent } from '@/components/ui/message'
-import { useChat } from '@/hooks/chat-ctx'
+import { useChat } from '@/hooks/use-chat'
 import {
   ArrowUp,
   Check,
@@ -27,14 +27,14 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { useTweetContext } from '@/hooks/tweet-ctx'
 import { useAttachments } from '@/hooks/use-attachments'
+import { useEditor } from '@/hooks/use-editors'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { client } from '@/lib/client'
+import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
 import { InferInput } from '@/server'
-import { EditTweetToolResult } from '@/server/routers/chat/chat-router'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
@@ -52,7 +52,7 @@ import {
 import { nanoid } from 'nanoid'
 import { useQueryState } from 'nuqs'
 import toast, { Toaster } from 'react-hot-toast'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { AttachmentItem } from './attachment-item'
 import { Icons } from './icons'
 import { Improvements } from './improvements'
@@ -68,20 +68,36 @@ import { Separator } from './ui/separator'
 import { Tabs, TabsContent } from './ui/tabs'
 import { TextShimmer } from './ui/text-shimmer'
 
+const initialConfig = {
+  namespace: 'app-sidebar-input',
+  theme: {
+    text: {
+      bold: 'font-bold',
+      italic: 'italic',
+      underline: 'underline',
+    },
+  },
+  onError: (error: Error) => {
+    console.error('[Context Document Editor Error]', error)
+  },
+  editable: true,
+  nodes: [],
+}
+
 type ChatInput = InferInput['chat']['generate']
 
 function ChatInput() {
   const navigate = useNavigate()
-  const [editor] = useLexicalComposerContext()
+  const editor = useEditor('app-sidebar')
   const location = useLocation()
-  const { chatId, startNewChat } = useChat()
+  let { chatId, startNewChat } = useChat()
 
   const { handleInputChange, input, messages, status, append } = useChat()
 
   const { attachments, addChatAttachment, removeAttachment, hasUploading } =
     useAttachments()
 
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     if (hasUploading) {
@@ -97,15 +113,16 @@ function ChatInput() {
     if (location.pathname.includes('/studio/knowledge')) {
       navigate('/studio')
     }
-    
+
     if (messages.length === 0 && !chatId) {
-      startNewChat({ newId: nanoid() })
+      chatId = (await startNewChat({ newId: nanoid() })) as string
     }
 
     append({
       content: input,
       role: 'user',
       metadata: { attachments },
+      chatId: chatId as string,
     })
 
     // cleanup
@@ -113,14 +130,14 @@ function ChatInput() {
       removeAttachment(attachment)
     })
 
-    editor.update(() => {
+    editor?.update(() => {
       const root = $getRoot()
       root.clear()
     })
   }
 
   useEffect(() => {
-    const removeUpdateListener = editor.registerUpdateListener(({ editorState }) => {
+    const removeUpdateListener = editor?.registerUpdateListener(({ editorState }) => {
       editorState.read(() => {
         const root = $getRoot()
         const text = root.getTextContent()
@@ -132,7 +149,7 @@ function ChatInput() {
     })
 
     return () => {
-      removeUpdateListener()
+      removeUpdateListener?.()
     }
   }, [editor, handleInputChange])
 
@@ -163,14 +180,14 @@ function ChatInputInner({
 }: {
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
 }) {
-  const [editor] = useLexicalComposerContext()
+  const editor = useEditor('app-sidebar')
   const context = useContext(FileUploadContext)
   const isDragging = context?.isDragging ?? false
 
   const { addKnowledgeAttachment, hasUploading } = useAttachments()
 
   useEffect(() => {
-    const removeCommand = editor.registerCommand(
+    const removeCommand = editor?.registerCommand(
       KEY_ENTER_COMMAND,
       (event: KeyboardEvent | null) => {
         if (event && !event.shiftKey) {
@@ -186,7 +203,7 @@ function ChatInputInner({
     )
 
     return () => {
-      removeCommand()
+      removeCommand?.()
     }
   }, [editor, onSubmit, hasUploading])
 
@@ -209,18 +226,21 @@ function ChatInputInner({
 
         <form onSubmit={onSubmit} className="relative">
           <div className="rounded-xl bg-white border-2 border-gray-200 shadow-[0_2px_0_#E5E7EB] font-medium transition-all duration-200 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-600">
-            <PlainTextPlugin
-              contentEditable={
-                <ContentEditable
-                  autoFocus
-                  className="w-full px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
-                  style={{ minHeight: '4.5rem' }}
-                />
-              }
-              ErrorBoundary={LexicalErrorBoundary}
-            />
-            <PlaceholderPlugin placeholder="What do you want to tweet?" />
-            <HistoryPlugin />
+            <LexicalComposer initialConfig={initialConfig}>
+              <PlainTextPlugin
+                contentEditable={
+                  <ContentEditable
+                    autoFocus
+                    className="w-full px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
+                    style={{ minHeight: '4.5rem' }}
+                  />
+                }
+                ErrorBoundary={LexicalErrorBoundary}
+              />
+              <PlaceholderPlugin placeholder="What do you want to tweet?" />
+              <HistoryPlugin />
+              <MultipleEditorStorePlugin id="app-sidebar" />
+            </LexicalComposer>
 
             <div className="flex items-center justify-between px-3 pb-3">
               <div className="flex gap-1.5 items-center">
@@ -383,22 +403,22 @@ const TweetCard = ({ name, username, src, text }: TweetCard) => {
 }
 
 export function TweetSuggestion({ id, suggestion }: { id: string; suggestion: string }) {
-  const { updateTweet } = useTweetContext()
+  // const { updateTweet } = useTweetContext()
   const [connectedAccount] = useLocalStorage(
     'connected-account',
     DEFAULT_CONNECTED_ACCOUNT,
   )
 
-  const reapply = () => {
-    updateTweet(suggestion)
-  }
+  // const reapply = () => {
+  //   updateTweet(suggestion)
+  // }
 
   return (
     <div className="relative w-full">
       <div className="relative text-left rounded-[calc(6px)] bg-white shadow overflow-hidden">
         <div className="absolute top-5 right-5">
           <button
-            onClick={reapply}
+            // onClick={reapply}
             className="transition-all flex items-center gap-0.5 px-2 py-1 text-xs rounded-md bg-light-gray text-primary hover:bg-stone-200"
           >
             <ChevronsLeft className="size-4" />
@@ -438,11 +458,11 @@ export function TweetSuggestion({ id, suggestion }: { id: string; suggestion: st
 }
 
 export function AppSidebar({ children }: { children: React.ReactNode }) {
-  const { addImprovements, queueImprovements } = useTweetContext()
+  // const { addImprovements, queueImprovements } = useTweetContext()
   const { toggleSidebar } = useSidebar()
   const { messages, status, startNewChat } = useChat()
   const { addKnowledgeAttachment, attachments, removeAttachment } = useAttachments()
-  const { id } = useParams()
+  const editor = useEditor('app-sidebar')
 
   const resultMap = new Map<string, boolean>()
   const resultRef = useRef(resultMap)
@@ -456,33 +476,29 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     serialize: (value) => value,
   })
 
-  useEffect(() => {
-    const lastMessage = messages[messages.length - 1]
+  // useEffect(() => {
+  //   const lastMessage = messages[messages.length - 1]
 
-    lastMessage?.parts.forEach((part) => {
-      if (part.type === 'tool-invocation') {
-        const hasFired = resultRef.current.get(part.toolInvocation.toolCallId)
+  //   lastMessage?.parts.forEach(async (part) => {
+  //     if (part.type === 'tool-invocation') {
+  //       const hasFired = resultRef.current.get(part.toolInvocation.toolCallId)
 
-        if (
-          !hasFired &&
-          part.toolInvocation.state === 'result' &&
-          part.toolInvocation.toolName === 'edit_tweet'
-        ) {
-          // tool is done generating tweet
-          const { id: triggeredForTweetId, diffs } = part.toolInvocation
-            .result as EditTweetToolResult
+  //       if (
+  //         !hasFired &&
+  //         part.toolInvocation.state === 'result' &&
+  //         part.toolInvocation.toolName === 'edit_tweet'
+  //       ) {
+  //         // tool is done generating tweet
+  //         const { id: triggeredForTweetId, diffs } = part.toolInvocation
+  //           .result as EditTweetToolResult
 
-          if (id === triggeredForTweetId) {
-            addImprovements(triggeredForTweetId, diffs)
-          } else {
-            queueImprovements(triggeredForTweetId, diffs)
-          }
+  //         console.log('id, triggeredfor', id, triggeredForTweetId)
 
-          resultRef.current.set(part.toolInvocation.toolCallId, true)
-        }
-      }
-    })
-  }, [messages, resultRef, id])
+  //         resultRef.current.set(part.toolInvocation.toolCallId, true)
+  //       }
+  //     }
+  //   })
+  // }, [messages, resultRef, id])
 
   const [tweetLink, setTweetLink] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -593,8 +609,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     },
   })
 
-  const [editor] = useLexicalComposerContext()
-
   const { data: knowledgeData } = useQuery({
     queryKey: ['knowledge-documents'],
     queryFn: async () => {
@@ -610,6 +624,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
   const renderPart = (
     part: UIMessage['parts'][number],
     index: number,
+    empty?: boolean,
   ): React.ReactNode => {
     switch (part.type) {
       case 'text':
@@ -659,19 +674,19 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
               )
             }
 
-            if (part.toolInvocation.toolName === 'edit_tweet') {
-              const result = part.toolInvocation.result
-              return (
-                <div
-                  key={result.id}
-                  className="bg-white shadow-[0_2px_0_#E5E7EB] rounded-lg p-3 border border-gray-200"
-                >
-                  <div className="flex flex-col gap-2 text-sm/6">
-                    <Improvements />
-                  </div>
-                </div>
-              )
-            }
+          // if (part.toolInvocation.toolName === 'edit_tweet') {
+          //   const result = part.toolInvocation.result
+          //   return (
+          //     <div
+          //       key={result.id}
+          //       className="bg-white shadow-[0_2px_0_#E5E7EB] rounded-lg p-3 border border-gray-200"
+          //     >
+          //       <div className="flex flex-col gap-2 text-sm/6">
+
+          //       </div>
+          //     </div>
+          //   )
+          // }
 
           default:
             return null
@@ -708,7 +723,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                   <Settings className="size-4" />
                 </DuolingoButton>
                 <DuolingoButton
-                  onClick={() => startNewChat({ newId: nanoid() })}
+                  onClick={() => startNewChat()}
                   size="icon"
                   variant="secondary"
                   title="New Chat"
@@ -749,6 +764,15 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                           typingLoader: true,
                         })
                       }
+
+                      const lastCallId = renderList.find((m) => {
+                        return m.parts.some(
+                          (part) =>
+                            part.type === 'tool-invocation' &&
+                            part.toolInvocation.toolName === 'edit_tweet',
+                        )
+                      })
+
                       return renderList.map((message, i) => {
                         // @ts-expect-error unknown property
                         if (message.typingLoader) {
@@ -758,6 +782,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                                 <div className="space-y-2 flex-1">
                                   <div className="flex items-center gap-2 mt-2">
                                     <Loader variant="typing" size="md" />
+                                    <p>Thinking</p>
                                   </div>
                                 </div>
                               </div>
@@ -795,7 +820,8 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                                 )}
                                 <div className="space-y-2 flex-1">
                                   {message.parts.map((part, index) => {
-                                    return renderPart(part, index)
+                                    const empty = !Boolean(message.id === lastCallId?.id)
+                                    return renderPart(part, index, empty)
                                   })}
                                 </div>
                               </div>
@@ -836,7 +862,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                             if (blogDoc) {
                               addKnowledgeAttachment(blogDoc)
 
-                              editor.update(() => {
+                              editor?.update(() => {
                                 const root = $getRoot()
                                 const p = $createParagraphNode()
                                 p.append(
@@ -846,7 +872,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                                 root.append(p)
                                 p.select()
                               })
-                              editor.focus()
+                              editor?.focus()
                             } else {
                               toast.error(
                                 'Example blog article not found. Try adding your own content!',
@@ -878,7 +904,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                             if (imageDoc) {
                               addKnowledgeAttachment(imageDoc)
 
-                              editor.update(() => {
+                              editor?.update(() => {
                                 const root = $getRoot()
                                 const p = $createParagraphNode()
                                 p.append(
@@ -888,7 +914,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                                 root.append(p)
                                 p.select()
                               })
-                              editor.focus()
+                              editor?.focus()
                             } else {
                               toast.error(
                                 'Example code image not found. Try uploading your own image!',
@@ -1055,6 +1081,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
 
           {activeTab === 'assistant' ? (
             <SidebarFooter className="p-3 border-t">
+              <Improvements />
               <ChatInput />
             </SidebarFooter>
           ) : (

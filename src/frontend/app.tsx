@@ -1,14 +1,15 @@
+import { ClientProviders } from '@/components/providers/client-providers'
 import { Toaster } from 'react-hot-toast'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { LoginPage } from './auth/login'
 import Page from './page'
 import { Settings } from './settings/page'
-import { ContextPage } from './studio/context/[id]/page'
 import NewKnowledgePage from './studio/knowledge/new/page'
 import KnowledgePage from './studio/knowledge/page'
 import Layout from './studio/layout'
 import StudioPage from './studio/page'
-import { ClientProviders } from '@/components/providers/client-providers'
+import { LexicalComposer } from '@lexical/react/LexicalComposer'
+import { AdditionNode, DeletionNode, ReplacementNode, UnchangedNode } from '@/lib/nodes'
 
 export default function App() {
   return (
@@ -25,14 +26,6 @@ export default function App() {
               element={
                 <Layout hideAppSidebar>
                   <Settings />
-                </Layout>
-              }
-            />
-            <Route
-              path="/studio/t/:id"
-              element={
-                <Layout>
-                  <StudioPage />
                 </Layout>
               }
             />
@@ -57,14 +50,6 @@ export default function App() {
               element={
                 <Layout>
                   <NewKnowledgePage />
-                </Layout>
-              }
-            />
-            <Route
-              path="/studio/knowledge/:id"
-              element={
-                <Layout>
-                  <ContextPage />
                 </Layout>
               }
             />

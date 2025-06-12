@@ -1,12 +1,15 @@
 'use client'
 
 import { buttonVariants } from '@/components/ui/button'
-import { useSidebarContext } from '@/hooks/sidebar-ctx'
-import { useTweetContext } from '@/hooks/tweet-ctx'
+import { useChat } from '@/hooks/use-chat'
+import { useEditor } from '@/hooks/use-editors'
+import { useTweets } from '@/hooks/use-tweets'
+import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
 import { InferOutput } from '@/server'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
 import {
   ArrowLeftFromLine,
   ArrowRightFromLine,
@@ -15,9 +18,10 @@ import {
   Plus,
   X,
 } from 'lucide-react'
-import { useSearchParams } from 'react-router'
+import { createSerializer, parseAsString } from 'nuqs'
 import toast from 'react-hot-toast'
 import { NavLink, useLocation, useNavigate } from 'react-router'
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import DuolingoButton from './ui/duolingo-button'
 import {
   Sidebar,
@@ -27,25 +31,28 @@ import {
   SidebarHeader,
   useSidebar,
 } from './ui/sidebar'
-import { useState } from 'react'
-import { authClient } from '@/lib/auth-client'
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
-import { useChat } from '@/hooks/chat-ctx'
+import { useTweetNavigation } from '@/hooks/use-tweet-navigation'
 
 type GetRecentTweetsOutput = InferOutput['tweet']['recents']['tweets']
 
+const searchParams = {
+  tweetId: parseAsString,
+  chatId: parseAsString,
+}
+
+const serialize = createSerializer(searchParams)
+
 export const LeftSidebar = () => {
+  const editor = useEditor('tweet-editor')
   const { state } = useSidebar()
-  const { triggerNewChat } = useSidebarContext()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { clearTweet, refreshPotentialId, mutationReset, queuedImprovements } =
-    useTweetContext()
   const location = useLocation()
   const { data } = authClient.useSession()
+  const { tweetId, queuedImprovements } = useTweets()
+  const { navigateToTweet } = useTweetNavigation()
 
-  const [searchParams] = useSearchParams()
-  const { chatId } = useChat()
+  const { chatId, setChatId } = useChat()
 
   const isCollapsed = state === 'collapsed'
 
@@ -86,25 +93,15 @@ export const LeftSidebar = () => {
     },
   })
 
-  const refresh = async () => {
-    clearTweet()
-    refreshPotentialId()
-    mutationReset()
-    triggerNewChat()
-
-    if (!recentTweets || recentTweets?.every((t) => t.id !== 'new')) {
-      queryClient.setQueryData(
-        ['get-recent-tweets'],
-        (old: GetRecentTweetsOutput | undefined) => {
-          const filtered = old?.filter((t) => t.id !== 'new')
-          if (filtered) {
-            return [{ id: 'new', content: 'New Tweet' }, ...filtered]
-          } else {
-            return [{ id: 'new', content: 'New Tweet' }]
-          }
-        },
-      )
-    }
+  const clear = () => {
+    setChatId(null)
+    editor?.update(
+      () => {
+        const root = $getRoot()
+        root.clear()
+      },
+      { tag: 'system-update' },
+    )
   }
 
   return (
@@ -138,8 +135,9 @@ export const LeftSidebar = () => {
       <SidebarContent>
         <SidebarGroup>
           <div className="flex flex-col gap-2">
-            <NavLink onClick={refresh} to="/studio/t/new">
+            <NavLink to="/studio">
               <DuolingoButton
+                onClick={clear}
                 size="sm"
                 className="w-full flex gap-1.5 justify-start items-center h-10"
               >
@@ -158,7 +156,7 @@ export const LeftSidebar = () => {
             <NavLink
               to={{
                 pathname: '/studio/knowledge',
-                search: chatId ? `?chatId=${chatId}` : undefined,
+                search: serialize({ chatId }),
               }}
               className={({ isActive }) =>
                 cn(
@@ -202,16 +200,14 @@ export const LeftSidebar = () => {
                   {recentTweets.slice(0, 5).map((tweet) => {
                     return (
                       <NavLink
-                        onClick={() => {
-                          mutationReset()
-                        }}
+                        onClick={() => navigateToTweet(tweet.id)}
                         key={tweet.id}
                         to={{
-                          pathname: `/studio/t/${tweet.id}`,
-                          search: chatId ? `?chatId=${chatId}` : undefined,
+                          pathname: `/studio`,
+                          search: serialize({ chatId }),
                         }}
                         className={() => {
-                          const isActive = location.pathname.includes(tweet.id)
+                          const isActive = (tweetId || 'draft') === tweet.id
                           return cn(
                             buttonVariants({
                               variant: 'ghost',

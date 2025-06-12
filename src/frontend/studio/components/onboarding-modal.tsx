@@ -1,28 +1,27 @@
-"use client"
+'use client'
 
-import { DEFAULT_CONNECTED_ACCOUNT } from "@/components/tweet-editor/tweet-editor"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import DuolingoButton from "@/components/ui/duolingo-button"
-import DuolingoInput from "@/components/ui/duolingo-input"
-import { Progress } from "@/components/ui/progress"
-import { DEFAULT_DOCS } from "@/constants/default-context-docs"
-import { SidebarDoc } from "@/hooks/document-ctx"
-import { useLocalStorage } from "@/hooks/use-local-storage"
-import { client } from "@/lib/client"
-import { cn } from "@/lib/utils"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, ArrowRight, AtSign } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
-import { useForm } from "react-hook-form"
-import toast from "react-hot-toast"
-import type SwiperType from "swiper"
-import { EffectCreative } from "swiper/modules"
-import { Swiper, SwiperSlide } from "swiper/react"
-import { TWITTER_HANDLE_VALIDATOR, TwitterHandleForm } from "../lib/validators"
-import Confetti, { ConfettiRef } from "./confetti"
-import "./swiper-bundle.css"
+import { DEFAULT_CONNECTED_ACCOUNT } from '@/components/tweet-editor/tweet-editor'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import DuolingoButton from '@/components/ui/duolingo-button'
+import DuolingoInput from '@/components/ui/duolingo-input'
+import { Progress } from '@/components/ui/progress'
+import { DEFAULT_DOCS } from '@/constants/default-context-docs'
+import { useLocalStorage } from '@/hooks/use-local-storage'
+import { client } from '@/lib/client'
+import { cn } from '@/lib/utils'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, ArrowRight, AtSign } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import toast from 'react-hot-toast'
+import type SwiperType from 'swiper'
+import { EffectCreative } from 'swiper/modules'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import { TWITTER_HANDLE_VALIDATOR, TwitterHandleForm } from '../lib/validators'
+import Confetti, { ConfettiRef } from './confetti'
+import './swiper-bundle.css'
 
 enum SLIDES {
   WELCOME_SLIDE = 0,
@@ -38,18 +37,18 @@ interface OnboardingModalProps {
 
 const STEPS: Array<{ id: string; name: string; fields: Field[] }> = [
   {
-    id: "Step 0",
-    name: "Welcome slide",
+    id: 'Step 0',
+    name: 'Welcome slide',
     fields: [],
   },
   {
-    id: "Step 1",
-    name: "Handle slide",
-    fields: ["handle"],
+    id: 'Step 1',
+    name: 'Handle slide',
+    fields: ['handle'],
   },
   {
-    id: "Step 2",
-    name: "Completed slide",
+    id: 'Step 2',
+    name: 'Completed slide',
     fields: [],
   },
 ]
@@ -61,10 +60,6 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
   const confettiRef = useRef<ConfettiRef>(null)
   const router = useRouter()
   const [exampleDocsCreated, setExampleDocsCreated] = useState(false)
-  const [contextDocs, setContextDocs] = useLocalStorage<SidebarDoc[]>(
-    "context-docs",
-    []
-  )
 
   useEffect(() => {
     if (confettiRef.current) {
@@ -81,40 +76,14 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
 
   // Create example documents when reaching the completion slide
   useEffect(() => {
-    if (
-      swiperRef?.activeIndex === SLIDES.COMPLETED_SLIDE &&
-      !exampleDocsCreated
-    ) {
-      createExampleDocuments()
+    if (swiperRef?.activeIndex === SLIDES.COMPLETED_SLIDE && !exampleDocsCreated) {
       setExampleDocsCreated(true)
     }
   }, [swiperRef?.activeIndex])
 
-  const createExampleDocuments = () => {
-    const currentDate = new Date()
-
-    const sidebarDocs = DEFAULT_DOCS.map((doc) => ({
-      id: doc.id,
-      title: doc.title,
-      updatedAt: currentDate,
-    }))
-
-    setContextDocs(sidebarDocs)
-
-    DEFAULT_DOCS.forEach((doc) => {
-      localStorage.setItem(
-        `doc-${doc.id}`,
-        JSON.stringify({
-          title: doc.title,
-          content: doc.content,
-        })
-      )
-    })
-  }
-
   const [, setConnectedAccount] = useLocalStorage(
-    "connected-account",
-    DEFAULT_CONNECTED_ACCOUNT
+    'connected-account',
+    DEFAULT_CONNECTED_ACCOUNT,
   )
   const queryClient = useQueryClient()
 
@@ -128,16 +97,16 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
       return await res.json()
     },
     onSuccess: ({ data }) => {
-      queryClient.setQueryData(["connected-account"], data)
-      queryClient.invalidateQueries({ queryKey: ["account-style"] })
-      queryClient.invalidateQueries({ queryKey: ["get-connected-account"] })
-      queryClient.invalidateQueries({ queryKey: ["knowledge-documents"] })
+      queryClient.setQueryData(['connected-account'], data)
+      queryClient.invalidateQueries({ queryKey: ['account-style'] })
+      queryClient.invalidateQueries({ queryKey: ['get-connected-account'] })
+      queryClient.invalidateQueries({ queryKey: ['knowledge-documents'] })
       setConnectedAccount(data)
       swiperRef?.slideNext()
     },
     onError: (error) => {
       toast.error(error.message)
-      setFocus("handle")
+      setFocus('handle')
     },
   })
 
@@ -151,7 +120,7 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
   } = useForm<TwitterHandleForm>({
     resolver: zodResolver(TWITTER_HANDLE_VALIDATOR),
     defaultValues: {
-      handle: "",
+      handle: '',
     },
   })
 
@@ -171,7 +140,7 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
     }
 
     if (currentSlide === 0) {
-      setFocus("handle")
+      setFocus('handle')
     }
 
     if (currentSlide === SLIDES.HANDLE_SLIDE) {
@@ -199,10 +168,7 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
   }, [swiperRef?.activeIndex])
 
   useEffect(() => {
-    if (
-      swiperRef?.activeIndex === SLIDES.COMPLETED_SLIDE &&
-      confettiRef.current
-    ) {
+    if (swiperRef?.activeIndex === SLIDES.COMPLETED_SLIDE && confettiRef.current) {
       confettiRef.current.fire({ angle: 75, spread: 90 })
       confettiRef.current.fire({ angle: 90, spread: 90 })
       confettiRef.current.fire({ angle: 105, spread: 90 })
@@ -212,10 +178,7 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
   // Determine if the button should be disabled
   const isButtonDisabled = () => {
     if (isPending) return true
-    if (
-      swiperRef?.activeIndex === SLIDES.HANDLE_SLIDE &&
-      !watch("handle").trim()
-    )
+    if (swiperRef?.activeIndex === SLIDES.HANDLE_SLIDE && !watch('handle').trim())
       return true
     return false
   }
@@ -278,11 +241,9 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
                   Welcome to contentport 🎉
                 </p>
                 <p className="text-stone-600">
-                  Just{" "}
-                  <span className="font-medium text-stone-800">
-                    1 quick question
-                  </span>{" "}
-                  to get you started!
+                  Just{' '}
+                  <span className="font-medium text-stone-800">1 quick question</span> to
+                  get you started!
                 </p>
               </div>
               <div className="aspect-video w-full overflow-hidden rounded-lg bg-gray-100">
@@ -325,9 +286,9 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
                           className="pointer-events-none col-start-1 row-start-1 ml-3 size-5 self-center text-gray-400 sm:size-4"
                         />
                       }
-                      {...register("handle")}
+                      {...register('handle')}
                       placeholder="joshtriedcoding"
-                      className={cn("col-start-1 row-start-1 z-10 w-full")}
+                      className={cn('col-start-1 row-start-1 z-10 w-full')}
                     />
                   </div>
 
@@ -336,9 +297,7 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
                   </p>
 
                   {!!errors.handle && (
-                    <p className="text-sm text-red-600">
-                      {errors.handle.message}
-                    </p>
+                    <p className="text-sm text-red-600">{errors.handle.message}</p>
                   )}
                 </div>
               </div>
@@ -347,21 +306,25 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
             <SwiperSlide>
               <div className="flex w-full space-y-6 flex-col items-center justify-center">
                 <div className="flex w-full flex-col items-center gap-1 text-center">
-                  <p className="text-2xl font-semibold text-gray-900">
-                    You're in! 🎉
-                  </p>
+                  <p className="text-2xl font-semibold text-gray-900">You're in! 🎉</p>
                   {data?.data && data?.data.userTweetCount < 20 ? (
                     <p className="text-gray-600">
-                      We've imported your <span className="font-medium text-stone-800">best recent tweets</span> and <span className="font-medium text-stone-800">high-performing
-                      examples</span> - contentport is already learning your
-                      style.
+                      We've imported your{' '}
+                      <span className="font-medium text-stone-800">
+                        best recent tweets
+                      </span>{' '}
+                      and{' '}
+                      <span className="font-medium text-stone-800">
+                        high-performing examples
+                      </span>{' '}
+                      - contentport is already learning your style.
                     </p>
                   ) : (
                     <p className="text-gray-600">
-                      We've imported your{" "}
+                      We've imported your{' '}
                       <span className="font-medium text-stone-800">
                         best {data?.data.userTweetCount ?? 20} recent tweets
-                      </span>{" "}
+                      </span>{' '}
                       - contentport is already learning your style.
                     </p>
                   )}
@@ -385,10 +348,10 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
                 disabled={isButtonDisabled()}
               >
                 {swiperRef?.activeIndex === 0
-                  ? "Get Started"
+                  ? 'Get Started'
                   : swiperRef?.activeIndex === SLIDES.COMPLETED_SLIDE
-                    ? "Write My First Tweet"
-                    : "Continue"}
+                    ? 'Write My First Tweet'
+                    : 'Continue'}
                 <ArrowRight className="size-4" />
               </DuolingoButton>
             </div>

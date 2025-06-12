@@ -1,7 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import DuolingoButton from '@/components/ui/duolingo-button'
-import { useSidebarContext } from '@/hooks/sidebar-ctx'
-import { useTweetContext } from '@/hooks/tweet-ctx'
+import { useTweets } from '@/hooks/use-tweets'
 import { client } from '@/lib/client'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
 import { InferInput, InferOutput } from '@/server'
@@ -11,11 +10,10 @@ import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { diff_match_patch } from 'diff-match-patch'
 import { $getRoot } from 'lexical'
-import { Bold, Download, ImagePlus, Italic, Pencil, Smile, Trash2, X } from 'lucide-react'
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import debounce from 'lodash.debounce'
+import { Bold, ImagePlus, Italic, Smile, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icons } from '../icons'
 import {
   Drawer,
@@ -25,15 +23,32 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '../ui/drawer'
-import { Separator } from '../ui/separator'
-import { ImageTool } from './image-tool'
 import { Skeleton } from '../ui/skeleton'
-import debounce from 'lodash.debounce'
-import { useSearchParams } from 'react-router'
-import { hasAutoParseableInput } from 'openai/lib/parser.mjs'
+import { ImageTool } from './image-tool'
+import { useEditor } from '@/hooks/use-editors'
+import { AdditionNode, DeletionNode, ReplacementNode, UnchangedNode } from '@/lib/nodes'
+import { InitialConfigType, LexicalComposer } from '@lexical/react/LexicalComposer'
+import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
+import { useNavigate } from 'react-router'
+import { KEY_DOWN_COMMAND } from 'lexical'
+
+const initialConfig: InitialConfigType = {
+  namespace: 'tweet-editor',
+  theme: {
+    text: {
+      bold: 'font-bold',
+      italic: 'italic',
+      underline: 'underline',
+    },
+  },
+  onError: (error: Error) => {
+    console.error('[Tweet Editor Error]', error)
+  },
+  editable: true,
+  nodes: [DeletionNode, AdditionNode, UnchangedNode, ReplacementNode],
+}
 
 interface TweetProps {
-  // suggestion: string | null
   account: {
     name: string
     handle: string
@@ -45,253 +60,45 @@ interface TweetProps {
   onAdd?: () => void
 }
 
-type SaveInput = InferInput['tweet']['save']
-type GetRecentTweetsOutput = InferOutput['tweet']['recents']['tweets']
-
-export default function Tweet({
-  // suggestion,
-  account,
-}: TweetProps) {
-  const [editor] = useLexicalComposerContext()
+export default function Tweet({ account }: TweetProps) {
+  const editor = useEditor('tweet-editor')
   const [charCount, setCharCount] = useState(0)
   const [open, setOpen] = useState(false)
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false)
-  const [searchParams] = useSearchParams()
-  const chatId = searchParams.get('chatId')
-  const { id } = useParams()
+  const { tweetId, queueSave, setTweetContent } = useTweets()
 
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const saveInFlight = useRef(false)
-  const hasPendingChanges = useRef(false)
-  const { queuedImprovements, addImprovements } = useTweetContext()
-
-  const pendingSaves = useRef<Array<({ assignedId }: { assignedId: string }) => void>>([])
-
-  // prevent unsaved changes
-  useEffect(() => {
-    const handleUnload = (e: BeforeUnloadEvent) => {
-      if (hasPendingChanges.current) {
-        const message = 'Changes you made may not be saved.'
-        e.preventDefault()
-        return (e.returnValue = message)
-      }
-    }
-
-    window.addEventListener('beforeunload', handleUnload)
-    return () => window.removeEventListener('beforeunload', handleUnload)
-  }, [])
-
-  const { registerClearTweet } = useSidebarContext()
-
-  const {
-    potentialId,
-    registerEditor,
-    registerMutationReset,
-    unregisterEditor,
-    downloadTweetImage,
-    tweet,
-  } = useTweetContext()
-
-  const prevContent = useRef('')
-
-  const { mutate, submittedAt, reset } = useMutation({
-    mutationFn: async ({ id, content, editorState }: SaveInput) => {
-      // prevent multiple saves at once
-      saveInFlight.current = true
-
-      // id if is "new", let server generate id
-      const payloadId = id === 'new' ? undefined : id
-
-      console.log(
-        '%c🔄 SAVING TWEET',
-        'color: #3b82f6; font-weight: bold; font-size: 14px;',
-        {
-          id: payloadId,
-          content,
-          timestamp: new Date().toISOString(),
-        },
-      )
-
-      const res = await client.tweet.save.$post({
-        id: payloadId,
-        content,
-        editorState,
-      })
-      saveInFlight.current = false
-
-      return await res.json()
-    },
-    onSuccess: ({ assignedId, tweet }) => {
-      processPendingSaves({ assignedId })
-
-      if (!id || id === 'new') {
-        if (chatId) {
-          navigate(`/studio/t/${assignedId}?chatId=${chatId}`)
-        } else {
-          navigate(`/studio/t/${assignedId}`)
-        }
-      }
-
-      // refresh "recents" in left sidebar
-      queryClient.setQueryData(['get-recent-tweets'], (old: GetRecentTweetsOutput) => {
-        const getNewData = () => {
-          const existing = old.find((t) => t.id === assignedId)
-
-          if (existing) {
-            return old.map((element) => {
-              if (element.id === assignedId && tweet)
-                return { ...element, content: tweet.content }
-              return element
-            })
-          }
-
-          if (tweet) {
-            return [tweet, ...old]
-          }
-
-          return old
-        }
-
-        const data = getNewData()
-
-        return data.filter((item) => item.id !== 'new')
-      })
-
-      queryClient.setQueryData(['tweet', assignedId], tweet)
-    },
-  })
-
-  const { data, isFetching: isLoadingTweet } = useQuery({
-    queryKey: ['tweet', id],
-    queryFn: async () => {
-      if (!id) return null
-
-      console.log(
-        '%c🔄 GETTING TWEET',
-        'color: #3b82f6; font-weight: bold; font-size: 14px;',
-        { id },
-      )
-
-      const res = await client.tweet.getTweet.$get({ id })
-      const { tweet } = await res.json()
-
-      if (!tweet) return null
-
-      return tweet
-    },
-    staleTime: Infinity,
-    enabled: !Boolean(submittedAt),
-  })
+  const prev = useRef('')
 
   useEffect(() => {
-    registerMutationReset(reset)
-  }, [reset])
-
-  const prevId = useRef('')
-
-  useEffect(() => {
-    if (!Boolean(submittedAt)) {
-      if (!data || !id) {
-        editor.update(() => $getRoot().clear(), { tag: 'system-update' })
-        return
-      }
-
-      const queue = queuedImprovements[id]
-
-      console.log('fucking queue', id, queuedImprovements, queue)
-
-      if (queue) {
-        addImprovements(id, queue, editor)
-        prevId.current = id
-        return
-        console.log('DONE IMPROVEMENTS')
-      }
-
-      if (id === prevId.current) return
-
-      const state = editor.parseEditorState(JSON.stringify(data.editorState))
-
-      if (state.isEmpty()) {
-        editor.update(() => $getRoot().clear(), { tag: 'system-update' })
-      } else {
-        editor.setEditorState(state, { tag: 'system-update' })
-      }
-
-      console.log('SET EDITOR AGAIN', id, prevId.current)
-
-      prevContent.current = editor.read(() => $getRoot().getTextContent())
-      editor.focus()
-
-      prevId.current = id
-    }
-  }, [data, editor, submittedAt, prevId, queuedImprovements, id])
-
-  const queueSave = useCallback(
-    debounce(({ id, content, editorState }: SaveInput) => {
-      hasPendingChanges.current = false
-      if (saveInFlight.current === true) {
-        pendingSaves.current.push(({ assignedId }) =>
-          mutate({ id: assignedId, content, editorState }),
-        )
-      } else {
-        mutate({ id, content, editorState })
-      }
-    }, 750),
-    [mutate],
-  )
-
-  const processPendingSaves = ({ assignedId }: { assignedId: string }) => {
-    if (pendingSaves.current.length > 0 && !saveInFlight.current) {
-      const next = pendingSaves.current.shift()
-      if (next) next({ assignedId })
-    }
-  }
-
-  useEffect(() => {
-    if(id) registerEditor(id, editor)
-    registerClearTweet(() => {
-      editor.update(() => {
-        const root = $getRoot()
-        root.clear()
-      })
-    })
-
-    // return () => {
-    //   if (id) {
-    //     console.log('unregistering', id)
-    //     unregisterEditor(id)
-    //   }
-    // }
-  }, [editor, id, registerEditor, unregisterEditor])
-
-  const { setContent } = useTweetContext()
-
-  useEffect(() => {
-    const unregister = editor.registerUpdateListener(({ editorState, tags }) => {
+    const unregister = editor?.registerUpdateListener(({ editorState, tags }) => {
       const content = editorState.read(() => $getRoot().getTextContent())
 
       setCharCount(content.length)
-      setContent(content)
 
-      if (tags.has('system-clear')) prevContent.current = ''
-      if (tags.has('system-update')) prevContent.current = content
+      if (tags.has('system-clear')) {
+        prev.current = ''
+        return
+      }
 
-      if (content === prevContent.current) return
+      if (tags.has('system-update')) {
+        prev.current = content
+        return
+      }
 
-      hasPendingChanges.current = true
-      queueSave({ id, content, editorState })
+      if (content === prev.current) return
+      setTweetContent(tweetId, content)
 
-      prevContent.current = content
+      queueSave({ tweetId, content })
     })
 
-    return () => unregister()
-  }, [editor, id, potentialId, queueSave])
+    return () => {
+      unregister?.()
+    }
+  }, [editor, tweetId, prev.current, queueSave])
 
   const handlePostToTwitter = () => {
-    const tweetText = editor.read(() => $getRoot().getTextContent())
-    const encodedText = encodeURIComponent(tweetText)
+    const tweetText = editor?.read(() => $getRoot().getTextContent())
+    const encodedText = encodeURIComponent(tweetText ?? '')
 
     const sanitizedText = encodedText.endsWith('%0A')
       ? encodedText.slice(0, -3)
@@ -310,42 +117,42 @@ export default function Tweet({
   const circumference = 2 * Math.PI * 10
   const strokeDashoffset = circumference - (progress / 100) * circumference
 
-  if (isLoadingTweet && id !== 'new') {
-    return (
-      <div className="relative bg-white p-6 rounded-2xl w-full border border-stone-200 bg-clip-padding shadow-sm">
-        <div className="flex gap-3">
-          <Skeleton className="h-12 w-12 rounded-full" />
+  // if (isLoadingTweet && tweetId !== 'new') {
+  //   return (
+  //     <div className="relative bg-white p-6 rounded-2xl w-full border border-stone-200 bg-clip-padding shadow-sm">
+  //       <div className="flex gap-3">
+  //         <Skeleton className="h-12 w-12 rounded-full" />
 
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-3">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-20" />
-            </div>
+  //         <div className="flex-1">
+  //           <div className="flex items-center gap-2 mb-3">
+  //             <Skeleton className="h-4 w-24" />
+  //             <Skeleton className="h-4 w-20" />
+  //           </div>
 
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-5/6" />
-            </div>
+  //           <div className="space-y-2">
+  //             <Skeleton className="h-4 w-full" />
+  //             <Skeleton className="h-4 w-3/4" />
+  //             <Skeleton className="h-4 w-5/6" />
+  //           </div>
 
-            <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
-              <div className="flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg">
-                <Skeleton className="h-8 w-8 rounded-md" />
-                <div className="w-px h-4 bg-stone-300 mx-2"></div>
-                <Skeleton className="h-8 w-8 rounded-md" />
-                <Skeleton className="h-8 w-8 rounded-md" />
-                <Skeleton className="h-8 w-8 rounded-md" />
-                <div className="w-px h-4 bg-stone-300 mx-2"></div>
-                <Skeleton className="h-8 w-8 rounded-full" />
-              </div>
+  //           <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
+  //             <div className="flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg">
+  //               <Skeleton className="h-8 w-8 rounded-md" />
+  //               <div className="w-px h-4 bg-stone-300 mx-2"></div>
+  //               <Skeleton className="h-8 w-8 rounded-md" />
+  //               <Skeleton className="h-8 w-8 rounded-md" />
+  //               <Skeleton className="h-8 w-8 rounded-md" />
+  //               <div className="w-px h-4 bg-stone-300 mx-2"></div>
+  //               <Skeleton className="h-8 w-8 rounded-full" />
+  //             </div>
 
-              <Skeleton className="h-11 w-28 rounded-lg" />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  //             <Skeleton className="h-11 w-28 rounded-lg" />
+  //           </div>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   )
+  // }
 
   return (
     <Drawer modal={false} open={open} onOpenChange={setOpen}>
@@ -372,21 +179,24 @@ export default function Tweet({
             </div>
 
             <div className="mt-1 text-stone-800 leading-relaxed">
-              <PlainTextPlugin
-                contentEditable={
-                  <ContentEditable
-                    autoFocus
-                    spellCheck={false}
-                    className="w-full !min-h-16 resize-none text-base/7 leading-relaxed text-stone-800 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none"
-                  />
-                }
-                ErrorBoundary={LexicalErrorBoundary}
-              />
-              <PlaceholderPlugin placeholder="What's happening?" />
-              <HistoryPlugin />
+              <LexicalComposer initialConfig={initialConfig}>
+                <PlainTextPlugin
+                  contentEditable={
+                    <ContentEditable
+                      autoFocus
+                      spellCheck={false}
+                      className="w-full !min-h-16 resize-none text-base/7 leading-relaxed text-stone-800 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none"
+                    />
+                  }
+                  ErrorBoundary={LexicalErrorBoundary}
+                />
+                <PlaceholderPlugin placeholder="What's happening?" />
+                <HistoryPlugin />
+                <MultipleEditorStorePlugin id="tweet-editor" />
+              </LexicalComposer>
             </div>
 
-            {tweet?.image && (
+            {/* {tweet?.image && (
               <>
                 <Separator className="bg-stone-200 my-4" />
 
@@ -436,7 +246,7 @@ export default function Tweet({
                   </div>
                 </div>
               </>
-            )}
+            )} */}
 
             <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
               <div className="flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg">
@@ -590,14 +400,14 @@ export default function Tweet({
 
           <div className="w-full drawer-body h-full overflow-y-auto">
             <div className="max-w-6xl mx-auto w-full mb-12">
-              <ImageTool
+              {/* <ImageTool
                 onClose={() => setImageDrawerOpen(false)}
                 onSave={(image) => {
                   // editTweetImage(id, image)
                   setImageDrawerOpen(false)
                 }}
                 initialEditorState={tweet?.image?.editorState}
-              />
+              /> */}
             </div>
           </div>
         </DrawerContent>

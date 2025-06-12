@@ -37,6 +37,7 @@ export type ChatMessage = Omit<UIMessage, 'content'> & {
   role: CoreMessage['role']
   id: string
   metadata?: MessageMetadata
+  chatId?: string
 }
 
 export interface Chat {
@@ -72,6 +73,7 @@ export type MessageMetadata = z.infer<typeof messageMetadataSchema>
 
 const chatMessageSchema = z.object({
   id: z.string(),
+  chatId: z.string(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
   metadata: messageMetadataSchema.optional(),
@@ -119,10 +121,14 @@ const chatLimiter = new Ratelimit({ redis, limiter: Ratelimit.fixedWindow(20, '1
 
 export const chatRouter = j.router({
   get_chat_messages: privateProcedure
-    .input(z.object({ chatId: z.string() }))
+    .input(z.object({ chatId: z.string().nullable() }))
     .get(async ({ c, input, ctx }) => {
       const { chatId } = input
       const { user } = ctx
+
+      if (!chatId) {
+        return c.superjson({ messages: [] })
+      }
 
       const chat = await redis.json.get<{ messages: UIMessage[] }>(
         `chat:${user.email}:${chatId}`,
@@ -136,15 +142,16 @@ export const chatRouter = j.router({
   generate: privateProcedure
     .input(
       z.object({
-        chatId: z.string(),
         message: chatMessageSchema,
-        tweet: tweetSchema,
+        tweet: tweetSchema.optional(),
       }),
     )
     .post(async ({ input, ctx }) => {
       const { user } = ctx
-      const { tweet } = input
+      const chatId = input.message.chatId
       const attachments = input.message.metadata?.attachments
+
+      const tweet = input.tweet ?? { id: nanoid(), content: '', isNew: true }
 
       if (process.env.NODE_ENV === 'production') {
         const { success } = await chatLimiter.limit(user.email)
@@ -157,7 +164,7 @@ export const chatRouter = j.router({
       }
 
       const existingChat = await redis.json.get<{ messages: TestUIMessage[] }>(
-        `chat:${user.email}:${input.chatId}`,
+        `chat:${user.email}:${chatId}`,
       )
 
       const { files, images, links } = await parseAttachments({ attachments })
@@ -221,17 +228,17 @@ export const chatRouter = j.router({
        * tool message construction
        */
       const edit_tweet = create_edit_tweet({
-        chatId: input.chatId,
+        chatId: chatId,
         userMessage,
         tweet,
         redisKeys: {
-          chat: `chat:tool:${user.email}:${input.chatId}`,
+          chat: `chat:tool:${user.email}:${chatId}`,
           account: `connected-account:${user.email}`,
           style: `style:${user.email}`,
         },
       })
 
-      const read_website_content = create_read_website_content({ chatId: input.chatId })
+      const read_website_content = create_read_website_content({ chatId: chatId })
 
       return createDataStreamResponse({
         execute: (stream) => {
@@ -243,11 +250,22 @@ export const chatRouter = j.router({
             experimental_transform: smoothStream({ delayInMs: 20 }),
             model: openai('gpt-4o'),
             messages: messages as CoreMessage[],
-            onError: (err) => {
-              console.log(err)
+            onError: ({ error }) => {
+              console.error(error)
+
+              throw new HTTPException(500, {
+                message: 'Something went wrong, please try again.',
+              })
+            },
+            onStepFinish: ({ toolResults }) => {
+              toolResults.some((result) => {
+                if (result.toolName === 'edit_tweet') {
+                  stream.writeData({ hook: 'onTweetResult', data: result.result })
+                }
+              })
             },
             onFinish: async ({ response }) => {
-              await redis.json.set(`chat:${user.email}:${input.chatId}`, '$', {
+              await redis.json.set(`chat:${user.email}:${chatId}`, '$', {
                 messages: appendResponseMessages({
                   messages: messages as UIMessage[],
                   responseMessages: response.messages,
@@ -269,7 +287,7 @@ export const chatRouter = j.router({
 
                 if (Boolean(attachments.length)) {
                   attachments.forEach((attachment) => {
-                    pipeline.lpush(`unseen-attachments:${input.chatId}`, attachment)
+                    pipeline.lpush(`unseen-attachments:${chatId}`, attachment)
                   })
                 }
 

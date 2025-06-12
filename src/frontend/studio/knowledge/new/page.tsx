@@ -1,6 +1,5 @@
 'use client'
 
-import { ContextDocumentEditor } from '@/components/context-document-editor'
 import DuolingoBadge from '@/components/ui/duolingo-badge'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import DuolingoInput from '@/components/ui/duolingo-input'
@@ -406,8 +405,6 @@ export default function NewKnowledgePage() {
     </div>
   )
 
-  const renderManualView = () => <ContextDocumentEditor documentId={newDocumentId} />
-
   const getDisabled = () => {
     if (type === 'upload') {
       return !Boolean(title) || !Boolean(uploadState?.isUploadDone)
@@ -434,7 +431,6 @@ export default function NewKnowledgePage() {
           <div>
             {type === 'upload' && renderUploadView()}
             {type === 'url' && renderUrlView()}
-            {type === 'manual' && renderManualView()}
           </div>
 
           <DuolingoButton

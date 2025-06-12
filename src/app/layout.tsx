@@ -1,10 +1,7 @@
 import { Metadata, Viewport } from 'next'
-import './globals.css'
 import { Instrument_Serif, JetBrains_Mono, Rubik } from 'next/font/google'
-import { Toaster } from 'react-hot-toast'
-import { ClientProviders } from '@/components/providers/client-providers'
-import { DocumentProvider } from '@/hooks/document-ctx'
 import { Suspense } from 'react'
+import './globals.css'
 
 export const metadata: Metadata = {
   title: 'contentport',
@@ -41,9 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${rubik.className} ${elegant.variable} ${jetBrainsMono.variable} antialiased light`}
       >
-        <Suspense>
-          <DocumentProvider>{children}</DocumentProvider>
-        </Suspense>
+        <Suspense>{children}</Suspense>
       </body>
     </html>
   )
