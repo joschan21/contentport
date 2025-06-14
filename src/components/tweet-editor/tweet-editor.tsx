@@ -3,6 +3,7 @@
 import { client } from '@/lib/client'
 import { useQuery } from '@tanstack/react-query'
 import Tweet from './tweet'
+import { InitialConfigType } from '@lexical/react/LexicalComposer'
 
 export type ConnectedAccount = {
   username: string
@@ -18,7 +19,13 @@ export const DEFAULT_CONNECTED_ACCOUNT: ConnectedAccount = {
   verified: true,
 }
 
-export default function TweetEditor({ tweetId }: { tweetId: string | null }) {
+export default function TweetEditor({
+  tweetId,
+  initialEditorString,
+}: {
+  tweetId: string | null
+  initialEditorString: string
+}) {
   const { data } = useQuery<ConnectedAccount>({
     queryKey: ['get-connected-account'],
     queryFn: async () => {
@@ -53,7 +60,7 @@ export default function TweetEditor({ tweetId }: { tweetId: string | null }) {
   return (
     <div className="relative z-10 w-full rounded-lg p-4 font-sans">
       <div className="space-y-4 w-full">
-        <Tweet account={account} />
+        <Tweet initialEditorString={initialEditorString} account={account} />
       </div>
     </div>
   )

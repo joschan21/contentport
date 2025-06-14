@@ -1,4 +1,4 @@
-import {xai} from "@ai-sdk/xai"
+import { xai } from '@ai-sdk/xai'
 import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
 import { diff_wordMode } from '@/lib/diff-utils'
 import { editToolStyleMessage, editToolSystemPrompt } from '@/lib/prompt-utils'
@@ -15,7 +15,7 @@ import { chunkDiffs } from '../../../../diff'
 import { Style } from '../style-router'
 import { PromptBuilder } from './utils'
 import { openai } from '@ai-sdk/openai'
-import { google } from "@ai-sdk/google"
+import { google } from '@ai-sdk/google'
 
 interface CreateEditTweetArgs {
   chatId: string
@@ -98,14 +98,14 @@ export const create_edit_tweet = ({
       const result = await generateText({
         // model: openai("gpt-4o"),
         // model: google("gemini-2.5-pro-preview-05-06"),
-        // model: xai("grok-3-latest"),
+        // model: xai('grok-3-latest'),
         model: anthropic('claude-4-opus-20250514'),
         system: editToolSystemPrompt,
         messages: messages as CoreMessage[],
       })
 
       const improvedText = sanitizeTweetOutput(result.text)
-      const diffs = diff(tweet.id, tweet.content, improvedText)
+      const diffs = diff(tweet.content, improvedText)
 
       await Promise.all([
         redis.set(`last-suggestion:${chatId}`, improvedText),
@@ -120,7 +120,6 @@ export const create_edit_tweet = ({
 
       return {
         id: tweet.id,
-        isNew: "isNew" in tweet && Boolean(tweet.isNew),
         improvedText,
         diffs,
       }
@@ -132,10 +131,13 @@ function append(messages: TestUIMessage[], message: TestUIMessage) {
   return messages
 }
 
-function diff(tweetId: string, currentContent: string, newContent: string): DiffWithReplacement[] {
+function diff(
+  currentContent: string,
+  newContent: string,
+): DiffWithReplacement[] {
   const rawDiffs = diff_wordMode(currentContent, newContent)
   const chunkedDiffs = chunkDiffs(rawDiffs)
-  return processDiffs(tweetId, chunkedDiffs)
+  return processDiffs(chunkedDiffs)
 }
 
 function sanitizeTweetOutput(text: string): string {
@@ -145,6 +147,7 @@ function sanitizeTweetOutput(text: string): string {
     .replaceAll('<current_tweet>', '')
     .replaceAll('</current_tweet>', '')
     .replaceAll('—', '-')
+    .trim()
 }
 
 async function buildEditorStateMessage(

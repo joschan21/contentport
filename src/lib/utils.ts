@@ -10,7 +10,6 @@ export function cn(...inputs: ClassValue[]) {
 type DiffType = -1 | 0 | 1 | 2
 
 export type DiffWithReplacement = {
-  tweetId: string
   id: string
   type: DiffType
   text: string
@@ -32,7 +31,7 @@ export function diff_lineMode(text1: string, text2: string) {
   return diffs
 }
 
-export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacement[] => {
+export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
   const processed: DiffWithReplacement[] = []
   const category =
     diffs.length === 1 && diffs.every((d) => d[0] === 1)
@@ -132,7 +131,6 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
 
       if (current[0] === -1 && i + 3 < diffs.length && diffs[i + 3]?.[0] === 1) {
         processed.push({
-          tweetId,
           id: `diff-${i}-replacement`,
           type: 2 as DiffType,
           text: combinedText,
@@ -145,7 +143,6 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
       } else {
         // This is just an addition or deletion
         processed.push({
-          tweetId,
           id: `diff-${i}`,
           type: current[0] as DiffType,
           text: combinedText,
@@ -157,7 +154,6 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
       }
     } else if (current![0] === -1 && next && next[0] === 1) {
       processed.push({
-        tweetId,
         id: `diff-${i}-replacement`,
         type: 2 as DiffType,
         text: current![1],
@@ -169,7 +165,6 @@ export const processDiffs = (tweetId: string, diffs: Diff[]): DiffWithReplacemen
       i++
     } else {
       processed.push({
-        tweetId,
         id: `diff-${i}`,
         type: current![0] as DiffType,
         text: current![1],

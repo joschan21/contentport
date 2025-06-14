@@ -1,19 +1,26 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import DuolingoButton from '@/components/ui/duolingo-button'
+import { useEditor } from '@/hooks/use-editors'
 import { useTweets } from '@/hooks/use-tweets'
-import { client } from '@/lib/client'
+import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
-import { InferInput, InferOutput } from '@/server'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { InitialConfigType, LexicalComposer } from '@lexical/react/LexicalComposer'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { $getRoot } from 'lexical'
-import debounce from 'lodash.debounce'
-import { Bold, ImagePlus, Italic, Smile, X } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
+import Confetti, { ConfettiRef } from '@/frontend/studio/components/confetti'
+
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getRoot,
+  EditorState,
+  LexicalEditor,
+} from 'lexical'
+import { Bold, Copy, ImagePlus, Italic, Pencil, Smile, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { Icons } from '../icons'
 import {
   Drawer,
@@ -23,32 +30,14 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '../ui/drawer'
-import { Skeleton } from '../ui/skeleton'
 import { ImageTool } from './image-tool'
-import { useEditor } from '@/hooks/use-editors'
 import { AdditionNode, DeletionNode, ReplacementNode, UnchangedNode } from '@/lib/nodes'
-import { InitialConfigType, LexicalComposer } from '@lexical/react/LexicalComposer'
-import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
-import { useNavigate } from 'react-router'
-import { KEY_DOWN_COMMAND } from 'lexical'
-
-const initialConfig: InitialConfigType = {
-  namespace: 'tweet-editor',
-  theme: {
-    text: {
-      bold: 'font-bold',
-      italic: 'italic',
-      underline: 'underline',
-    },
-  },
-  onError: (error: Error) => {
-    console.error('[Tweet Editor Error]', error)
-  },
-  editable: true,
-  nodes: [DeletionNode, AdditionNode, UnchangedNode, ReplacementNode],
-}
+import { useQueryClient } from '@tanstack/react-query'
+import { Separator } from '../ui/separator'
+import { toast } from 'react-hot-toast'
 
 interface TweetProps {
+  initialEditorString: string
   account: {
     name: string
     handle: string
@@ -60,41 +49,75 @@ interface TweetProps {
   onAdd?: () => void
 }
 
-export default function Tweet({ account }: TweetProps) {
+export default function Tweet({ account, initialEditorString }: TweetProps) {
+  const { setTweetContent, currentTweet, setTweetImage, removeTweetImage } = useTweets()
   const editor = useEditor('tweet-editor')
   const [charCount, setCharCount] = useState(0)
   const [open, setOpen] = useState(false)
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false)
-  const { tweetId, queueSave, setTweetContent } = useTweets()
-
-  const prev = useRef('')
 
   useEffect(() => {
-    const unregister = editor?.registerUpdateListener(({ editorState, tags }) => {
-      const content = editorState.read(() => $getRoot().getTextContent())
+    console.log('reading')
+    const tweet = localStorage.getItem('tweet')
 
-      setCharCount(content.length)
+    console.log('tweet', tweet)
 
-      if (tags.has('system-clear')) {
-        prev.current = ''
-        return
-      }
+    if (tweet) {
+      editor?.update(() => {
+        const root = $getRoot()
+        const p = $createParagraphNode()
+        const text = $createTextNode(tweet)
 
-      if (tags.has('system-update')) {
-        prev.current = content
-        return
-      }
-
-      if (content === prev.current) return
-      setTweetContent(tweetId, content)
-
-      queueSave({ tweetId, content })
-    })
-
-    return () => {
-      unregister?.()
+        p.append(text)
+        root.clear()
+        root.append(p)
+      })
     }
-  }, [editor, tweetId, prev.current, queueSave])
+  }, [editor])
+
+  const initialConfig: InitialConfigType = {
+    namespace: `tweet-editor`,
+    theme: {
+      text: {
+        bold: 'font-bold',
+        italic: 'italic',
+        underline: 'underline',
+      },
+    },
+    editable: true,
+    onError: (error: Error) => {
+      console.error('[Tweet Editor Error]', error)
+    },
+    nodes: [DeletionNode, AdditionNode, UnchangedNode, ReplacementNode],
+    editorState: initialEditorString,
+  }
+
+  const onEditorChange = (
+    editorState: EditorState,
+    editor: LexicalEditor,
+    tags: Set<string>,
+  ) => {
+    const content = editorState.read(() => $getRoot().getTextContent())
+
+    setCharCount(content.length)
+    setTweetContent(content)
+
+    localStorage.setItem('tweet', content)
+
+    // if (tags.has('system-clear')) {
+    //   prev.current = ''
+    //   return
+    // }
+
+    // if (tags.has('system-update')) {
+    //   prev.current = content
+    //   return
+    // }
+
+    // if (content === prev.current) return
+
+    // queueSave({ tweetId, content })
+  }
 
   const handlePostToTwitter = () => {
     const tweetText = editor?.read(() => $getRoot().getTextContent())
@@ -105,6 +128,26 @@ export default function Tweet({ account }: TweetProps) {
       : encodedText
 
     window.open(`https://x.com/intent/tweet?text=${sanitizedText}`, '_blank')
+  }
+
+  const copyTweetImageToClipboard = async () => {
+    if (!currentTweet?.image) return
+
+    try {
+      const response = await fetch(currentTweet.image.src)
+      const blob = await response.blob()
+
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [blob.type]: blob,
+        }),
+      ])
+
+      toast.success('Image copied to clipboard! 📋')
+    } catch (error) {
+      console.error('Failed to copy image to clipboard:', error)
+      toast.error('Failed to copy image to clipboard')
+    }
   }
 
   const getProgressColor = () => {
@@ -154,12 +197,20 @@ export default function Tweet({ account }: TweetProps) {
   //   )
   // }
 
+  const confettiRef = useRef<ConfettiRef>(null)
+
   return (
     <Drawer modal={false} open={open} onOpenChange={setOpen}>
       <div className="relative bg-white p-6 rounded-2xl w-full border border-stone-200 bg-clip-padding shadow-sm">
         {/* {showConnector && (
         <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-gray-200 dark:bg-stone-700 z-0"></div>
       )} */}
+
+        <Confetti
+          ref={confettiRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute left-0 top-0 z-[1000] h-full w-full"
+        />
 
         <div className="flex gap-3 relative z-10">
           <Avatar className="h-12 w-12 rounded-full border-2 border-white bg-white">
@@ -179,7 +230,11 @@ export default function Tweet({ account }: TweetProps) {
             </div>
 
             <div className="mt-1 text-stone-800 leading-relaxed">
-              <LexicalComposer initialConfig={initialConfig}>
+              <LexicalComposer
+                initialConfig={{
+                  ...initialConfig,
+                }}
+              >
                 <PlainTextPlugin
                   contentEditable={
                     <ContentEditable
@@ -191,12 +246,13 @@ export default function Tweet({ account }: TweetProps) {
                   ErrorBoundary={LexicalErrorBoundary}
                 />
                 <PlaceholderPlugin placeholder="What's happening?" />
+                <OnChangePlugin onChange={onEditorChange} />
                 <HistoryPlugin />
                 <MultipleEditorStorePlugin id="tweet-editor" />
               </LexicalComposer>
             </div>
 
-            {/* {tweet?.image && (
+            {currentTweet?.image && (
               <>
                 <Separator className="bg-stone-200 my-4" />
 
@@ -204,11 +260,11 @@ export default function Tweet({ account }: TweetProps) {
                   <div
                     className="relative w-full"
                     style={{
-                      paddingBottom: `${(tweet.image.height / tweet.image.width) * 100}%`,
+                      paddingBottom: `${(currentTweet.image.height / currentTweet.image.width) * 100}%`,
                     }}
                   >
                     <img
-                      src={tweet.image.src}
+                      src={currentTweet.image.src}
                       alt="Tweet media"
                       className="absolute inset-0 w-full h-full object-cover"
                     />
@@ -227,17 +283,17 @@ export default function Tweet({ account }: TweetProps) {
                       <DuolingoButton
                         size="icon"
                         variant="secondary"
-                        onClick={() => id && downloadTweetImage(id)}
+                        onClick={copyTweetImageToClipboard}
                         className="rounded-full"
                       >
-                        <Download className="h-4 w-4" />
-                        <span className="sr-only">Download image</span>
+                        <Copy className="h-4 w-4" />
+                        <span className="sr-only">Copy image to clipboard</span>
                       </DuolingoButton>
                       <DuolingoButton
                         size="icon"
                         variant="secondary"
-                        // onClick={() => removeTweetImage(id)}
-                        className="size-8 p-0 rounded-full"
+                        onClick={removeTweetImage}
+                        className="rounded-full"
                       >
                         <Trash2 className="h-4 w-4 text-red-600" />
                         <span className="sr-only">Remove image</span>
@@ -246,7 +302,7 @@ export default function Tweet({ account }: TweetProps) {
                   </div>
                 </div>
               </>
-            )} */}
+            )}
 
             <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
               <div className="flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg">
@@ -277,7 +333,30 @@ export default function Tweet({ account }: TweetProps) {
                       <ImageTool
                         onClose={() => setOpen(false)}
                         onSave={(image) => {
-                          // setTweetImage(id, image)
+                          setTweetImage({
+                            src: image.src,
+                            originalSrc: image.editorState.blob.src,
+                            width: image.width,
+                            height: image.height,
+                            editorState: image.editorState,
+                          })
+
+                          confettiRef.current?.fire({
+                            particleCount: 100,
+                            spread: 110,
+                            origin: { y: 0.6 },
+                          })
+                          confettiRef.current?.fire({
+                            particleCount: 100,
+                            spread: 90,
+                            origin: { y: 0.6 },
+                          })
+                          confettiRef.current?.fire({
+                            particleCount: 100,
+                            spread: 70,
+                            origin: { y: 0.6 },
+                          })
+
                           setOpen(false)
                         }}
                       />
@@ -400,14 +479,20 @@ export default function Tweet({ account }: TweetProps) {
 
           <div className="w-full drawer-body h-full overflow-y-auto">
             <div className="max-w-6xl mx-auto w-full mb-12">
-              {/* <ImageTool
+              <ImageTool
                 onClose={() => setImageDrawerOpen(false)}
                 onSave={(image) => {
-                  // editTweetImage(id, image)
+                  setTweetImage({
+                    src: image.src,
+                    originalSrc: image.editorState.blob.src,
+                    width: image.width,
+                    height: image.height,
+                    editorState: image.editorState,
+                  })
                   setImageDrawerOpen(false)
                 }}
-                initialEditorState={tweet?.image?.editorState}
-              /> */}
+                initialEditorState={currentTweet?.image?.editorState}
+              />
             </div>
           </div>
         </DrawerContent>

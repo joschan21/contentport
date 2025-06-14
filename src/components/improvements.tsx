@@ -1,4 +1,3 @@
-import { useTweetNavigation } from '@/hooks/use-tweet-navigation'
 import { useTweets } from '@/hooks/use-tweets'
 import { cn, DiffWithReplacement } from '@/lib/utils'
 import { Check, ChevronRight, X } from 'lucide-react'
@@ -128,9 +127,7 @@ function ContextAfter({ diff, text }: { diff: DiffWithReplacement; text: string 
 }
 
 export const Improvements = ({ empty }: { empty?: boolean }) => {
-  const { tweetId, setTweetId, improvements, acceptImprovement, rejectImprovement } =
-    useTweets()
-  const { navigateToTweet } = useTweetNavigation()
+  const { tweetId, improvements, acceptImprovement, rejectImprovement } = useTweets()
 
   const visibleImprovements = empty ? [] : improvements.filter((i) => i.type !== 0)
 
@@ -149,7 +146,7 @@ export const Improvements = ({ empty }: { empty?: boolean }) => {
       <div className="h-full w-full">
         {visibleImprovements && visibleImprovements.length ? (
           <div className="space-y-1">
-            <p className='text-sm/7 font-medium text-black'>Improvements</p>
+            <p className="text-sm/7 font-medium text-black">Improvements</p>
             {visibleImprovements.map((diff, index) => {
               return (
                 <SuggestionCard
@@ -158,17 +155,17 @@ export const Improvements = ({ empty }: { empty?: boolean }) => {
                   expanded={index === 0}
                   onAccept={() => {
                     // accepting while viewing a different tweet
-                    if (diff.tweetId !== tweetId) {
-                      navigateToTweet(diff.tweetId)
-                    }
+                    // if (diff.tweetId !== tweetId) {
+                    //   navigateToTweet(diff.tweetId)
+                    // }
 
                     handleAcceptImprovement(diff)
                   }}
                   onReject={() => {
                     // rejecting while viewing a different tweet
-                    if (diff.tweetId !== tweetId) {
-                      setTweetId(diff.tweetId)
-                    }
+                    // if (diff.tweetId !== tweetId) {
+                    //   setTweetId(diff.tweetId)
+                    // }
 
                     handleRejectImprovement(diff)
                   }}

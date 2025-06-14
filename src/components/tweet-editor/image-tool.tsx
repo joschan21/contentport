@@ -1,24 +1,17 @@
-"use client"
+'use client'
 
-import type React from "react"
+import type React from 'react'
 
-import { Button } from "@/components/ui/button"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Toggle } from "@/components/ui/toggle"
-import { cn } from "@/lib/utils"
-import domtoimage from "dom-to-image"
-import {
-  Grip,
-  ImagePlus
-} from "lucide-react"
-import { PropsWithChildren, useEffect, useRef, useState } from "react"
-import { toast } from "react-hot-toast"
-import { EnhancedSlider } from "../ui/enhanced-slider"
-import { Separator } from "../ui/separator"
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Toggle } from '@/components/ui/toggle'
+import { cn } from '@/lib/utils'
+import domtoimage from 'dom-to-image'
+import { Grip, ImagePlus } from 'lucide-react'
+import { PropsWithChildren, useEffect, useRef, useState } from 'react'
+import { toast } from 'react-hot-toast'
+import { EnhancedSlider } from '../ui/enhanced-slider'
+import { Separator } from '../ui/separator'
 
 interface ImageBeautifierProps {
   onClose?: () => void
@@ -55,9 +48,9 @@ interface ImageBeautifierProps {
           intensity: number
           rotation: number
           opacity: number
-          type: "waves" | "dots" | "stripes" | "zigzag" | "graphpaper" | "none"
+          type: 'waves' | 'dots' | 'stripes' | 'zigzag' | 'graphpaper' | 'none'
         }
-        frame: "none" | "arc" | "stack"
+        frame: 'none' | 'arc' | 'stack'
         outlineSize: number
         outlineColor: string
       }
@@ -92,9 +85,9 @@ interface ImageBeautifierProps {
         intensity: number
         rotation: number
         opacity: number
-        type: "waves" | "dots" | "stripes" | "zigzag" | "graphpaper" | "none"
+        type: 'waves' | 'dots' | 'stripes' | 'zigzag' | 'graphpaper' | 'none'
       }
-      frame: "none" | "arc" | "stack"
+      frame: 'none' | 'arc' | 'stack'
       outlineSize: number
       outlineColor: string
     }
@@ -126,37 +119,32 @@ interface Options {
     intensity: number
     rotation: number
     opacity: number
-    type: "waves" | "dots" | "stripes" | "zigzag" | "graphpaper" | "none"
+    type: 'waves' | 'dots' | 'stripes' | 'zigzag' | 'graphpaper' | 'none'
   }
-  frame: "none" | "arc" | "stack"
+  frame: 'none' | 'arc' | 'stack'
   outlineSize: number
   outlineColor: string
 }
 
 interface FrameProps extends PropsWithChildren {
-  type: "none" | "arc" | "stack"
+  type: 'none' | 'arc' | 'stack'
   backgroundColor: string
   borderRadius: number
 }
 
-const Frame = ({
-  type,
-  borderRadius,
-  backgroundColor,
-  children,
-}: FrameProps) => {
-  if (type === "arc") {
+const Frame = ({ type, borderRadius, backgroundColor, children }: FrameProps) => {
+  if (type === 'arc') {
     return (
       <div className="relative pointer-events-none">
         <div
           style={{
             borderRadius: borderRadius + 7,
             boxShadow:
-              "rgba(0, 0, 0, 0.22) 0px 18px 88px -4px, rgba(0, 0, 0, 0.22) 0px 8px 28px -6px",
-            backgroundColor: "rgba(255, 255, 255, 0.314)",
+              'rgba(0, 0, 0, 0.22) 0px 18px 88px -4px, rgba(0, 0, 0, 0.22) 0px 8px 28px -6px',
+            backgroundColor: 'rgba(255, 255, 255, 0.314)',
             zIndex: 2,
-            border: "1px solid rgba(255, 255, 255, 0.376)",
-            padding: "7px",
+            border: '1px solid rgba(255, 255, 255, 0.376)',
+            padding: '7px',
           }}
         >
           {children}
@@ -165,7 +153,7 @@ const Frame = ({
     )
   }
 
-  if (type === "stack") {
+  if (type === 'stack') {
     return (
       <div className="relative pointer-events-none">
         <div className="absolute inset-0">
@@ -185,9 +173,9 @@ const Frame = ({
                   borderTopRightRadius: borderRadius,
                   backgroundColor,
                   transform: `translateY(${translateY}px) scaleX(${scale})`,
-                  transformOrigin: "top center",
+                  transformOrigin: 'top center',
                   opacity,
-                  clipPath: "inset(0 0 calc(100% - 10px) 0)", // Only show the top 10px
+                  clipPath: 'inset(0 0 calc(100% - 10px) 0)', // Only show the top 10px
                 }}
               />
             )
@@ -201,21 +189,15 @@ const Frame = ({
   return children
 }
 
-export function ImageTool({
-  onClose,
-  onSave,
-  initialEditorState,
-}: ImageBeautifierProps) {
+export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifierProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [blob, setBlob] = useState<ScreenshotBlob>({
-    src: initialEditorState?.blob.src || "",
+    src: initialEditorState?.blob.src || '',
   })
-  const [canvasWidth, setCanvasWidth] = useState(
-    initialEditorState?.canvasWidth || 600
-  )
+  const [canvasWidth, setCanvasWidth] = useState(initialEditorState?.canvasWidth || 600)
   const [canvasHeight, setCanvasHeight] = useState(
-    initialEditorState?.canvasHeight || 400
+    initialEditorState?.canvasHeight || 400,
   )
   const [isResizing, setIsResizing] = useState(false)
   const [resizeStart, setResizeStart] = useState<{
@@ -224,25 +206,23 @@ export function ImageTool({
     w: number
     h: number
   } | null>(null)
-  const [outlineSize, setOutlineSize] = useState(
-    initialEditorState?.outlineSize || 0
-  )
+  const [outlineSize, setOutlineSize] = useState(initialEditorState?.outlineSize || 0)
   const [outlineColor, setOutlineColor] = useState(
-    initialEditorState?.outlineColor || "#292524"
+    initialEditorState?.outlineColor || '#292524',
   )
   const [options, setOptions] = useState<Options>(
     initialEditorState?.options || {
-      aspectRatio: "aspect-auto",
-      theme: "bg-gradient-to-br from-cyan-300 to-sky-400",
+      aspectRatio: 'aspect-auto',
+      theme: 'bg-gradient-to-br from-cyan-300 to-sky-400',
       customTheme: {
-        colorStart: "#f3f4f6",
-        colorEnd: "#e5e7eb",
+        colorStart: '#f3f4f6',
+        colorEnd: '#e5e7eb',
       },
       rounded: 12,
-      roundedWrapper: "rounded-xl",
+      roundedWrapper: 'rounded-xl',
       shadow: 3,
       noise: true,
-      browserBar: "hidden",
+      browserBar: 'hidden',
       screenshotScale: 1,
       rotation: 0,
       pattern: {
@@ -250,20 +230,18 @@ export function ImageTool({
         intensity: 15,
         rotation: 0,
         opacity: 6,
-        type: "stripes",
+        type: 'stripes',
       },
-      frame: "arc",
+      frame: 'arc',
       outlineSize: 0,
-      outlineColor: "#292524",
-    }
+      outlineColor: '#292524',
+    },
   )
-  const [userResized, setUserResized] = useState(
-    !!initialEditorState?.canvasWidth
-  )
+  const [userResized, setUserResized] = useState(!!initialEditorState?.canvasWidth)
   const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => {
-    const preset = localStorage.getItem("options")
+    const preset = localStorage.getItem('options')
     if (preset) {
       // @ts-ignore
       setOptions(JSON.parse(preset))
@@ -272,20 +250,20 @@ export function ImageTool({
 
   useEffect(() => {
     const handleShortcuts = (e: KeyboardEvent) => {
-      if ((e.key === "s" && e.ctrlKey) || (e.key === "s" && e.metaKey)) {
+      if ((e.key === 's' && e.ctrlKey) || (e.key === 's' && e.metaKey)) {
         e.preventDefault()
         saveImage()
       }
     }
 
-    document.addEventListener("keydown", handleShortcuts)
+    document.addEventListener('keydown', handleShortcuts)
     return () => {
-      document.removeEventListener("keydown", handleShortcuts)
+      document.removeEventListener('keydown', handleShortcuts)
     }
   }, [blob])
 
   useEffect(() => {
-    localStorage.setItem("options", JSON.stringify(options))
+    localStorage.setItem('options', JSON.stringify(options))
   }, [options])
 
   useEffect(() => {
@@ -297,8 +275,8 @@ export function ImageTool({
       }
     }
     setCanvasToContainer()
-    window.addEventListener("resize", setCanvasToContainer)
-    return () => window.removeEventListener("resize", setCanvasToContainer)
+    window.addEventListener('resize', setCanvasToContainer)
+    return () => window.removeEventListener('resize', setCanvasToContainer)
   }, [userResized, outlineSize])
 
   useEffect(() => {
@@ -314,7 +292,7 @@ export function ImageTool({
         clientX = e.clientX
         clientY = e.clientY
       }
-      console.log("calculating")
+      console.log('calculating')
       const newWidth = Math.max(100, resizeStart.w + (clientX - resizeStart.x))
       const newHeight = Math.max(100, resizeStart.h + (clientY - resizeStart.y))
       setCanvasWidth(newWidth)
@@ -323,16 +301,16 @@ export function ImageTool({
 
     const onUp = () => setIsResizing(false)
 
-    window.addEventListener("mousemove", onMove as any)
-    window.addEventListener("mouseup", onUp)
-    window.addEventListener("touchmove", onMove as any)
-    window.addEventListener("touchend", onUp)
+    window.addEventListener('mousemove', onMove as any)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove as any)
+    window.addEventListener('touchend', onUp)
 
     return () => {
-      window.removeEventListener("mousemove", onMove as any)
-      window.removeEventListener("mouseup", onUp)
-      window.removeEventListener("touchmove", onMove as any)
-      window.removeEventListener("touchend", onUp)
+      window.removeEventListener('mousemove', onMove as any)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove as any)
+      window.removeEventListener('touchend', onUp)
     }
   }, [isResizing, resizeStart])
 
@@ -345,7 +323,7 @@ export function ImageTool({
         const item = items[i]
         if (!item) continue
 
-        if (item.kind === "file" && item.type.includes("image")) {
+        if (item.kind === 'file' && item.type.includes('image')) {
           const file = item.getAsFile()
           if (!file) continue
 
@@ -361,9 +339,9 @@ export function ImageTool({
       }
     }
 
-    document.addEventListener("paste", handlePaste)
+    document.addEventListener('paste', handlePaste)
     return () => {
-      document.removeEventListener("paste", handlePaste)
+      document.removeEventListener('paste', handlePaste)
     }
   }, [])
 
@@ -372,12 +350,12 @@ export function ImageTool({
       const element = wrapperRef.current
       if (!element) return
 
-      const savingToast = toast.loading("Exporting image...")
+      const savingToast = toast.loading('Exporting image...')
 
       const dragHandle = element.querySelector('[role="slider"]') as HTMLElement
       const originalDisplay = dragHandle?.style.display
       if (dragHandle) {
-        dragHandle.style.display = "none"
+        dragHandle.style.display = 'none'
       }
 
       const data = await domtoimage.toPng(element, {
@@ -385,14 +363,14 @@ export function ImageTool({
         width: element.offsetWidth * scale,
         style: {
           transform: `scale(${scale})`,
-          transformOrigin: "top left",
+          transformOrigin: 'top left',
           width: `${element.offsetWidth}px`,
           height: `${element.offsetHeight}px`,
         },
       })
 
       if (dragHandle) {
-        dragHandle.style.display = originalDisplay || ""
+        dragHandle.style.display = originalDisplay || ''
       }
 
       if (onSave) {
@@ -415,9 +393,9 @@ export function ImageTool({
         })
       }
 
-      toast.success("Image exported!", { id: savingToast })
+      toast.success('Ready to copy&paste to twitter! 🎉', { id: savingToast })
     } catch (error) {
-      toast.error("something went wrong")
+      toast.error('something went wrong')
     }
   }
 
@@ -438,8 +416,8 @@ export function ImageTool({
       const item = items[i]
 
       if (
-        (item as DataTransferItem).kind === "file" ||
-        ((item as File).type && (item as File).type.includes("image"))
+        (item as DataTransferItem).kind === 'file' ||
+        ((item as File).type && (item as File).type.includes('image'))
       ) {
         const file = (item as DataTransferItem).kind
           ? (item as DataTransferItem).getAsFile()
@@ -460,16 +438,16 @@ export function ImageTool({
   }
 
   const shadowMap: Record<number, string> = {
-    0: "none",
-    1: "rgba(0, 0, 0, 0.1) 0px 0px 10px",
-    2: "rgba(0, 0, 0, 0.15) 0px 10px 35px 0px",
-    3: "rgba(0, 0, 0, 0.2) 0px 20px 40px 0px",
-    4: "rgba(0, 0, 0, 0.25) 0px 25px 45px 0px",
+    0: 'none',
+    1: 'rgba(0, 0, 0, 0.1) 0px 0px 10px',
+    2: 'rgba(0, 0, 0, 0.15) 0px 10px 35px 0px',
+    3: 'rgba(0, 0, 0, 0.2) 0px 20px 40px 0px',
+    4: 'rgba(0, 0, 0, 0.25) 0px 25px 45px 0px',
   }
 
   const renderBrowserBar = () => {
     switch (options.browserBar) {
-      case "light":
+      case 'light':
         return (
           <div className="flex items-center w-full px-4 py-[10px] rounded-t-lg bg-white/80">
             <div className="flex items-center space-x-2">
@@ -479,7 +457,7 @@ export function ImageTool({
             </div>
           </div>
         )
-      case "dark":
+      case 'dark':
         return (
           <div className="flex items-center w-full px-4 py-[10px] rounded-t-lg bg-black/40">
             <div className="flex items-center space-x-2">
@@ -496,14 +474,14 @@ export function ImageTool({
 
   const getMostCommonBorderColor = (
     imageSrc: string,
-    callback: (color: string) => void
+    callback: (color: string) => void,
   ) => {
     const img = new Image()
-    img.crossOrigin = "anonymous"
+    img.crossOrigin = 'anonymous'
     img.onload = () => {
       const exec = () => {
-        const canvas = document.createElement("canvas")
-        const ctx = canvas.getContext("2d", { willReadFrequently: true })
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
         if (!ctx) return
 
         canvas.width = img.width
@@ -514,18 +492,13 @@ export function ImageTool({
         const imageData = ctx.getImageData(0, 0, width, height).data
         const colorCount: Record<string, number> = {}
 
-        const getColorKey = (r: number, g: number, b: number) =>
-          `${r},${g},${b}`
+        const getColorKey = (r: number, g: number, b: number) => `${r},${g},${b}`
 
         // Sample top and bottom rows
         for (let x = 0; x < width; x++) {
           for (const y of [0, height - 1]) {
             const i = (y * width + x) * 4
-            const key = getColorKey(
-              imageData[i]!,
-              imageData[i + 1]!,
-              imageData[i + 2]!
-            )
+            const key = getColorKey(imageData[i]!, imageData[i + 1]!, imageData[i + 2]!)
             colorCount[key] = (colorCount[key] || 0) + 1
           }
         }
@@ -534,17 +507,13 @@ export function ImageTool({
         for (let y = 1; y < height - 1; y++) {
           for (const x of [0, width - 1]) {
             const i = (y * width + x) * 4
-            const key = getColorKey(
-              imageData[i]!,
-              imageData[i + 1]!,
-              imageData[i + 2]!
-            )
+            const key = getColorKey(imageData[i]!, imageData[i + 1]!, imageData[i + 2]!)
             colorCount[key] = (colorCount[key] || 0) + 1
           }
         }
 
         // Find most common color
-        let mostUsed = ["0,0,0", 0]
+        let mostUsed = ['0,0,0', 0]
         for (const [key, count] of Object.entries(colorCount)) {
           // @ts-ignore
           if (count > mostUsed[1]) {
@@ -555,7 +524,7 @@ export function ImageTool({
         callback(`rgb(${mostUsed[0]})`)
       }
 
-      if ("requestIdleCallback" in window) {
+      if ('requestIdleCallback' in window) {
         window.requestIdleCallback(exec)
       } else {
         setTimeout(exec, 0)
@@ -567,10 +536,10 @@ export function ImageTool({
 
   const rgbToHex = (rgb: string): string => {
     const result = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgb)
-    if (!result) return "#e11d48"
+    if (!result) return '#e11d48'
 
     return (
-      "#" +
+      '#' +
       (
         (1 << 24) +
         (Number.parseInt(result[1]!) << 16) +
@@ -583,9 +552,9 @@ export function ImageTool({
   }
 
   const previewSizes = {
-    waves: "250%",
-    dots: "250%",
-    graphpaper: "225%",
+    waves: '250%',
+    dots: '250%',
+    graphpaper: '225%',
   }
 
   return (
@@ -594,18 +563,18 @@ export function ImageTool({
         {/* CANVAS */}
         <div
           className={cn(
-            "relative w-full flex-1 flex items-start justify-center min-h-[500px] h-full rounded-lg",
-            "bg-light-gray border border-stone-200 bg-[size:10px_10px] bg-fixed transition-all duration-200",
+            'relative w-full flex-1 flex items-start justify-center min-h-[500px] h-full rounded-lg',
+            'bg-light-gray border border-stone-200 bg-[size:10px_10px] bg-fixed transition-all duration-200',
             {
-              "items-center h-[80vh]": !Boolean(blob.src),
-              "max-w-[calc(72rem-330px)] h-[80vh]": Boolean(blob.src),
-              "ring-2 ring-indigo-500 ring-offset-2 bg-indigo-50/50":
+              'items-center h-[80vh]': !Boolean(blob.src),
+              'max-w-[calc(72rem-330px)] h-[80vh]': Boolean(blob.src),
+              'ring-2 ring-indigo-500 ring-offset-2 bg-indigo-50/50':
                 isDragging && !blob.src,
-              "bg-[image:repeating-linear-gradient(315deg,rgba(209,213,219,0.4)_0,rgba(209,213,219,0.4)_1px,_transparent_0,_transparent_50%)]":
+              'bg-[image:repeating-linear-gradient(315deg,rgba(209,213,219,0.4)_0,rgba(209,213,219,0.4)_1px,_transparent_0,_transparent_50%)]':
                 !isDragging || blob.src,
-              "bg-[image:repeating-linear-gradient(315deg,rgba(251,191,36,0.15)_0,rgba(251,191,36,0.15)_1px,_transparent_0,_transparent_50%)]":
+              'bg-[image:repeating-linear-gradient(315deg,rgba(251,191,36,0.15)_0,rgba(251,191,36,0.15)_1px,_transparent_0,_transparent_50%)]':
                 isDragging && !blob.src,
-            }
+            },
           )}
           ref={containerRef}
           onDragOver={(e) => {
@@ -629,30 +598,30 @@ export function ImageTool({
         >
           {blob?.src ? (
             <div
-              className={cn("overflow-hidden")}
+              className={cn('overflow-hidden')}
               style={{
                 width: canvasWidth + outlineSize,
                 height: canvasHeight + outlineSize,
                 minWidth: 100,
                 minHeight: 100,
-                maxWidth: "100%",
-                maxHeight: "80vh",
+                maxWidth: '100%',
+                maxHeight: '80vh',
                 // borderRadius: `${options.rounded}px`,
               }}
             >
               <div
                 ref={wrapperRef}
                 style={{
-                  position: "relative",
-                  width: "100%",
-                  height: "100%",
+                  position: 'relative',
+                  width: '100%',
+                  height: '100%',
                   boxShadow: shadowMap[options.shadow],
                   //   borderRadius: `${options.rounded}px`,
                 }}
                 className={cn(
-                  "transition-all duration-200 ease-in-out flex items-center justify-center overflow-hidden w-full h-full flex-col",
+                  'transition-all duration-200 ease-in-out flex items-center justify-center overflow-hidden w-full h-full flex-col',
                   [options.theme],
-                  options.aspectRatio
+                  options.aspectRatio,
                 )}
               >
                 {renderBrowserBar()}
@@ -663,10 +632,10 @@ export function ImageTool({
                       //   borderRadius: `${options.rounded}px`,
                     }}
                     className={cn(
-                      "absolute inset-0 w-full h-full bg-repeat opacity-[0.15]",
+                      'absolute inset-0 w-full h-full bg-repeat opacity-[0.15]',
                       {
-                        "rounded-t-none": options.browserBar !== "hidden",
-                      }
+                        'rounded-t-none': options.browserBar !== 'hidden',
+                      },
                     )}
                   />
                 )}
@@ -676,16 +645,16 @@ export function ImageTool({
                     className="w-full h-full absolute inset-0 overflow-hidden"
                     style={{
                       zIndex: 1,
-                      pointerEvents: "none",
+                      pointerEvents: 'none',
                       opacity: options.pattern.opacity / 100,
-                      mixBlendMode: "luminosity",
+                      mixBlendMode: 'luminosity',
                     }}
                   >
                     <div
                       className="w-full h-full absolute inset-0 object-cover"
                       style={{
                         backgroundImage: `url("/pattern/${options.pattern.type}.svg")`,
-                        backgroundRepeat: "repeat",
+                        backgroundRepeat: 'repeat',
                         backgroundSize: `${options.pattern.intensity}%`,
                         transform: `rotate(${options.pattern.rotation}deg) scale(2)`,
                       }}
@@ -696,14 +665,14 @@ export function ImageTool({
                 <div
                   className="flex items-center justify-center transition-all ease-in-out antialiased"
                   style={{
-                    willChange: "transform",
+                    willChange: 'transform',
                     borderRadius: `${options.rounded}px`,
-                    transition: "400ms cubic-bezier(0.03, 0.98, 0.52, 0.99)",
-                    position: "relative",
+                    transition: '400ms cubic-bezier(0.03, 0.98, 0.52, 0.99)',
+                    position: 'relative',
                     zIndex: 2,
                     transform: `scale(${options.screenshotScale}) rotate(${options.rotation}deg)`,
-                    maxWidth: "100%",
-                    maxHeight: "100%",
+                    maxWidth: '100%',
+                    maxHeight: '100%',
                     boxShadow: shadowMap[options.shadow],
                   }}
                 >
@@ -715,21 +684,20 @@ export function ImageTool({
                     <div
                       className="transition-all ease-in-out"
                       style={{
-                        overflow: "hidden",
+                        overflow: 'hidden',
                         borderRadius: `${options.rounded}px`,
                         boxShadow: shadowMap[options.shadow],
                         background: outlineColor,
                         border: `${outlineSize}px solid ${outlineColor}`,
-                        transition:
-                          "border 400ms cubic-bezier(0.03, 0.98, 0.52, 0.99)",
+                        transition: 'border 400ms cubic-bezier(0.03, 0.98, 0.52, 0.99)',
                       }}
                     >
                       <img
-                        src={blob.src || "/placeholder.svg"}
+                        src={blob.src || '/placeholder.svg'}
                         style={{
-                          width: "100%",
-                          height: "100%",
-                          display: "block",
+                          width: '100%',
+                          height: '100%',
+                          display: 'block',
                         }}
                         onLoad={(e) => {
                           const target = e.target as HTMLImageElement
@@ -755,7 +723,7 @@ export function ImageTool({
                   role="slider"
                   aria-label="Resize canvas"
                   className="absolute bottom-2 right-2 size-4 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center cursor-nwse-resize z-50 shadow-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  style={{ touchAction: "none", userSelect: "none" }}
+                  style={{ touchAction: 'none', userSelect: 'none' }}
                   onMouseDown={(e) => {
                     e.preventDefault()
                     setIsResizing(true)
@@ -785,28 +753,25 @@ export function ImageTool({
           ) : (
             <div
               className={cn(
-                "flex flex-col items-center justify-center p-12 border bg-white border-stone-200 rounded-xl cursor-pointer hover:border-stone-300 transition-all duration-300 backdrop-blur-sm"
+                'flex flex-col items-center justify-center p-12 border bg-white border-stone-200 rounded-xl cursor-pointer hover:border-stone-300 transition-all duration-300 backdrop-blur-sm',
               )}
             >
-              <label
-                htmlFor="screenshot-upload"
-                className="cursor-pointer w-full"
-              >
+              <label htmlFor="screenshot-upload" className="cursor-pointer w-full">
                 <div className="flex flex-col items-center text-center space-y-3">
                   <div className="relative">
                     <ImagePlus
-                      className={cn("size-6 text-stone-300", {
-                        "text-indigo-500": isDragging,
+                      className={cn('size-6 text-stone-300', {
+                        'text-indigo-500': isDragging,
                       })}
                     />
                   </div>
 
                   <div className="space-y-3">
                     <h3 className="text-xl font-medium text-stone-800">
-                      {isDragging ? "Drop your image here" : "Add an image"}
+                      {isDragging ? 'Drop your image here' : 'Add an image'}
                     </h3>
                     <p className="text-sm text-stone-500 max-w-sm">
-                      Transform your images into{" "}
+                      Transform your images into{' '}
                       <span className="text-indigo-600 font-medium">
                         clear, beautiful visuals
                       </span>
@@ -839,10 +804,10 @@ export function ImageTool({
         {/* SIDEBAR */}
         <div
           className={cn(
-            "bg-light-gray w-[19rem] rounded-lg0 p-6 min-h-full max-h-[80vh] overflow-y-auto",
+            'bg-light-gray w-[19rem] rounded-lg p-6 min-h-full max-h-[80vh] overflow-y-auto',
             {
               hidden: !Boolean(blob.src),
-            }
+            },
           )}
         >
           <div className="space-y-8">
@@ -860,9 +825,7 @@ export function ImageTool({
               <Popover>
                 <div className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-1">
-                    <span className="block text-xs font-medium text-gray-700">
-                      Frame
-                    </span>
+                    <span className="block text-xs font-medium text-gray-700">Frame</span>
                   </div>
                   <PopoverTrigger asChild>
                     <button
@@ -882,14 +845,14 @@ export function ImageTool({
                     </span>
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { type: "none" as const, label: "None" },
-                        { type: "arc" as const, label: "Arc" },
-                        { type: "stack" as const, label: "Stack" },
+                        { type: 'none' as const, label: 'None' },
+                        { type: 'arc' as const, label: 'Arc' },
+                        { type: 'stack' as const, label: 'Stack' },
                       ].map((frame) => (
                         <div
                           key={frame.type}
                           className={cn(
-                            "cursor-pointer flex flex-col items-center gap-1.5"
+                            'cursor-pointer flex flex-col items-center gap-1.5',
                           )}
                           onClick={() => {
                             setOptions({
@@ -900,11 +863,10 @@ export function ImageTool({
                         >
                           <div
                             className={cn(
-                              "w-full h-14 rounded-md border border-gray-200 flex items-center justify-center bg-white overflow-hidden",
+                              'w-full h-14 rounded-md border border-gray-200 flex items-center justify-center bg-white overflow-hidden',
                               {
-                                "ring-2 ring-blue-400":
-                                  frame.type === options.frame,
-                              }
+                                'ring-2 ring-blue-400': frame.type === options.frame,
+                              },
                             )}
                           >
                             {/* <div
@@ -918,9 +880,7 @@ export function ImageTool({
                               }}
                             /> */}
                           </div>
-                          <span className="text-xs text-gray-600">
-                            {frame.label}
-                          </span>
+                          <span className="text-xs text-gray-600">{frame.label}</span>
                         </div>
                       ))}
                     </div>
@@ -930,9 +890,7 @@ export function ImageTool({
 
               <EnhancedSlider
                 value={options.screenshotScale}
-                onChange={(value) =>
-                  setOptions({ ...options, screenshotScale: value })
-                }
+                onChange={(value) => setOptions({ ...options, screenshotScale: value })}
                 min={0.5}
                 max={1.5}
                 step={0.01}
@@ -942,9 +900,7 @@ export function ImageTool({
               />
               <EnhancedSlider
                 value={options.rotation}
-                onChange={(value) =>
-                  setOptions({ ...options, rotation: value })
-                }
+                onChange={(value) => setOptions({ ...options, rotation: value })}
                 min={0}
                 max={360}
                 step={1}
@@ -1041,12 +997,12 @@ export function ImageTool({
                         className="size-8 rounded-md border border-gray-300 flex items-center justify-center transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400"
                       >
                         <div
-                          className={cn("size-7 rounded-sm", options.theme)}
+                          className={cn('size-7 rounded-sm', options.theme)}
                           style={{
-                            background: options.theme.includes("gradient")
+                            background: options.theme.includes('gradient')
                               ? undefined
                               : options.theme,
-                            backgroundImage: options.theme.includes("gradient")
+                            backgroundImage: options.theme.includes('gradient')
                               ? undefined
                               : undefined,
                           }}
@@ -1054,44 +1010,41 @@ export function ImageTool({
                       </button>
                     </PopoverTrigger>
                   </div>
-                  <PopoverContent
-                    align="end"
-                    className="relativ z-[999] e w-80"
-                  >
+                  <PopoverContent align="end" className="relativ z-[999] e w-80">
                     <div>
                       <span className="block font-medium text-sm text-gray-900 mb-2">
                         Background Presets
                       </span>
                       <div className="grid grid-cols-5 gap-2">
                         {[
-                          "bg-gradient-to-br from-cyan-300 to-sky-400",
-                          "bg-gradient-to-br from-green-300 to-emerald-400",
-                          "bg-gradient-to-br from-indigo-300 to-violet-400",
-                          "bg-gradient-to-br from-rose-300 to-pink-400",
-                          "bg-gradient-to-br from-indigo-300 to-orange-400",
-                          "bg-gradient-to-br from-purple-300 to-fuchsia-400",
-                          "bg-gradient-to-br from-blue-300 to-indigo-400",
-                          "bg-gradient-to-br from-teal-300 to-emerald-400",
-                          "bg-gradient-to-br from-red-300 to-rose-400",
-                          "bg-gradient-to-br from-yellow-200 to-indigo-400",
+                          'bg-gradient-to-br from-cyan-300 to-sky-400',
+                          'bg-gradient-to-br from-green-300 to-emerald-400',
+                          'bg-gradient-to-br from-indigo-300 to-violet-400',
+                          'bg-gradient-to-br from-rose-300 to-pink-400',
+                          'bg-gradient-to-br from-indigo-300 to-orange-400',
+                          'bg-gradient-to-br from-purple-300 to-fuchsia-400',
+                          'bg-gradient-to-br from-blue-300 to-indigo-400',
+                          'bg-gradient-to-br from-teal-300 to-emerald-400',
+                          'bg-gradient-to-br from-red-300 to-rose-400',
+                          'bg-gradient-to-br from-yellow-200 to-indigo-400',
 
-                          "bg-white",
-                          "bg-stone-800",
+                          'bg-white',
+                          'bg-stone-800',
                         ].map((theme) => (
                           <div
                             key={theme}
                             className={cn(
-                              "cursor-pointer w-full h-8 rounded-md border",
+                              'cursor-pointer w-full h-8 rounded-md border',
                               theme,
-                              theme === options.theme && "ring-2 ring-blue-400"
+                              theme === options.theme && 'ring-2 ring-blue-400',
                             )}
                             onClick={() => {
                               setOptions({
                                 ...options,
                                 theme: theme,
                                 customTheme: {
-                                  colorStart: "#f3f4f6",
-                                  colorEnd: "#e5e7eb",
+                                  colorStart: '#f3f4f6',
+                                  colorEnd: '#e5e7eb',
                                 },
                               })
                             }}
@@ -1114,8 +1067,8 @@ export function ImageTool({
                       <button
                         aria-label="Edit pattern overlay"
                         className={cn(
-                          "size-8 rounded-md border border-gray-300 flex items-center justify-center transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400",
-                          options.pattern.enabled ? "opacity-100" : "opacity-50"
+                          'size-8 rounded-md border border-gray-300 flex items-center justify-center transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400',
+                          options.pattern.enabled ? 'opacity-100' : 'opacity-50',
                         )}
                       >
                         <div className="size-7 rounded-sm relative overflow-hidden bg-white flex items-center justify-center">
@@ -1124,15 +1077,14 @@ export function ImageTool({
                               className="w-full h-full relative"
                               style={{
                                 backgroundImage: `url("/pattern/${options.pattern.type}.svg")`,
-                                backgroundRepeat: "repeat",
+                                backgroundRepeat: 'repeat',
                                 backgroundSize:
                                   previewSizes[
-                                    options.pattern
-                                      .type as keyof typeof previewSizes
-                                  ] || "25%",
+                                    options.pattern.type as keyof typeof previewSizes
+                                  ] || '25%',
                                 opacity: 100,
                                 transform: `rotate(${options.pattern.rotation}deg) scale(2)`,
-                                imageRendering: "crisp-edges",
+                                imageRendering: 'crisp-edges',
                               }}
                             />
                           ) : (
@@ -1153,17 +1105,17 @@ export function ImageTool({
                       </span>
                       <div className="grid grid-cols-3 gap-2">
                         {[
-                          { type: "none", label: "None" },
-                          { type: "waves", label: "Waves" },
-                          { type: "dots", label: "Dots" },
-                          { type: "stripes", label: "Stripes" },
-                          { type: "zigzag", label: "Zigzag" },
-                          { type: "graphpaper", label: "Graph Paper" },
+                          { type: 'none', label: 'None' },
+                          { type: 'waves', label: 'Waves' },
+                          { type: 'dots', label: 'Dots' },
+                          { type: 'stripes', label: 'Stripes' },
+                          { type: 'zigzag', label: 'Zigzag' },
+                          { type: 'graphpaper', label: 'Graph Paper' },
                         ].map((pattern) => (
                           <div
                             key={pattern.type}
                             className={cn(
-                              "cursor-pointer flex flex-col items-center gap-1.5"
+                              'cursor-pointer flex flex-col items-center gap-1.5',
                             )}
                             onClick={() => {
                               setOptions({
@@ -1171,53 +1123,50 @@ export function ImageTool({
                                 pattern: {
                                   ...options.pattern,
                                   type: pattern.type as any,
-                                  enabled: pattern.type !== "none",
+                                  enabled: pattern.type !== 'none',
                                 },
                               })
                             }}
                           >
                             <div
                               className={cn(
-                                "w-full h-14 rounded-md border border-gray-200 flex items-center justify-center bg-white overflow-hidden",
+                                'w-full h-14 rounded-md border border-gray-200 flex items-center justify-center bg-white overflow-hidden',
                                 {
-                                  "ring-2 ring-blue-400":
+                                  'ring-2 ring-blue-400':
                                     pattern.type === options.pattern.type,
-                                }
+                                },
                               )}
                             >
-                              {pattern.type !== "none" ? (
+                              {pattern.type !== 'none' ? (
                                 <div
                                   className="w-full h-full relative"
                                   style={{
                                     backgroundImage: `url("/pattern/${pattern.type}.svg")`,
-                                    backgroundRepeat: "repeat",
-                                    backgroundSize: [
-                                      "stripes",
-                                      "zigzag",
-                                    ].includes(pattern.type)
-                                      ? "25%"
-                                      : "85%",
+                                    backgroundRepeat: 'repeat',
+                                    backgroundSize: ['stripes', 'zigzag'].includes(
+                                      pattern.type,
+                                    )
+                                      ? '25%'
+                                      : '85%',
                                     opacity: 0.3,
-                                    transform: "rotate(45deg) scale(2)",
-                                    imageRendering: "crisp-edges",
-                                    WebkitBackfaceVisibility: "hidden",
-                                    backfaceVisibility: "hidden",
-                                    WebkitTransform: "translateZ(0)",
-                                    WebkitFontSmoothing: "antialiased",
-                                    MozOsxFontSmoothing: "grayscale",
+                                    transform: 'rotate(45deg) scale(2)',
+                                    imageRendering: 'crisp-edges',
+                                    WebkitBackfaceVisibility: 'hidden',
+                                    backfaceVisibility: 'hidden',
+                                    WebkitTransform: 'translateZ(0)',
+                                    WebkitFontSmoothing: 'antialiased',
+                                    MozOsxFontSmoothing: 'grayscale',
                                   }}
                                 />
                               ) : null}
                             </div>
-                            <span className="text-xs text-gray-600">
-                              {pattern.label}
-                            </span>
+                            <span className="text-xs text-gray-600">{pattern.label}</span>
                           </div>
                         ))}
                       </div>
                       <div className="mt-4 space-y-3">
                         <EnhancedSlider
-                          disabled={options.pattern.type === "none"}
+                          disabled={options.pattern.type === 'none'}
                           value={options.pattern.intensity}
                           onChange={(value) =>
                             setOptions({
@@ -1234,7 +1183,7 @@ export function ImageTool({
                           label="Size"
                         />
                         <EnhancedSlider
-                          disabled={options.pattern.type === "none"}
+                          disabled={options.pattern.type === 'none'}
                           value={options.pattern.rotation}
                           onChange={(value) =>
                             setOptions({
@@ -1252,7 +1201,7 @@ export function ImageTool({
                           unit="°"
                         />
                         <EnhancedSlider
-                          disabled={options.pattern.type === "none"}
+                          disabled={options.pattern.type === 'none'}
                           value={options.pattern.opacity}
                           onChange={(value) =>
                             setOptions({
@@ -1291,5 +1240,3 @@ export function ImageTool({
     </div>
   )
 }
-
-

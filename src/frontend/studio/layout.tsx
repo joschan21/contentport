@@ -1,44 +1,28 @@
-'use client'
-
 import { PropsWithChildren } from 'react'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { LeftSidebar } from '@/components/context-sidebar'
 import { AppSidebarInset } from '@/components/providers/app-sidebar-inset'
 import { SidebarProvider } from '@/components/ui/sidebar'
-import { MentionNode } from '@/lib/nodes'
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
-
-function parseCookies(): Record<string, string> {
-  return document.cookie
-    .split(';')
-    .map((c) => c.trim())
-    .reduce(
-      (acc, cookie) => {
-        const eqIdx = cookie.indexOf('=')
-        if (eqIdx === -1) return acc
-        const key = decodeURIComponent(cookie.slice(0, eqIdx))
-        const val = decodeURIComponent(cookie.slice(eqIdx + 1))
-        acc[key] = val
-        return acc
-      },
-      {} as Record<string, string>,
-    )
-}
+import { cookies } from 'next/headers'
 
 interface LayoutProps extends PropsWithChildren {
+  cookies: any
   hideAppSidebar?: boolean
 }
 
-export default function Layout({ children, hideAppSidebar }: LayoutProps) {
-  const cookies = parseCookies()
-  const sidebarWidth = cookies['sidebar:width']
-  const sidebarState = cookies['sidebar:state']
+export default async function ClientLayout({
+  children,
+  cookies,
+  hideAppSidebar,
+}: LayoutProps) {
+  const sidebarWidth = cookies.get('sidebar:width')
+  const sidebarState = cookies.get('sidebar:state')
 
   let defaultOpen = true
 
   if (sidebarState) {
-    defaultOpen = sidebarState === 'true'
+    defaultOpen = sidebarState && sidebarState.value === 'true'
   }
 
   return (
@@ -47,7 +31,10 @@ export default function Layout({ children, hideAppSidebar }: LayoutProps) {
         <LeftSidebar />
       </SidebarProvider>
 
-      <SidebarProvider defaultOpen={defaultOpen} defaultWidth={sidebarWidth || '32rem'}>
+      <SidebarProvider
+        defaultOpen={defaultOpen}
+        defaultWidth={sidebarWidth?.value || '32rem'}
+      >
         {hideAppSidebar ? (
           <AppSidebarInset>{children}</AppSidebarInset>
         ) : (

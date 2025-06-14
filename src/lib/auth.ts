@@ -1,16 +1,16 @@
-import { db } from "@/db"
-import { betterAuth } from "better-auth"
-import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import { createAuthMiddleware } from "better-auth/api"
-import { client } from "@/lib/client"
-import { redis } from "./redis"
+import { db } from '@/db'
+import { betterAuth } from 'better-auth'
+import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { createAuthMiddleware } from 'better-auth/api'
+import { client } from '@/lib/client'
+import { redis } from './redis'
 
-const database = drizzleAdapter(db, { provider: "pg" })
+const database = drizzleAdapter(db, { provider: 'pg' })
 
 export const auth = betterAuth({
   user: {
     additionalFields: {
-      plan: { type: "string", defaultValue: "free" },
+      plan: { type: 'string', defaultValue: 'free' },
     },
   },
   database,
@@ -80,9 +80,9 @@ export const auth = betterAuth({
       ]
 
       if (session && allowlist.includes(session.user.email)) {
-        ctx.redirect("/studio")
+        ctx.redirect('/studio')
       } else {
-        ctx.redirect("/")
+        ctx.redirect('/')
       }
     }),
   },

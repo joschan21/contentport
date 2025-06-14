@@ -2,14 +2,13 @@ import { client } from '@/lib/client'
 import { clearStreamHooks, registerStreamHooks } from '@/lib/register-response-hooks'
 import { DiffWithReplacement } from '@/lib/utils'
 import { ChatMessage } from '@/server/routers/chat/chat-router'
-import { TestUIMessage } from '@/types/message'
 import { useChat as aisdk_useChat } from '@ai-sdk/react'
 import { useQuery } from '@tanstack/react-query'
-import { nanoid } from 'nanoid'
-import { parseAsString, useQueryState } from 'nuqs'
+import { useQueryState } from 'nuqs'
 import { createContext, PropsWithChildren, useContext, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { useTweets } from './use-tweets'
+import { ChatRequestOptions } from 'ai'
 
 interface StartNewChatOpts {
   newId?: string
@@ -17,29 +16,17 @@ interface StartNewChatOpts {
 
 type TChatContext = Omit<ReturnType<typeof aisdk_useChat>, 'append'> & {
   messages: ChatMessage[]
-  append: (message: Partial<ChatMessage>) => void
+  append: (message: Partial<ChatMessage>, chatRequestOptions?: ChatRequestOptions) => void
   startNewChat: (opts?: StartNewChatOpts) => Promise<string | null>
   chatId: string | null
   setChatId: (id: string | null) => void
-}
-
-const searchParams = {
-  tweetId: parseAsString,
-  chatId: parseAsString,
 }
 
 const ChatContext = createContext<TChatContext | null>(null)
 
 export const ChatProvider = ({ children }: PropsWithChildren) => {
   const [chatId, setChatId] = useQueryState('chatId')
-  const {
-    tweetId,
-    currentTweet,
-    listImprovements,
-    showImprovementsInEditor,
-    setTweetId,
-    setQueuedImprovements,
-  } = useTweets()
+  const { tweetId, listImprovements, showImprovementsInEditor } = useTweets()
 
   const tweetIdRef = useRef(tweetId)
 
@@ -76,34 +63,15 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
       registerStreamHooks(response, {
         onTweetResult: async ({
           id,
-          isNew,
           diffs,
         }: {
           id: string
-          isNew: boolean
+          isDraft: boolean
           diffs: DiffWithReplacement[]
+          improvedText: string
         }) => {
-          if (isNew) {
-            setTweetId(id)
-            listImprovements(diffs)
-            showImprovementsInEditor(id, diffs)
-
-            return
-          }
-
-          console.log('created for id:', id)
-          console.log('current tweet:', tweetId)
-          if (id === tweetIdRef.current) {
-            console.log('ADDING IMPROVEMENTS', diffs)
-            listImprovements(diffs)
-            showImprovementsInEditor(id, diffs)
-          } else {
-            listImprovements(diffs)
-            setQueuedImprovements((prev) => ({
-              ...prev,
-              [id]: diffs,
-            }))
-          }
+          listImprovements(diffs)
+          showImprovementsInEditor(id, diffs)
         },
       })
     },
@@ -111,19 +79,25 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
       clearStreamHooks()
     },
     experimental_prepareRequestBody({ messages, requestBody }) {
-      const lastMessage = messages[messages.length - 1] as TestUIMessage
       return {
-        message: {
-          ...lastMessage,
-          role: 'user',
-          id: lastMessage?.id ?? nanoid(),
-          content: (lastMessage?.content as string).trimEnd(),
-          metadata: lastMessage?.metadata,
-        } satisfies TestUIMessage,
-        tweet: currentTweet,
+        messages: undefined,
         ...requestBody,
       }
     },
+    // experimental_prepareRequestBody({ messages, requestBody }) {
+    //   const lastMessage = messages[messages.length - 1] as TestUIMessage
+    //   return {
+    //     message: {
+    //       ...lastMessage,
+    //       role: 'user',
+    //       id: lastMessage?.id ?? nanoid(),
+    //       content: (lastMessage?.content as string).trimEnd(),
+    //       metadata: lastMessage?.metadata,
+    //     } satisfies TestUIMessage,
+    //     tweet: lastMessage.tweet,
+    //     ...requestBody,
+    //   }
+    // },
   })
 
   return (

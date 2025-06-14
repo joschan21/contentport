@@ -1,14 +1,12 @@
 import { client } from '@/lib/client'
+import { AdditionNode, DeletionNode, ReplacementNode, UnchangedNode } from '@/lib/nodes'
+import { DiffWithReplacement } from '@/lib/utils'
 import { InferInput, InferOutput } from '@/server'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  $createParagraphNode,
-  $createTextNode,
-  $getNodeByKey,
-  $getRoot,
-  LexicalEditor,
-} from 'lexical'
-import { useQueryState } from 'nuqs'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { $createParagraphNode, $createTextNode, $getNodeByKey, $getRoot } from 'lexical'
+import debounce from 'lodash.debounce'
+import { nanoid } from 'nanoid'
+import { useParams, usePathname, useSearchParams } from 'next/navigation'
 import React, {
   createContext,
   PropsWithChildren,
@@ -19,10 +17,6 @@ import React, {
   useState,
 } from 'react'
 import { useEditor } from './use-editors'
-import { DiffWithReplacement } from '@/lib/utils'
-import { AdditionNode, DeletionNode, ReplacementNode, UnchangedNode } from '@/lib/nodes'
-import debounce from 'lodash.debounce'
-import type { DebouncedFunc } from 'lodash'
 
 interface TweetImage {
   src: string
@@ -67,115 +61,64 @@ interface TweetImage {
   }
 }
 
-export type Tweet = InferOutput['tweet']['recents']['tweets'][number]
+export type Tweet = InferOutput['tweet']['getTweet']['tweet'] & { image?: TweetImage }
 
 interface TweetContextType {
-  tweets: Tweet[]
-  currentTweet: Tweet | undefined
+  // tweets: Tweet[]
+  currentTweet: { id: string; content: string; image?: TweetImage }
   tweetId: string | null
   improvements: DiffWithReplacement[]
-  setTweetId: (id: string) => void
-  setTweetContent: (tweetId: string | null, content: string) => void
+  // setTweetId: (id: string) => void
+  setTweetContent: (content: string) => void
+  setTweetImage: (image: TweetImage) => void
+  removeTweetImage: () => void
   listImprovements: (diffs: DiffWithReplacement[]) => void
   showImprovementsInEditor: (tweetId: string, diffs: DiffWithReplacement[]) => void
-  acceptImprovement: (diff: DiffWithReplacement) => void
+  acceptImprovement: (diff: DiffWithReplacement, opts?: { isInitial: boolean }) => void
   rejectImprovement: (diff: DiffWithReplacement) => void
   queuedImprovements: Record<string, DiffWithReplacement[]>
   setQueuedImprovements: React.Dispatch<
     React.SetStateAction<Record<string, DiffWithReplacement[]>>
   >
-  queueSave: ({ tweetId, content }: {
-    content: string;
-    tweetId: string | null;
-}) => void
+  resetImprovements: () => void
 }
 
 const TweetContext = createContext<TweetContextType | undefined>(undefined)
 
 export function TweetProvider({ children }: PropsWithChildren) {
-  const [tweetId, setTweetId] = useQueryState('tweetId')
+  const { tweetId } = useParams() as { tweetId: string | null }
   const queryClient = useQueryClient()
   const hasLoaded = useRef(false)
+
   const editor = useEditor('tweet-editor')
   const [improvements, setImprovements] = useState<DiffWithReplacement[]>([])
   const [queuedImprovements, setQueuedImprovements] = useState<
     Record<string, DiffWithReplacement[]>
   >({})
 
-  const improvementKeys = useRef(new Map<string, string>())
-
-  const setTweetContent = (tweetId: string | null, content: string) => {
-    if (!tweetId) {
-      // update draft tweet
-      queryClient.setQueryData(['get-recent-tweets'], (prev: Tweet[] | undefined) => {
-        const old = prev ?? []
-
-        if (old.some((t) => t.id === 'draft')) {
-          // update draft
-          console.log('update draft')
-          return old.map((t) => {
-            if (t.id === 'draft') {
-              return {
-                ...t,
-                content,
-              }
-            } else {
-              return t
-            }
-          })
-        } else {
-          console.log('create draft')
-          // create draft
-          return [{ id: 'draft', content }, ...old]
-        }
-      })
-    } else {
-      // update existing tweet
-      queryClient.setQueryData(['get-recent-tweets'], (prev: Tweet[]) => {
-        return prev?.map((tweet) => {
-          if (tweet.id === (tweetId ?? 'draft')) {
-            return {
-              ...tweet,
-              content,
-            }
-          }
-          return tweet
-        })
-      })
-    }
-
-    // if (data?.some((tweet) => tweet.id === 'draft')) {
-    //   // existing tweet is updated
-
-    // } else {
-    //   // create new tweet
-    //   console.log('creating existing')
-    //   queryClient.setQueryData(['get-recent-tweets'], (prev: Tweet[]) => {
-    //     return [
-    //       {
-    //         id: 'draft',
-    //         content,
-    //       },
-    //       ...prev,
-    //     ]
-    //   })
-    // }
+  const resetImprovements = () => {
+    setImprovements([])
   }
 
-  const { data: tweets, isPending } = useQuery({
-    queryKey: ['get-recent-tweets'],
-    queryFn: async () => {
-      const res = await client.tweet.recents.$get()
-      const { tweets } = await res.json()
+  const improvementKeys = useRef(new Map<string, string>())
 
-      return tweets as Tweet[]
-    },
-    initialData: [],
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  })
+  const [currentTweet, setCurrentTweet] = useState<{
+    id: string
+    content: string
+    image?: TweetImage
+  }>({ id: nanoid(), content: '' })
 
-  const currentTweet = tweets.find((t) => t.id === tweetId)
+  const setTweetContent = (content: string) => {
+    setCurrentTweet((prev) => ({ ...prev, content }))
+  }
+
+  const setTweetImage = (image: TweetImage) => {
+    setCurrentTweet((prev) => ({ ...prev, image }))
+  }
+
+  const removeTweetImage = () => {
+    setCurrentTweet((prev) => ({ ...prev, image: undefined }))
+  }
 
   // initial load
   useEffect(() => {
@@ -224,9 +167,6 @@ export function TweetProvider({ children }: PropsWithChildren) {
             p.append(node)
           } else if (diff.type === 0) {
             const node = new UnchangedNode(diff.text)
-            const key = node.getKey()
-
-            // improvementKeys.current.set(diff.id, key)
 
             p.append(node)
           } else {
@@ -249,50 +189,55 @@ export function TweetProvider({ children }: PropsWithChildren) {
     )
   }
 
-  const acceptImprovement = (diff: DiffWithReplacement) => {
-    const improvement = improvements?.find((d) => d.id === diff.id)
-    if (!improvement) return console.warn('no improvement')
+  const acceptImprovement = (
+    diff: DiffWithReplacement,
+    opts?: { isInitial: boolean },
+  ) => {
+    // apply initial suggestion directly
+    if (opts?.isInitial) {
+      if (!editor) console.warn('no editor')
+      console.log('editor', editor)
 
-    const key = improvementKeys.current.get(diff.id)
-    if (!key) return console.warn('no key')
+      editor?.update(() => {
+        const root = $getRoot()
+        const p = $createParagraphNode()
+        const text = $createTextNode(diff.text)
 
-    editor?.update(
-      () => {
-        const node = $getNodeByKey(key)
+        p.append(text)
 
-        if (node instanceof DeletionNode) {
-          node.remove()
-        } else if (node instanceof AdditionNode) {
-          const textNode = $createTextNode(node.getTextContent())
-          node.replace(textNode)
-        } else if (node instanceof ReplacementNode) {
-          const textNode = $createTextNode(diff.replacement)
-          node.replace(textNode)
-        }
-      },
-      { tag: 'accept-improvement' },
-    )
-
-    // show new content via state
-    const content = editor?.read(() => $getRoot().getTextContent())
-    queryClient.setQueryData(['get-recent-tweets'], (prev: Tweet[]) => {
-      return prev?.map((tweet) => {
-        if (tweet.id === (diff.tweetId ?? 'draft')) {
-          return {
-            ...tweet,
-            content,
-          }
-        }
-        return tweet
+        root.append(p)
       })
-    })
+    } else {
+      const improvement = improvements?.find((d) => d.id === diff.id)
+      if (!improvement) return console.warn('no improvement')
 
-    console.log('CONTENT IS', content)
+      const key = improvementKeys.current.get(diff.id)
+      if (!key) return console.warn('no key')
+
+      editor?.update(
+        () => {
+          const node = $getNodeByKey(key)
+
+          if (node instanceof DeletionNode) {
+            node.remove()
+          } else if (node instanceof AdditionNode) {
+            const textNode = $createTextNode(node.getTextContent())
+            node.replace(textNode)
+          } else if (node instanceof ReplacementNode) {
+            const textNode = $createTextNode(diff.replacement)
+            node.replace(textNode)
+          }
+        },
+        { tag: 'accept-improvement' },
+      )
+    }
+
+    const content = editor?.read(() => $getRoot().getTextContent())
 
     // save improvement
-    if (typeof content === 'string') {
-      queueSave({ tweetId: diff.tweetId, content })
-    }
+    // if (typeof content === 'string') {
+    //   queueSave({ tweetId: diff.tweetId, content })
+    // }
 
     // cleanup
     improvementKeys.current.delete(diff.id)
@@ -318,7 +263,6 @@ export function TweetProvider({ children }: PropsWithChildren) {
     })
 
     improvementKeys.current.delete(diff.id)
-
     setImprovements((prev) => prev.filter((i) => i.id !== diff.id))
   }
 
@@ -330,6 +274,8 @@ export function TweetProvider({ children }: PropsWithChildren) {
   const hasPendingChanges = useRef(false)
   const prevSave = useRef('')
   const pendingSaves = useRef<Array<({ assignedId }: { assignedId: string }) => void>>([])
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
 
   type SaveInput = InferInput['tweet']['save']
   const { mutate } = useMutation({
@@ -357,14 +303,24 @@ export function TweetProvider({ children }: PropsWithChildren) {
       return await res.json()
     },
     onSuccess: ({ assignedId, tweet }) => {
+      queryClient.setQueryData(['get-current-tweet', tweetId], tweet)
+      // queryClient.refetchQueries({ queryKey: ['get-recent-tweets'] })
+
       if (tweet) prevSave.current = tweet.content
       processPendingSaves({ assignedId })
 
-      if (tweetId === 'draft' || !tweetId) {
-        setTweetId(assignedId)
-      }
+      // if (pathname === '/studio') {
+      //   const chatId = searchParams.get('chatId')
+      //   let push = `/studio/t/${assignedId}`
+      //   if (chatId) push += `?chatId=${chatId}`
 
-      queryClient.invalidateQueries({ queryKey: ['get-recent-tweets'] })
+      //   router.push(push)
+      // }
+      // setDraft({ isVisible: false, content: '' })
+
+      // if (tweetId === 'draft' || !tweetId) {
+      //   setTweetId(assignedId)
+      // }
     },
   })
 
@@ -381,7 +337,7 @@ export function TweetProvider({ children }: PropsWithChildren) {
     }, 750),
     [mutate],
   )
-  
+
   const queueSave = useCallback(
     ({ tweetId, content }: SaveInput) => {
       hasPendingChanges.current = true
@@ -428,19 +384,21 @@ export function TweetProvider({ children }: PropsWithChildren) {
   return (
     <TweetContext.Provider
       value={{
-        tweets,
+        // tweets,
         improvements,
         currentTweet,
         tweetId,
-        setTweetId,
+        // setTweetId,
         setTweetContent,
+        setTweetImage,
+        removeTweetImage,
         listImprovements,
         showImprovementsInEditor,
         acceptImprovement,
         rejectImprovement,
         queuedImprovements,
         setQueuedImprovements,
-        queueSave,
+        resetImprovements,
       }}
     >
       {children}

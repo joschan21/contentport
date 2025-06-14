@@ -1,3 +1,5 @@
+'use client'
+
 import { TweetSuggestionLoader } from '@/components/app-sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

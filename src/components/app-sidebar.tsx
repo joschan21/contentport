@@ -50,9 +50,8 @@ import {
   KEY_ENTER_COMMAND,
 } from 'lexical'
 import { nanoid } from 'nanoid'
-import { useQueryState } from 'nuqs'
+import { createSerializer, parseAsString, useQueryState } from 'nuqs'
 import toast, { Toaster } from 'react-hot-toast'
-import { useLocation, useNavigate } from 'react-router'
 import { AttachmentItem } from './attachment-item'
 import { Icons } from './icons'
 import { Improvements } from './improvements'
@@ -67,6 +66,8 @@ import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-uplo
 import { Separator } from './ui/separator'
 import { Tabs, TabsContent } from './ui/tabs'
 import { TextShimmer } from './ui/text-shimmer'
+import { Tweet, useTweets } from '@/hooks/use-tweets'
+import { usePathname, useRouter } from 'next/navigation'
 
 const initialConfig = {
   namespace: 'app-sidebar-input',
@@ -87,12 +88,10 @@ const initialConfig = {
 type ChatInput = InferInput['chat']['generate']
 
 function ChatInput() {
-  const navigate = useNavigate()
   const editor = useEditor('app-sidebar')
-  const location = useLocation()
   let { chatId, startNewChat } = useChat()
-
-  const { handleInputChange, input, messages, status, append } = useChat()
+  const { handleInputChange, input, messages, handleSubmit, append } = useChat()
+  const { currentTweet } = useTweets()
 
   const { attachments, addChatAttachment, removeAttachment, hasUploading } =
     useAttachments()
@@ -106,23 +105,28 @@ function ChatInput() {
     }
 
     if (!input.trim()) {
-      console.log('no input lol ')
+      console.log('no input')
       return
-    }
-
-    if (location.pathname.includes('/studio/knowledge')) {
-      navigate('/studio')
     }
 
     if (messages.length === 0 && !chatId) {
       chatId = (await startNewChat({ newId: nanoid() })) as string
     }
 
-    append({
+    const message = {
+      id: nanoid(),
       content: input,
       role: 'user',
       metadata: { attachments },
       chatId: chatId as string,
+    }
+
+    // @ts-ignore
+    append(message, {
+      body: {
+        message,
+        tweet: currentTweet,
+      },
     })
 
     // cleanup
@@ -254,7 +258,7 @@ function ChatInputInner({
               </div>
 
               <DuolingoButton
-                loading={status === 'streaming' || status === 'submitted'}
+                // loading={status === 'streaming' || status === 'submitted'}
                 disabled={hasUploading}
                 variant="icon"
                 size="icon"
@@ -270,39 +274,22 @@ function ChatInputInner({
   )
 }
 
-function TweetSuggestionLoader() {
-  const [connectedAccount] = useLocalStorage(
-    'connected-account',
-    DEFAULT_CONNECTED_ACCOUNT,
-  )
-
-  const account = {
-    avatar: connectedAccount.profile_image_url,
-    avatarFallback: connectedAccount.name.slice(0, 1).toUpperCase(),
-    handle: connectedAccount.username,
-    name: connectedAccount.name,
-    verified: connectedAccount.verified,
-  }
-
+export function TweetSuggestionLoader() {
   return (
-    <div>
-      <div className="my-3 !mt-5 rounded-lg bg-white border border-dashed border-stone-200 shadow-sm overflow-hidden">
-        <div className="flex items-start gap-3 p-6">
-          <Avatar className="size-12 rounded-full border-2 border-white bg-white">
-            <AvatarImage src={account.avatar} alt={account.handle} />
-            <AvatarFallback>{account.avatarFallback}</AvatarFallback>
-          </Avatar>
+    <div className="w-full h-32">
+      <div className="my-3 h-full rounded-lg bg-white border border-dashed border-stone-200 shadow-sm overflow-hidden">
+        <div className="h-full flex items-center justify-start gap-3 p-2">
+          <div className="relative h-28 w-28 overflow-hidden rounded-md">
+            <img
+              src="/images/typing-cat.gif"
+              alt="Typing cat"
+              className="scale-[1.3] object-cover object-right"
+            />
+          </div>
           <div className="flex flex-col">
-            <div className="flex items-center gap-1">
-              <span className="font-semibold text-text-gray text-base">
-                {account.name}
-              </span>
-              {account.verified && <Icons.verificationBadge className="h-4 w-4" />}
-              <span className="text-stone-400 text-base">@{account.handle}</span>
-            </div>
-            <div className="mt-1 text-base leading-relaxed whitespace-pre-line">
+            <div className="text-base leading-relaxed">
               <TextShimmer className=" [--base-gradient-color:#78716c]" duration={0.7}>
-                Creating...
+                Ghostwriters at work...
               </TextShimmer>
             </div>
           </div>
@@ -559,11 +546,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     },
   })
 
-  const [connectedAccount, setConnectedAccount] = useLocalStorage(
-    'connected-account',
-    DEFAULT_CONNECTED_ACCOUNT,
-  )
-
   const { data: style, refetch: refetchStyle } = useQuery({
     queryKey: ['account-style'],
     queryFn: async () => {
@@ -583,13 +565,11 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
       const { account } = await res.json()
       return account ?? DEFAULT_CONNECTED_ACCOUNT
     },
-    initialData: connectedAccount,
     refetchOnWindowFocus: false,
   })
 
   useEffect(() => {
     if (account && account.username) {
-      setConnectedAccount(account)
       setTwitterUsername('@' + account.username)
     }
   }, [account])
@@ -601,7 +581,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     },
     onSuccess: ({ data }) => {
       queryClient.setQueryData(['connected-account'], data)
-      setConnectedAccount(data)
       toast.success('Account connected!')
     },
     onError: (error: HTTPException) => {
@@ -741,7 +720,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </SidebarHeader>
-          <SidebarContent className="h-full p-4 !mb-8">
+          <SidebarContent className="h-full p-4">
             <SidebarGroup className="h-full">
               <TabsContent className="h-full" value="assistant">
                 <div className="flex flex-col-reverse space-y-reverse space-y-3 h-full overflow-y-auto">
@@ -814,7 +793,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                                 {message.role === 'user' && (
                                   <Avatar className="size-7 flex items-center justify-center bg-stone-800 rounded-full flex-shrink-0">
                                     <p className="text-white text-[12px] font-medium">
-                                      {connectedAccount.name.slice(0, 1).toUpperCase()}
+                                      {account?.name.slice(0, 1).toUpperCase()}
                                     </p>
                                   </Avatar>
                                 )}
@@ -1080,7 +1059,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
           </SidebarContent>
 
           {activeTab === 'assistant' ? (
-            <SidebarFooter className="p-3 border-t">
+            <SidebarFooter className="relative p-3 border-t">
               <Improvements />
               <ChatInput />
             </SidebarFooter>

@@ -4,6 +4,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
+import { HTTPException } from 'hono/http-exception'
 
 export const tweetRouter = j.router({
   recents: privateProcedure.get(async ({ c, ctx }) => {
@@ -20,43 +21,44 @@ export const tweetRouter = j.router({
   }),
 
   getTweet: privateProcedure
-    .input(z.object({ tweetId: z.string().nullable() }))
+    .input(z.object({ tweetId: z.string() }))
     .get(async ({ c, ctx, input }) => {
       const { user } = ctx
       const { tweetId } = input
-
-      if (!tweetId) return c.superjson({ tweet: null })
 
       const tweet = await db.query.tweets.findFirst({
         where: and(eq(tweets.id, tweetId), eq(tweets.userId, user.id)),
       })
 
-      return c.superjson({ tweet: tweet ?? null })
+      return c.superjson({ tweet })
     }),
 
-  create: privateProcedure
-    .input(z.object({ id: z.string().optional().nullable() }))
-    .post(async ({ c, ctx, input }) => {
-      const { user } = ctx
-      const tweetId = input.id ?? nanoid()
+  create: privateProcedure.post(async ({ c, ctx }) => {
+    const { user } = ctx
 
-      const result = await db
-        .insert(tweets)
-        .values({
-          id: tweetId,
-          userId: user.id,
-          content: '',
-          editorState: {},
-        })
-        .returning()
+    const id = crypto.randomUUID()
 
-      return c.json({ success: true, id: result[0]?.id ?? tweetId })
-    }),
+    const [tweet] = await db
+      .insert(tweets)
+      .values({
+        id,
+        userId: user.id,
+        content: '',
+        editorState: {},
+      })
+      .returning()
+
+    if (!tweet) {
+      throw new HTTPException(500, { message: 'Failed to create tweet' })
+    }
+
+    return c.superjson({ id, tweet })
+  }),
 
   save: privateProcedure
     .input(
       z.object({
-        tweetId: z.string().nanoid().nullable(),
+        tweetId: z.string(),
         content: z.string(),
       }),
     )
@@ -64,38 +66,16 @@ export const tweetRouter = j.router({
       const { user } = ctx
       const { tweetId, content } = input
 
-      let assignedId: string | undefined = undefined
-      let tweet: TweetQuery | undefined = undefined
+      const [tweet] = await db
+        .insert(tweets)
+        .values({ id: tweetId, userId: user.id, content, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: tweets.id,
+          set: { content, updatedAt: new Date() },
+        })
+        .returning()
 
-      if (tweetId) {
-        assignedId = tweetId
-
-        const [result] = await db
-          .update(tweets)
-          .set({
-            content,
-            updatedAt: new Date(),
-          })
-          .where(and(eq(tweets.id, tweetId), eq(tweets.userId, user.id)))
-          .returning()
-
-        tweet = result
-      } else {
-        assignedId = nanoid()
-
-        const [result] = await db
-          .insert(tweets)
-          .values({
-            id: assignedId,
-            userId: user.id,
-            content,
-          })
-          .returning()
-
-        tweet = result
-      }
-
-      return c.superjson({ success: true, assignedId, tweet })
+      return c.superjson({ success: true, assignedId: tweetId, tweet })
     }),
 
   delete: privateProcedure

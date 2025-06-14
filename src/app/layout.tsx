@@ -2,6 +2,9 @@ import { Metadata, Viewport } from 'next'
 import { Instrument_Serif, JetBrains_Mono, Rubik } from 'next/font/google'
 import { Suspense } from 'react'
 import './globals.css'
+import { Providers } from '@/components/providers/providers'
+import ClientLayout from '@/frontend/studio/layout'
+import { cookies } from 'next/headers'
 
 export const metadata: Metadata = {
   title: 'contentport',
@@ -32,13 +35,15 @@ export const viewport: Viewport = {
   maximumScale: 1, // Disable auto-zoom on mobile Safari
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html suppressHydrationWarning lang="en">
       <body
         className={`${rubik.className} ${elegant.variable} ${jetBrainsMono.variable} antialiased light`}
       >
-        <Suspense>{children}</Suspense>
+        <Suspense>
+          <Providers>{children}</Providers>
+        </Suspense>
       </body>
     </html>
   )

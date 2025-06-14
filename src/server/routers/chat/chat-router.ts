@@ -139,19 +139,22 @@ export const chatRouter = j.router({
       return c.superjson({ messages: visibleMessages })
     }),
 
+  conversation: privateProcedure.post(({ c }) => {
+    return c.json({ id: crypto.randomUUID() })
+  }),
+
   generate: privateProcedure
     .input(
       z.object({
         message: chatMessageSchema,
-        tweet: tweetSchema.optional(),
+        tweet: tweetSchema,
       }),
     )
     .post(async ({ input, ctx }) => {
       const { user } = ctx
       const chatId = input.message.chatId
       const attachments = input.message.metadata?.attachments
-
-      const tweet = input.tweet ?? { id: nanoid(), content: '', isNew: true }
+      const { tweet } = input
 
       if (process.env.NODE_ENV === 'production') {
         const { success } = await chatLimiter.limit(user.email)

@@ -1,7 +1,6 @@
 import { cn } from '@/lib/utils'
 import { X } from 'lucide-react'
 import { useState } from 'react'
-import { NavLink } from 'react-router'
 import {
   Dialog,
   DialogClose,
@@ -14,6 +13,7 @@ import { Attachment } from '@/server/routers/chat/chat-router'
 import { LocalAttachment, useAttachments } from '@/hooks/use-attachments'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '@/lib/client'
+import Link from 'next/link'
 
 interface AttachmentItemProps {
   attachment: Attachment | LocalAttachment
@@ -110,8 +110,8 @@ function DocumentAttachment({ attachment, onRemove, className }: DocumentReferen
         className,
       )}
     >
-      <NavLink
-        to={`/studio/knowledge/${attachment.id}`}
+      <Link
+        href={`/studio/knowledge/${attachment.id}`}
         className="flex items-center gap-2"
       >
         <span className="text-base">
@@ -122,7 +122,7 @@ function DocumentAttachment({ attachment, onRemove, className }: DocumentReferen
             {attachment.title}
           </span>
         ) : null}
-      </NavLink>
+      </Link>
       {onRemove && (
         <button onClick={onRemove} className="hover:bg-stone-300 rounded-full p-1 ml-1">
           <X className="size-3" />

@@ -171,7 +171,7 @@ ${tweet.content}
 
         const rawDiffs = dmp.diff_main(tweet.content, text)
         dmp.diff_cleanupSemantic(rawDiffs)
-        const processedDiffs = processDiffs(tweet.id, rawDiffs)
+        const processedDiffs = processDiffs(rawDiffs)
 
         results.push({
           id: tweet.id,
