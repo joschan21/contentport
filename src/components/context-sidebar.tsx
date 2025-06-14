@@ -265,7 +265,7 @@ export const LeftSidebar = () => {
             {data?.user && (
               <Link
                 href={{
-                  pathname: `/settings`,
+                  pathname: `/studio/settings`,
                   search: chatId ? `?chatId=${chatId}` : undefined,
                 }}
                 className={cn(
