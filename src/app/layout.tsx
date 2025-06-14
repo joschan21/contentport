@@ -5,6 +5,7 @@ import './globals.css'
 import { Providers } from '@/components/providers/providers'
 import ClientLayout from '@/frontend/studio/layout'
 import { cookies } from 'next/headers'
+import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
   title: 'contentport',
@@ -42,6 +43,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         className={`${rubik.className} ${elegant.variable} ${jetBrainsMono.variable} antialiased light`}
       >
         <Suspense>
+          <Toaster position="top-center" />
+
           <Providers>{children}</Providers>
         </Suspense>
       </body>

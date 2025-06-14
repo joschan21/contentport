@@ -1,3 +1,5 @@
+"use client"
+
 import React, { forwardRef, useImperativeHandle, useRef } from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"

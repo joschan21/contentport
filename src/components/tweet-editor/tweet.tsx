@@ -1,3 +1,5 @@
+'use client'
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { useEditor } from '@/hooks/use-editors'

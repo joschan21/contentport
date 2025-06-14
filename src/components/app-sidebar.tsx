@@ -677,7 +677,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <Toaster position="top-center" />
       {children}
       <Tabs
         defaultValue="assistant"
