@@ -36,6 +36,7 @@ export default function NewKnowledgePage() {
       return res.json()
     },
     onSuccess: (data) => {
+      queryClient.refetchQueries({ queryKey: ['knowledge-documents'] })
       toast.success(`Successfully imported content from ${data.url}`)
       setTitle('')
       setUrl('')
