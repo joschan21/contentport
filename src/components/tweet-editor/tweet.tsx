@@ -2,8 +2,8 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import DuolingoButton from '@/components/ui/duolingo-button'
-import { useEditor } from '@/hooks/use-editors'
 import { useConfetti } from '@/hooks/use-confetti'
+import { useEditor } from '@/hooks/use-editors'
 import { useTweets } from '@/hooks/use-tweets'
 import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
@@ -24,7 +24,7 @@ import {
   LexicalEditor,
 } from 'lexical'
 import { Bold, Copy, ImagePlus, Italic, Pencil, Smile, Trash2, X } from 'lucide-react'
-import { Ref, RefObject, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { Icons } from '../icons'
 import {
@@ -35,7 +35,6 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '../ui/drawer'
-import { Separator } from '../ui/separator'
 import { ImageTool } from './image-tool'
 
 interface TweetProps {
@@ -270,8 +269,6 @@ export default function Tweet({
 
               {currentTweet?.image && (
                 <>
-                  <Separator className="bg-stone-200 my-4" />
-
                   <div className="overflow-hidden group relative">
                     <div
                       className="relative w-full"
@@ -282,7 +279,7 @@ export default function Tweet({
                       <img
                         src={currentTweet.image.src}
                         alt="Tweet media"
-                        className="absolute inset-0 w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-cover rounded-md"
                       />
                       {!selectionMode && (
                         <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -360,7 +357,7 @@ export default function Tweet({
                       <div className="max-w-6xl mx-auto w-full mb-12">
                         <ImageTool
                           onClose={() => setOpen(false)}
-                          onSave={(image) => {
+                          onSave={async (image) => {
                             setTweetImage({
                               src: image.src,
                               originalSrc: image.editorState.blob.src,
@@ -368,6 +365,19 @@ export default function Tweet({
                               height: image.height,
                               editorState: image.editorState,
                             })
+
+                            try {
+                              const response = await fetch(image.src)
+                              const blob = await response.blob()
+
+                              await navigator.clipboard.write([
+                                new ClipboardItem({
+                                  [blob.type]: blob,
+                                }),
+                              ])
+                            } catch (error) {
+                              console.error('Failed to copy image to clipboard:', error)
+                            }
 
                             fire({
                               particleCount: 100,
@@ -458,13 +468,6 @@ export default function Tweet({
                       </div>
                     )}
                   </div>
-
-                  {/* <div className="flex items-center gap-1 ml-2">
-                  {getSaveStatusIcon()}
-                  <span className="text-xs text-stone-500">
-                    {getSaveStatusText()}
-                  </span>
-                </div> */}
                 </div>
                 <div className="flex items-center gap-2">
                   <DuolingoButton
@@ -476,31 +479,6 @@ export default function Tweet({
                     <span className="text-sm">Preview</span>
                     <span className="sr-only">Preview on Twitter</span>
                   </DuolingoButton>
-                  {/* <DuolingoButton
-                variant="secondary"
-                size="sm"
-                className="h-7 w-7 p-0 rounded-full"
-                onClick={handleImproveClarity}
-                disabled={improvementsMutation.isPending}
-              >
-                {improvementsMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4 text-indigo-600" />
-                )}
-                <span className="sr-only">Improve clarity</span>
-              </DuolingoButton> */}
-                  {/* {onDelete && (
-                <DuolingoButton
-                  variant="secondary"
-                  size="icon"
-                  className="h-7 w-7 p-0 rounded-full"
-                  onClick={onDelete}
-                >
-                  <Trash2 className="h-4 w-4 text-red-600" />
-                  <span className="sr-only">Delete tweet</span>
-                </DuolingoButton>
-              )} */}
                 </div>
               </div>
             </div>
@@ -532,7 +510,7 @@ export default function Tweet({
               <div className="max-w-6xl mx-auto w-full mb-12">
                 <ImageTool
                   onClose={() => setImageDrawerOpen(false)}
-                  onSave={(image) => {
+                  onSave={async (image) => {
                     setTweetImage({
                       src: image.src,
                       originalSrc: image.editorState.blob.src,
@@ -540,9 +518,22 @@ export default function Tweet({
                       height: image.height,
                       editorState: image.editorState,
                     })
+
+                    try {
+                      const response = await fetch(image.src)
+                      const blob = await response.blob()
+
+                      await navigator.clipboard.write([
+                        new ClipboardItem({
+                          [blob.type]: blob,
+                        }),
+                      ])
+                    } catch (error) {
+                      console.error('Failed to copy image to clipboard:', error)
+                    }
+
                     setImageDrawerOpen(false)
                   }}
-                  initialEditorState={currentTweet?.image?.editorState}
                 />
               </div>
             </div>

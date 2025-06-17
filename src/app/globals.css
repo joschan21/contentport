@@ -8,6 +8,62 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.glass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  clip-path: url(#diagonal-curve);
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.02) 50%,
+    rgba(255, 255, 255, 0) 90%
+  );
+  mix-blend-mode: lighten;
+  pointer-events: none;
+}
+
+
+
+.glass::after {
+  content: '';
+  position: absolute;
+  inset: -115px;
+  background: linear-gradient(
+    122deg,
+    transparent 45%,
+    rgba(173, 216, 230, 0.05) 50%,
+    transparent 55%
+  );
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.glass::before {
+  content: '';
+  position: absolute;
+  opacity: 0.2;
+  inset: -10px;
+  background: radial-gradient(
+    ellipse at top left,
+    rgba(255, 255, 255, 0.05),
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: -1;
+}
+
+.glass-line {
+  position: absolute;
+  inset: 0;
+  fill: none;
+  stroke: lime; /* 💥 hardcoded ugly color */
+  stroke-width: 0.01; /* visible on a normalized 0–1 viewBox */
+  z-index: 1000;
+  pointer-events: none;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
@@ -141,7 +197,7 @@ body {
   @apply text-gray-900;
 }
 
-[data-lexical-editor] [contenteditable="true"]:empty::before {
+[data-lexical-editor] [contenteditable='true']:empty::before {
   content: attr(placeholder);
   color: #9ca3af;
   pointer-events: none;
@@ -163,7 +219,7 @@ body {
   opacity: 0.8;
 }
 
-[contenteditable="true"] {
+[contenteditable='true'] {
   min-height: 1.5rem;
 }
 
@@ -186,119 +242,119 @@ body {
     transform: translateY(-2px);
     opacity: 1;
   }
-  }
+}
 
-  @keyframes loading-dots {
+@keyframes loading-dots {
   0%,
   100% {
-  opacity: 0;
+    opacity: 0;
   }
   50% {
-  opacity: 1;
+    opacity: 1;
   }
-  }
+}
 
-  @keyframes wave {
+@keyframes wave {
   0%,
   100% {
-  transform: scaleY(1);
+    transform: scaleY(1);
   }
   50% {
-  transform: scaleY(0.6);
+    transform: scaleY(0.6);
   }
-  }
+}
 
-  @keyframes blink {
+@keyframes blink {
   0%,
   100% {
-  opacity: 1;
+    opacity: 1;
   }
   50% {
-  opacity: 0;
+    opacity: 0;
   }
-  }
+}
 
-  @keyframes text-blink {
+@keyframes text-blink {
   0%,
   100% {
-  color: var(--primary);
+    color: var(--primary);
   }
   50% {
-  color: var(--muted-foreground);
+    color: var(--muted-foreground);
   }
-  }
+}
 
-  @keyframes bounce-dots {
+@keyframes bounce-dots {
   0%,
   100% {
-  transform: scale(0.8);
-  opacity: 0.5;
+    transform: scale(0.8);
+    opacity: 0.5;
   }
   50% {
-  transform: scale(1.2);
-  opacity: 1;
+    transform: scale(1.2);
+    opacity: 1;
   }
-  }
+}
 
-  @keyframes thin-pulse {
+@keyframes thin-pulse {
   0%,
   100% {
-  transform: scale(0.95);
-  opacity: 0.8;
+    transform: scale(0.95);
+    opacity: 0.8;
   }
   50% {
-  transform: scale(1.05);
-  opacity: 0.4;
+    transform: scale(1.05);
+    opacity: 0.4;
   }
-  }
+}
 
-  @keyframes pulse-dot {
+@keyframes pulse-dot {
   0%,
   100% {
-  transform: scale(1);
-  opacity: 0.8;
+    transform: scale(1);
+    opacity: 0.8;
   }
   50% {
-  transform: scale(1.5);
-  opacity: 1;
+    transform: scale(1.5);
+    opacity: 1;
   }
-  }
+}
 
-  @keyframes shimmer-text {
+@keyframes shimmer-text {
   0% {
-  background-position: 150% center;
+    background-position: 150% center;
   }
   100% {
-  background-position: -150% center;
+    background-position: -150% center;
   }
-  }
+}
 
-  @keyframes wave-bars {
+@keyframes wave-bars {
   0%,
   100% {
-  transform: scaleY(1);
-  opacity: 0.5;
+    transform: scaleY(1);
+    opacity: 0.5;
   }
   50% {
-  transform: scaleY(0.6);
-  opacity: 1;
+    transform: scaleY(0.6);
+    opacity: 1;
   }
-  }
+}
 
-  @keyframes shimmer {
+@keyframes shimmer {
   0% {
-  background-position: 200% 50%;
+    background-position: 200% 50%;
   }
   100% {
-  background-position: -200% 50%;
+    background-position: -200% 50%;
   }
-  }
+}
 
-  @keyframes spinner-fade {
+@keyframes spinner-fade {
   0% {
-  opacity: 0;
+    opacity: 0;
   }
   100% {
-  opacity: 1;
+    opacity: 1;
   }
-  }
+}

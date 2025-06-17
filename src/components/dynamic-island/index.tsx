@@ -32,12 +32,13 @@ import { InferOutput } from "@/server"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import { Icons } from "../icons"
 import { formatCode } from "@/lib/code-action-menu-plugin"
+import { useEditor } from "@/hooks/use-editors"
 
 type SubmissionStatus = "idle" | "generating" | "confirmation"
 type Output = InferOutput["voice"]["transcribe"]
 
 export function DynamicIsland() {
-  const [editor] = useLexicalComposerContext()
+  const editor = useEditor("tweet-editor")
   const {
     transcribe,
     isProcessing,
@@ -97,10 +98,10 @@ export function DynamicIsland() {
 
   // Update editor state when it changes
   useEffect(() => {
-    const unsubscribe = editor.registerUpdateListener(({ editorState }) => {
+    const unsubscribe = editor?.registerUpdateListener(({ editorState }) => {
       editorStateRef.current = editorState
     })
-    return () => unsubscribe()
+    // return () => unsubscribe()
   }, [editor])
 
   // Handle keyboard shortcuts
@@ -305,7 +306,7 @@ export function DynamicIsland() {
           cursorPosition: -1,
         }
 
-        editor.getEditorState().read(() => {
+        editor?.getEditorState().read(() => {
           const root = $getRoot()
           const selection = $getSelection()
 

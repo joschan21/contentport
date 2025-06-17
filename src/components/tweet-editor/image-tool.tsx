@@ -77,6 +77,7 @@ interface ImageBeautifierProps {
       roundedWrapper: string
       shadow: number
       noise: boolean
+      reflection: boolean
       browserBar: string
       screenshotScale: number
       rotation: number
@@ -111,6 +112,7 @@ interface Options {
   roundedWrapper: string
   shadow: number
   noise: boolean
+  reflection: boolean
   browserBar: string
   screenshotScale: number
   rotation: number
@@ -222,8 +224,9 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
       roundedWrapper: 'rounded-xl',
       shadow: 3,
       noise: true,
+      reflection: true,
       browserBar: 'hidden',
-      screenshotScale: 1,
+      screenshotScale: 0.9,
       rotation: 0,
       pattern: {
         enabled: true,
@@ -233,7 +236,7 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
         type: 'stripes',
       },
       frame: 'arc',
-      outlineSize: 0,
+      outlineSize: 8,
       outlineColor: '#292524',
     },
   )
@@ -268,7 +271,7 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
 
   useEffect(() => {
     function setCanvasToContainer() {
-      if (containerRef.current && !userResized) {
+      if (containerRef.current && !userResized && !blob.src) {
         const rect = containerRef.current.getBoundingClientRect()
         setCanvasWidth(Math.max(100, rect.width - outlineSize))
         setCanvasHeight(Math.max(100, rect.height - outlineSize))
@@ -277,7 +280,7 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
     setCanvasToContainer()
     window.addEventListener('resize', setCanvasToContainer)
     return () => window.removeEventListener('resize', setCanvasToContainer)
-  }, [userResized, outlineSize])
+  }, [userResized, outlineSize, blob.src])
 
   useEffect(() => {
     if (!isResizing) return
@@ -393,7 +396,7 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
         })
       }
 
-      toast.success('Ready to copy&paste to twitter! 🎉', { id: savingToast })
+      toast.success('Image copied & ready to paste! 🎉', { id: savingToast })
     } catch (error) {
       toast.error('something went wrong')
     }
@@ -663,7 +666,7 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
                 )}
 
                 <div
-                  className="flex items-center justify-center transition-all ease-in-out antialiased"
+                  className="relative flex items-center justify-center transition-all ease-in-out antialiased"
                   style={{
                     willChange: 'transform',
                     borderRadius: `${options.rounded}px`,
@@ -676,46 +679,92 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
                     boxShadow: shadowMap[options.shadow],
                   }}
                 >
-                  <Frame
-                    backgroundColor={outlineColor}
-                    borderRadius={options.rounded}
-                    type={options.frame}
-                  >
-                    <div
-                      className="transition-all ease-in-out"
-                      style={{
-                        overflow: 'hidden',
-                        borderRadius: `${options.rounded}px`,
-                        boxShadow: shadowMap[options.shadow],
-                        background: outlineColor,
-                        border: `${outlineSize}px solid ${outlineColor}`,
-                        transition: 'border 400ms cubic-bezier(0.03, 0.98, 0.52, 0.99)',
-                      }}
+                  <div className="relative">
+                    {options.reflection && (
+                      <div className="glass-wrapper absolute inset-0 z-20 pointer-events-none">
+                        <svg
+                          className="glass-line"
+                          viewBox="0 0 1 1"
+                          preserveAspectRatio="none"
+                        >
+                          <defs>
+                            <clipPath id="diagonal-curve" clipPathUnits="objectBoundingBox">
+                              <path
+                                className="outline outline-red-500"
+                                d="M 0 0 L 0 1 Q 0.2 1.2, 0.65 0 L 0.65 0 Z"
+                              />
+                            </clipPath>
+                          </defs>
+                        </svg>
+
+                        <div className="glass" style={{ clipPath: 'url(#diagonal-curve)' }}>
+                          <div className="glass-edge"></div>
+                        </div>
+                      </div>
+                    )}
+
+                    <Frame
+                      backgroundColor={outlineColor}
+                      borderRadius={options.rounded}
+                      type={options.frame}
                     >
-                      <img
-                        src={blob.src || '/placeholder.svg'}
+                      <div
+                        className="relative transition-all ease-in-out"
                         style={{
-                          width: '100%',
-                          height: '100%',
-                          display: 'block',
+                          overflow: 'hidden',
+                          borderRadius: `${options.rounded}px`,
+                          boxShadow: shadowMap[options.shadow],
+                          background: outlineColor,
+                          border: `${outlineSize}px solid ${outlineColor}`,
+                          transition: 'border 400ms cubic-bezier(0.03, 0.98, 0.52, 0.99)',
                         }}
-                        onLoad={(e) => {
-                          const target = e.target as HTMLImageElement
-                          setBlob({
-                            ...blob,
-                            w: target.naturalWidth,
-                            h: target.naturalHeight,
-                          })
-                          if (blob.src) {
-                            getMostCommonBorderColor(blob.src, (color) => {
-                              setOutlineColor(rgbToHex(color))
+                      >
+                        <img
+                          src={blob.src || '/placeholder.svg'}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'block',
+                          }}
+                          onLoad={(e) => {
+                            const target = e.target as HTMLImageElement
+                            const naturalWidth = target.naturalWidth
+                            const naturalHeight = target.naturalHeight
+
+                            setBlob({
+                              ...blob,
+                              w: naturalWidth,
+                              h: naturalHeight,
                             })
-                          }
-                        }}
-                        alt="Screenshot preview"
-                      />
-                    </div>
-                  </Frame>
+
+                            if (!userResized && naturalWidth && naturalHeight) {
+                              const aspectRatio = naturalHeight / naturalWidth
+                              const maxHeight = window.innerHeight * 0.7
+                              const maxWidth = canvasWidth
+
+                              let newHeight = canvasWidth * aspectRatio
+
+                              if (newHeight > maxHeight) {
+                                newHeight = maxHeight
+                                const newWidth = newHeight / aspectRatio
+                                setCanvasWidth(Math.min(newWidth, maxWidth))
+                              }
+
+                              setCanvasHeight(Math.max(200, Math.min(newHeight, maxHeight)))
+                              setUserResized(true)
+                            }
+
+                            if (blob.src) {
+                              getMostCommonBorderColor(blob.src, (color) => {
+                                setOutlineColor(rgbToHex(color))
+                              })
+                            }
+                          }}
+                          alt="Screenshot preview"
+                        />
+                      </div>
+                    </Frame>
+                  </div>
                 </div>
 
                 <div
@@ -771,7 +820,7 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
                       {isDragging ? 'Drop your image here' : 'Add an image'}
                     </h3>
                     <p className="text-sm text-stone-500 max-w-sm">
-                      Transform your images into{' '}
+                      Tweets perform better with{' '}
                       <span className="text-indigo-600 font-medium">
                         clear, beautiful visuals
                       </span>
@@ -804,435 +853,573 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
         {/* SIDEBAR */}
         <div
           className={cn(
-            'bg-light-gray w-[19rem] rounded-lg p-6 min-h-full max-h-[80vh] overflow-y-auto',
+            'bg-light-gray w-[19rem] rounded-lg min-h-full max-h-[80vh] flex flex-col',
             {
               hidden: !Boolean(blob.src),
             },
           )}
         >
-          <div className="space-y-8">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Grip className="size-4 text-stone-500" />
-                  <span className="block font-medium text-xs text-stone-700">
-                    Image Settings
-                  </span>
-                </div>
-              </div>
-
-              {/* Frame Popover */}
-              <Popover>
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-1">
-                    <span className="block text-xs font-medium text-gray-700">Frame</span>
-                  </div>
-                  <PopoverTrigger asChild>
-                    <button
-                      aria-label="Edit frame"
-                      className="size-8 rounded-md border border-gray-300 flex items-center justify-center transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400"
-                    >
-                      <div className="size-7 rounded-sm relative overflow-hidden bg-white flex items-center justify-center">
-                        <div className="size-6 border-2 border-gray-300 rounded-sm" />
-                      </div>
-                    </button>
-                  </PopoverTrigger>
-                </div>
-                <PopoverContent align="end" className="relative z-[999] w-80">
-                  <div>
-                    <span className="block font-medium text-sm text-gray-900 mb-2">
-                      Frame Style
-                    </span>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { type: 'none' as const, label: 'None' },
-                        { type: 'arc' as const, label: 'Arc' },
-                        { type: 'stack' as const, label: 'Stack' },
-                      ].map((frame) => (
-                        <div
-                          key={frame.type}
-                          className={cn(
-                            'cursor-pointer flex flex-col items-center gap-1.5',
-                          )}
-                          onClick={() => {
-                            setOptions({
-                              ...options,
-                              frame: frame.type,
-                            })
-                          }}
-                        >
-                          <div
-                            className={cn(
-                              'w-full h-14 rounded-md border border-gray-200 flex items-center justify-center bg-white overflow-hidden',
-                              {
-                                'ring-2 ring-blue-400': frame.type === options.frame,
-                              },
-                            )}
-                          >
-                            {/* <div
-                              className="size-10"
-                              style={{
-                                border:
-                                  frame.type === "none"
-                                    ? "none"
-                                    : `${options.frame.width}px ${frame.type} ${options.frame.color}`,
-                                borderRadius: "4px",
-                              }}
-                            /> */}
-                          </div>
-                          <span className="text-xs text-gray-600">{frame.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-
-              <EnhancedSlider
-                value={options.screenshotScale}
-                onChange={(value) => setOptions({ ...options, screenshotScale: value })}
-                min={0.5}
-                max={1.5}
-                step={0.01}
-                defaultValue={0.8}
-                label="Size"
-                unit="x"
-              />
-              <EnhancedSlider
-                value={options.rotation}
-                onChange={(value) => setOptions({ ...options, rotation: value })}
-                min={0}
-                max={360}
-                step={1}
-                defaultValue={0}
-                label="Rotation"
-                unit="°"
-              />
-
-              <EnhancedSlider
-                value={options.rounded}
-                onChange={(value) => setOptions({ ...options, rounded: value })}
-                min={0}
-                max={32}
-                step={1}
-                defaultValue={12}
-                label="Roundness"
-                unit="px"
-              />
-
-              <EnhancedSlider
-                value={options.shadow}
-                onChange={(value) => setOptions({ ...options, shadow: value })}
-                min={0}
-                max={4}
-                step={1}
-                label="Shadow"
-              />
-
-              <EnhancedSlider
-                value={outlineSize}
-                onChange={setOutlineSize}
-                min={0}
-                max={100}
-                step={1}
-                label="Inset"
-              />
-
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-1">
-                  <span className="block text-xs font-medium text-gray-700">
-                    Inset color
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={outlineColor}
-                    onChange={(e) => setOutlineColor(e.target.value)}
-                    className="w-8 h-8 rounded-md border border-gray-300 cursor-pointer transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <Separator className="bg-gray-200" />
-
-              <div className="flex flex-col gap-6 items-center justify-between">
-                <div className="w-full flex items-center justify-between gap-2">
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="space-y-8">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Grip className="size-4 text-stone-500" />
                     <span className="block font-medium text-xs text-stone-700">
-                      Background Settings
+                      Image Settings
                     </span>
                   </div>
                 </div>
 
-                <Toggle
-                  checked={options.noise}
-                  label="Grain"
-                  onCheckedChange={(checked) =>
-                    setOptions({ ...options, noise: checked })
-                  }
-                />
-
-                {/* Background Popover */}
+                {/* Frame Popover */}
                 <Popover>
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-1">
                       <span className="block text-xs font-medium text-gray-700">
-                        Background
-                      </span>
-                      {/* <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-500 w-fit font-mono">
-                      {options.theme.includes("gradient")
-                        ? "Gradient"
-                        : options.theme.includes("white")
-                          ? "White"
-                          : "Solid"}
-                    </span> */}
-                    </div>
-                    <PopoverTrigger asChild>
-                      <button
-                        aria-label="Edit background"
-                        className="size-8 rounded-md border border-gray-300 flex items-center justify-center transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400"
-                      >
-                        <div
-                          className={cn('size-7 rounded-sm', options.theme)}
-                          style={{
-                            background: options.theme.includes('gradient')
-                              ? undefined
-                              : options.theme,
-                            backgroundImage: options.theme.includes('gradient')
-                              ? undefined
-                              : undefined,
-                          }}
-                        />
-                      </button>
-                    </PopoverTrigger>
-                  </div>
-                  <PopoverContent align="end" className="relativ z-[999] e w-80">
-                    <div>
-                      <span className="block font-medium text-sm text-gray-900 mb-2">
-                        Background Presets
-                      </span>
-                      <div className="grid grid-cols-5 gap-2">
-                        {[
-                          'bg-gradient-to-br from-cyan-300 to-sky-400',
-                          'bg-gradient-to-br from-green-300 to-emerald-400',
-                          'bg-gradient-to-br from-indigo-300 to-violet-400',
-                          'bg-gradient-to-br from-rose-300 to-pink-400',
-                          'bg-gradient-to-br from-indigo-300 to-orange-400',
-                          'bg-gradient-to-br from-purple-300 to-fuchsia-400',
-                          'bg-gradient-to-br from-blue-300 to-indigo-400',
-                          'bg-gradient-to-br from-teal-300 to-emerald-400',
-                          'bg-gradient-to-br from-red-300 to-rose-400',
-                          'bg-gradient-to-br from-yellow-200 to-indigo-400',
-
-                          'bg-white',
-                          'bg-stone-800',
-                        ].map((theme) => (
-                          <div
-                            key={theme}
-                            className={cn(
-                              'cursor-pointer w-full h-8 rounded-md border',
-                              theme,
-                              theme === options.theme && 'ring-2 ring-blue-400',
-                            )}
-                            onClick={() => {
-                              setOptions({
-                                ...options,
-                                theme: theme,
-                                customTheme: {
-                                  colorStart: '#f3f4f6',
-                                  colorEnd: '#e5e7eb',
-                                },
-                              })
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-
-                {/* Pattern Popover */}
-                <Popover>
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-1">
-                      <span className="block text-xs font-medium text-gray-700">
-                        Pattern
+                        Frame
                       </span>
                     </div>
                     <PopoverTrigger asChild>
                       <button
-                        aria-label="Edit pattern overlay"
-                        className={cn(
-                          'size-8 rounded-md border border-gray-300 flex items-center justify-center transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400',
-                          options.pattern.enabled ? 'opacity-100' : 'opacity-50',
-                        )}
+                        aria-label="Edit frame"
+                        className="w-20 h-14 rounded-md border border-gray-300 flex items-center justify-center transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400"
                       >
-                        <div className="size-7 rounded-sm relative overflow-hidden bg-white flex items-center justify-center">
-                          {options.pattern.enabled ? (
-                            <div
-                              className="w-full h-full relative"
-                              style={{
-                                backgroundImage: `url("/pattern/${options.pattern.type}.svg")`,
-                                backgroundRepeat: 'repeat',
-                                backgroundSize:
-                                  previewSizes[
-                                    options.pattern.type as keyof typeof previewSizes
-                                  ] || '25%',
-                                opacity: 100,
-                                transform: `rotate(${options.pattern.rotation}deg) scale(2)`,
-                                imageRendering: 'crisp-edges',
-                              }}
-                            />
-                          ) : (
-                            <span className="text-gray-400 text-xs">Off</span>
+                        <div className="w-full h-full rounded-sm relative overflow-hidden bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+                          {options.frame === 'none' && (
+                            <div className="w-10 h-8 bg-white border border-gray-300 rounded-sm" />
+                          )}
+                          {options.frame === 'arc' && (
+                            <div className="relative">
+                              <div
+                                className="w-10 h-8 bg-white border border-gray-300"
+                                style={{
+                                  borderRadius: '5px',
+                                  boxShadow: 'rgba(0, 0, 0, 0.15) 0px 4px 12px -2px',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.314)',
+                                  border: '1px solid rgba(255, 255, 255, 0.376)',
+                                  padding: '2px',
+                                }}
+                              >
+                                <div className="w-full h-full bg-white rounded-[3px]" />
+                              </div>
+                            </div>
+                          )}
+                          {options.frame === 'stack' && (
+                            <div className="relative">
+                              <div className="absolute">
+                                {Array.from({ length: 3 }).map((_, index) => {
+                                  const reverseIndex = 3 - index - 1
+                                  const translateY = reverseIndex * -2.5
+                                  const scale = 1 - reverseIndex * 0.06
+                                  const opacity = Math.pow(0.7, reverseIndex)
+
+                                  return (
+                                    <div
+                                      key={index}
+                                      className="absolute w-10"
+                                      style={{
+                                        height: '5px',
+                                        borderTopLeftRadius: '5px',
+                                        borderTopRightRadius: '5px',
+                                        backgroundColor: '#e5e7eb',
+                                        transform: `translateY(${translateY}px) scaleX(${scale})`,
+                                        transformOrigin: 'top center',
+                                        opacity,
+                                        clipPath: 'inset(0 0 calc(100% - 5px) 0)',
+                                      }}
+                                    />
+                                  )
+                                })}
+                              </div>
+                              <div className="relative z-10">
+                                <div className="w-10 h-8 bg-white border border-gray-300 rounded-sm" />
+                              </div>
+                            </div>
                           )}
                         </div>
                       </button>
                     </PopoverTrigger>
                   </div>
-                  <PopoverContent
-                    align="end"
-                    className="w-80"
-                    onClick={(e) => e.stopPropagation()}
+                  <PopoverContent 
+                    align="end" 
+                    className="relative z-[9999] w-80 pointer-events-auto" 
+                    onClick={(e) => e.stopPropagation()} 
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onMouseUp={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
                   >
-                    <div>
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onMouseUp={(e) => e.stopPropagation()}
+                      className="pointer-events-auto"
+                    >
                       <span className="block font-medium text-sm text-gray-900 mb-2">
-                        Pattern Options
+                        Frame Style
                       </span>
                       <div className="grid grid-cols-3 gap-2">
                         {[
-                          { type: 'none', label: 'None' },
-                          { type: 'waves', label: 'Waves' },
-                          { type: 'dots', label: 'Dots' },
-                          { type: 'stripes', label: 'Stripes' },
-                          { type: 'zigzag', label: 'Zigzag' },
-                          { type: 'graphpaper', label: 'Graph Paper' },
-                        ].map((pattern) => (
+                          { type: 'none' as const, label: 'None' },
+                          { type: 'arc' as const, label: 'Arc' },
+                          { type: 'stack' as const, label: 'Stack' },
+                        ].map((frame) => (
                           <div
-                            key={pattern.type}
+                            key={frame.type}
                             className={cn(
                               'cursor-pointer flex flex-col items-center gap-1.5',
                             )}
                             onClick={() => {
                               setOptions({
                                 ...options,
-                                pattern: {
-                                  ...options.pattern,
-                                  type: pattern.type as any,
-                                  enabled: pattern.type !== 'none',
-                                },
+                                frame: frame.type,
                               })
                             }}
                           >
                             <div
                               className={cn(
-                                'w-full h-14 rounded-md border border-gray-200 flex items-center justify-center bg-white overflow-hidden',
+                                'w-full h-14 rounded-md border border-gray-200 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-indigo-600 overflow-hidden',
                                 {
-                                  'ring-2 ring-blue-400':
-                                    pattern.type === options.pattern.type,
+                                  'ring-2 ring-blue-400': frame.type === options.frame,
                                 },
                               )}
                             >
-                              {pattern.type !== 'none' ? (
-                                <div
-                                  className="w-full h-full relative"
-                                  style={{
-                                    backgroundImage: `url("/pattern/${pattern.type}.svg")`,
-                                    backgroundRepeat: 'repeat',
-                                    backgroundSize: ['stripes', 'zigzag'].includes(
-                                      pattern.type,
-                                    )
-                                      ? '25%'
-                                      : '85%',
-                                    opacity: 0.3,
-                                    transform: 'rotate(45deg) scale(2)',
-                                    imageRendering: 'crisp-edges',
-                                    WebkitBackfaceVisibility: 'hidden',
-                                    backfaceVisibility: 'hidden',
-                                    WebkitTransform: 'translateZ(0)',
-                                    WebkitFontSmoothing: 'antialiased',
-                                    MozOsxFontSmoothing: 'grayscale',
-                                  }}
-                                />
-                              ) : null}
+                              {frame.type === 'none' && (
+                                <div className="w-10 h-8 bg-white border border-gray-300 rounded-sm" />
+                              )}
+                              {frame.type === 'arc' && (
+                                <div className="relative">
+                                  <div
+                                    className="w-10 h-8 bg-white border border-gray-300"
+                                    style={{
+                                      borderRadius: '5px',
+                                      boxShadow: 'rgba(0, 0, 0, 0.15) 0px 4px 12px -2px',
+                                      backgroundColor: 'rgba(255, 255, 255, 0.314)',
+                                      border: '1px solid rgba(255, 255, 255, 0.376)',
+                                      padding: '2px',
+                                    }}
+                                  >
+                                    <div className="w-full h-full bg-white rounded-[3px]" />
+                                  </div>
+                                </div>
+                              )}
+                              {frame.type === 'stack' && (
+                                <div className="relative">
+                                  <div className="absolute">
+                                    {Array.from({ length: 3 }).map((_, index) => {
+                                      const reverseIndex = 3 - index - 1
+                                      const translateY = reverseIndex * -2.5
+                                      const scale = 1 - reverseIndex * 0.06
+                                      const opacity = Math.pow(0.7, reverseIndex)
+
+                                      return (
+                                        <div
+                                          key={index}
+                                          className="absolute w-10"
+                                          style={{
+                                            height: '5px',
+                                            borderTopLeftRadius: '5px',
+                                            borderTopRightRadius: '5px',
+                                            backgroundColor: '#e5e7eb',
+                                            transform: `translateY(${translateY}px) scaleX(${scale})`,
+                                            transformOrigin: 'top center',
+                                            opacity,
+                                            clipPath: 'inset(0 0 calc(100% - 5px) 0)',
+                                          }}
+                                        />
+                                      )
+                                    })}
+                                  </div>
+                                  <div className="relative z-10">
+                                    <div className="w-10 h-8 bg-white border border-gray-300 rounded-sm" />
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <span className="text-xs text-gray-600">{pattern.label}</span>
+                            <span className="text-xs text-gray-600">{frame.label}</span>
                           </div>
                         ))}
-                      </div>
-                      <div className="mt-4 space-y-3">
-                        <EnhancedSlider
-                          disabled={options.pattern.type === 'none'}
-                          value={options.pattern.intensity}
-                          onChange={(value) =>
-                            setOptions({
-                              ...options,
-                              pattern: {
-                                ...options.pattern,
-                                intensity: value,
-                              },
-                            })
-                          }
-                          min={1}
-                          max={100}
-                          step={1}
-                          label="Size"
-                        />
-                        <EnhancedSlider
-                          disabled={options.pattern.type === 'none'}
-                          value={options.pattern.rotation}
-                          onChange={(value) =>
-                            setOptions({
-                              ...options,
-                              pattern: {
-                                ...options.pattern,
-                                rotation: value,
-                              },
-                            })
-                          }
-                          min={0}
-                          max={360}
-                          step={1}
-                          label="Rotation"
-                          unit="°"
-                        />
-                        <EnhancedSlider
-                          disabled={options.pattern.type === 'none'}
-                          value={options.pattern.opacity}
-                          onChange={(value) =>
-                            setOptions({
-                              ...options,
-                              pattern: {
-                                ...options.pattern,
-                                opacity: value,
-                              },
-                            })
-                          }
-                          min={0}
-                          max={35}
-                          step={1}
-                          label="Opacity"
-                        />
                       </div>
                     </div>
                   </PopoverContent>
                 </Popover>
+
+                <EnhancedSlider
+                  value={options.screenshotScale}
+                  onChange={(value) => setOptions({ ...options, screenshotScale: value })}
+                  min={0.5}
+                  max={1.5}
+                  step={0.01}
+                  defaultValue={0.9}
+                  label="Size"
+                  unit="x"
+                />
+                <EnhancedSlider
+                  value={options.rotation}
+                  onChange={(value) => setOptions({ ...options, rotation: value })}
+                  min={0}
+                  max={360}
+                  step={1}
+                  defaultValue={0}
+                  label="Rotation"
+                  unit="°"
+                />
+
+                <EnhancedSlider
+                  value={options.rounded}
+                  onChange={(value) => setOptions({ ...options, rounded: value })}
+                  min={0}
+                  max={32}
+                  step={1}
+                  defaultValue={12}
+                  label="Roundness"
+                  unit="px"
+                />
+
+                <EnhancedSlider
+                  value={options.shadow}
+                  onChange={(value) => setOptions({ ...options, shadow: value })}
+                  min={0}
+                  max={4}
+                  step={1}
+                  label="Shadow"
+                />
+
+                <EnhancedSlider
+                  value={outlineSize}
+                  onChange={setOutlineSize}
+                  min={0}
+                  max={100}
+                  step={1}
+                  label="Inset"
+                />
+
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-1">
+                    <span className="block text-xs font-medium text-gray-700">
+                      Inset color
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={outlineColor}
+                      onChange={(e) => setOutlineColor(e.target.value)}
+                      className="w-8 h-8 rounded-md border border-gray-300 cursor-pointer transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <Separator className="bg-gray-200" />
+
+                <div className="flex flex-col gap-6 items-center justify-between">
+                  <div className="w-full flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Grip className="size-4 text-stone-500" />
+                      <span className="block font-medium text-xs text-stone-700">
+                        Background Settings
+                      </span>
+                    </div>
+                  </div>
+
+                  <Toggle
+                    checked={options.noise}
+                    label="Grain"
+                    onCheckedChange={(checked) =>
+                      setOptions({ ...options, noise: checked })
+                    }
+                  />
+
+                  <Toggle
+                    checked={options.reflection}
+                    label="Reflection"
+                    onCheckedChange={(checked) =>
+                      setOptions({ ...options, reflection: checked })
+                    }
+                  />
+
+                  {/* Background Popover */}
+                  <Popover>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1">
+                        <span className="block text-xs font-medium text-gray-700">
+                          Background
+                        </span>
+                        {/* <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-500 w-fit font-mono">
+                        {options.theme.includes("gradient")
+                          ? "Gradient"
+                          : options.theme.includes("white")
+                            ? "White"
+                            : "Solid"}
+                      </span> */}
+                      </div>
+                      <PopoverTrigger asChild>
+                        <button
+                          aria-label="Edit background"
+                          className="size-8 rounded-md border border-gray-300 flex items-center justify-center transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        >
+                          <div
+                            className={cn('size-7 rounded-sm', options.theme)}
+                            style={{
+                              background: options.theme.includes('gradient')
+                                ? undefined
+                                : options.theme,
+                              backgroundImage: options.theme.includes('gradient')
+                                ? undefined
+                                : undefined,
+                            }}
+                          />
+                        </button>
+                      </PopoverTrigger>
+                    </div>
+                    <PopoverContent 
+                      align="end" 
+                      className="relative z-[9999] w-80 pointer-events-auto" 
+                      onClick={(e) => e.stopPropagation()} 
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onMouseUp={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onPointerUp={(e) => e.stopPropagation()}
+                    >
+                      <div 
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onMouseUp={(e) => e.stopPropagation()}
+                        className="pointer-events-auto"
+                      >
+                        <span className="block font-medium text-sm text-gray-900 mb-2">
+                          Background Presets
+                        </span>
+                        <div className="grid grid-cols-5 gap-2">
+                          {[
+                            'bg-gradient-to-br from-cyan-300 to-sky-400',
+                            'bg-gradient-to-br from-emerald-300 to-teal-400',
+                            'bg-gradient-to-br from-indigo-300 to-violet-400',
+                            'bg-gradient-to-br from-rose-300 to-pink-400',
+                            'bg-gradient-to-br from-orange-300 to-red-400',
+                            'bg-gradient-to-br from-purple-300 to-fuchsia-400',
+                            'bg-gradient-to-br from-blue-300 to-cyan-400',
+                            'bg-gradient-to-br from-yellow-300 to-orange-400',
+                            'bg-gradient-to-br from-indigo-300 to-purple-400',
+                          ].map((theme) => (
+                            <div
+                              key={theme}
+                              className={cn(
+                                'cursor-pointer w-full h-8 rounded-md border',
+                                theme,
+                                theme === options.theme && 'ring-2 ring-blue-400',
+                              )}
+                              onClick={() => {
+                                setOptions({
+                                  ...options,
+                                  theme: theme,
+                                  customTheme: {
+                                    colorStart: '#f3f4f6',
+                                    colorEnd: '#e5e7eb',
+                                  },
+                                })
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Pattern Popover */}
+                  <Popover>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1">
+                        <span className="block text-xs font-medium text-gray-700">
+                          Pattern
+                        </span>
+                      </div>
+                      <PopoverTrigger asChild>
+                        <button
+                          aria-label="Edit pattern overlay"
+                          className={cn(
+                            'size-8 rounded-md border border-gray-300 flex items-center justify-center transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400',
+                            options.pattern.enabled ? 'opacity-100' : 'opacity-50',
+                          )}
+                        >
+                          <div className="size-7 rounded-sm relative overflow-hidden bg-white flex items-center justify-center">
+                            {options.pattern.enabled ? (
+                              <div
+                                className="w-full h-full relative"
+                                style={{
+                                  backgroundImage: `url("/pattern/${options.pattern.type}.svg")`,
+                                  backgroundRepeat: 'repeat',
+                                  backgroundSize:
+                                    previewSizes[
+                                      options.pattern.type as keyof typeof previewSizes
+                                    ] || '25%',
+                                  opacity: 100,
+                                  transform: `rotate(${options.pattern.rotation}deg) scale(2)`,
+                                  imageRendering: 'crisp-edges',
+                                }}
+                              />
+                            ) : (
+                              <span className="text-gray-400 text-xs">Off</span>
+                            )}
+                          </div>
+                        </button>
+                      </PopoverTrigger>
+                    </div>
+                    <PopoverContent
+                      align="end"
+                      className="relative z-[9999] w-80 pointer-events-auto"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onMouseUp={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onPointerUp={(e) => e.stopPropagation()}
+                    >
+                      <div 
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onMouseUp={(e) => e.stopPropagation()}
+                        className="pointer-events-auto"
+                      >
+                        <span className="block font-medium text-sm text-gray-900 mb-2">
+                          Pattern Options
+                        </span>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { type: 'none', label: 'None' },
+                            { type: 'waves', label: 'Waves' },
+                            { type: 'dots', label: 'Dots' },
+                            { type: 'stripes', label: 'Stripes' },
+                            { type: 'zigzag', label: 'Zigzag' },
+                            { type: 'graphpaper', label: 'Graph Paper' },
+                          ].map((pattern) => (
+                            <div
+                              key={pattern.type}
+                              className={cn(
+                                'cursor-pointer flex flex-col items-center gap-1.5',
+                              )}
+                              onClick={() => {
+                                setOptions({
+                                  ...options,
+                                  pattern: {
+                                    ...options.pattern,
+                                    type: pattern.type as any,
+                                    enabled: pattern.type !== 'none',
+                                  },
+                                })
+                              }}
+                            >
+                              <div
+                                className={cn(
+                                  'w-full h-14 rounded-md border border-gray-200 flex items-center justify-center bg-white overflow-hidden',
+                                  {
+                                    'ring-2 ring-blue-400':
+                                      pattern.type === options.pattern.type,
+                                  },
+                                )}
+                              >
+                                {pattern.type !== 'none' ? (
+                                  <div
+                                    className="w-full h-full relative"
+                                    style={{
+                                      backgroundImage: `url("/pattern/${pattern.type}.svg")`,
+                                      backgroundRepeat: 'repeat',
+                                      backgroundSize: ['stripes', 'zigzag'].includes(
+                                        pattern.type,
+                                      )
+                                        ? '25%'
+                                        : '85%',
+                                      opacity: 0.3,
+                                      transform: 'rotate(45deg) scale(2)',
+                                      imageRendering: 'crisp-edges',
+                                      WebkitBackfaceVisibility: 'hidden',
+                                      backfaceVisibility: 'hidden',
+                                      WebkitTransform: 'translateZ(0)',
+                                      WebkitFontSmoothing: 'antialiased',
+                                      MozOsxFontSmoothing: 'grayscale',
+                                    }}
+                                  />
+                                ) : null}
+                              </div>
+                              <span className="text-xs text-gray-600">
+                                {pattern.label}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-4 space-y-3">
+                          <EnhancedSlider
+                            disabled={options.pattern.type === 'none'}
+                            value={options.pattern.intensity}
+                            onChange={(value) =>
+                              setOptions({
+                                ...options,
+                                pattern: {
+                                  ...options.pattern,
+                                  intensity: value,
+                                },
+                              })
+                            }
+                            min={1}
+                            defaultValue={15}
+                            max={100}
+                            step={1}
+                            label="Size"
+                          />
+                          <EnhancedSlider
+                            disabled={options.pattern.type === 'none'}
+                            value={options.pattern.rotation}
+                            onChange={(value) =>
+                              setOptions({
+                                ...options,
+                                pattern: {
+                                  ...options.pattern,
+                                  rotation: value,
+                                },
+                              })
+                            }
+                            min={0}
+                            max={360}
+                            step={1}
+                            label="Rotation"
+                            unit="°"
+                          />
+                          <EnhancedSlider
+                            disabled={options.pattern.type === 'none'}
+                            value={options.pattern.opacity}
+                            onChange={(value) =>
+                              setOptions({
+                                ...options,
+                                pattern: {
+                                  ...options.pattern,
+                                  opacity: value,
+                                },
+                              })
+                            }
+                            min={0}
+                            defaultValue={6}
+                            max={35}
+                            step={1}
+                            label="Opacity"
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </div>
+          </div>
 
-            <Separator className="bg-gray-200" />
-
+          <div className="p-6 pt-6 border-t border-gray-200">
             <Button
               className="w-full gap-2"
               size="lg"
               onClick={() => saveImage(3)}
               disabled={!blob?.src}
             >
-              Looks good!
+              Looks good! 🎉
             </Button>
           </div>
         </div>

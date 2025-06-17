@@ -35,6 +35,7 @@ import {
 
 import { $setBlocksType } from "@lexical/selection"
 import { client } from "@/lib/client"
+import { useEditor } from "@/hooks/use-editors"
 
 interface VoiceContextType {
   completion: string
@@ -58,7 +59,7 @@ type DocumentState = InferInput["voice"]["transcribe"]["documentState"]
 export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const [currentCommand, setCurrentCommand] = useState("")
   const [proposedText, setProposedText] = useState<string | null>(null)
-  const [editor] = useLexicalComposerContext()
+  const editor = useEditor("tweet-editor")
   const currentTextRef = useRef<string>("")
   const [trigger, setTrigger] = useState(false)
 
