@@ -62,6 +62,7 @@ const allowlist = [
   'heywinit@gmail.com',
   'chriszeuch.cz@gmail.com',
   'Danpvernon@gmail.com',
+  'danpvernon@gmail.com',
   'ask199768@gmail.com',
   'theorcdev@gmail.com',
   'mazewinther@gmail.com',

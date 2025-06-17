@@ -1414,7 +1414,7 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
 
           <div className="p-6 pt-6 border-t border-gray-200">
             <Button
-              className="w-full gap-2"
+              className="w-full gap-2 h-11"
               size="lg"
               onClick={() => saveImage(3)}
               disabled={!blob?.src}
