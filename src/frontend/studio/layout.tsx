@@ -4,7 +4,6 @@ import { AppSidebar } from '@/components/app-sidebar'
 import { LeftSidebar } from '@/components/context-sidebar'
 import { AppSidebarInset } from '@/components/providers/app-sidebar-inset'
 import { SidebarProvider } from '@/components/ui/sidebar'
-import { cookies } from 'next/headers'
 
 interface LayoutProps extends PropsWithChildren {
   cookies: any
@@ -27,7 +26,7 @@ export default async function ClientLayout({
 
   return (
     <div className="flex">
-      <SidebarProvider className="w-fit">
+      <SidebarProvider className="w-fit" defaultOpen={false}>
         <LeftSidebar />
       </SidebarProvider>
 

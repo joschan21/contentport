@@ -15,7 +15,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react'
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 
 import { Loader } from '@/components/ui/loader'
 import {
@@ -30,6 +30,7 @@ import {
 import { useAttachments } from '@/hooks/use-attachments'
 import { useEditor } from '@/hooks/use-editors'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+import { useTweets } from '@/hooks/use-tweets'
 import { client } from '@/lib/client'
 import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
@@ -50,8 +51,8 @@ import {
   KEY_ENTER_COMMAND,
 } from 'lexical'
 import { nanoid } from 'nanoid'
-import { createSerializer, parseAsString, useQueryState } from 'nuqs'
-import toast, { Toaster } from 'react-hot-toast'
+import { useQueryState } from 'nuqs'
+import toast from 'react-hot-toast'
 import { AttachmentItem } from './attachment-item'
 import { Icons } from './icons'
 import { Improvements } from './improvements'
@@ -66,8 +67,7 @@ import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-uplo
 import { Separator } from './ui/separator'
 import { Tabs, TabsContent } from './ui/tabs'
 import { TextShimmer } from './ui/text-shimmer'
-import { Tweet, useTweets } from '@/hooks/use-tweets'
-import { usePathname, useRouter } from 'next/navigation'
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 const initialConfig = {
   namespace: 'app-sidebar-input',
@@ -89,9 +89,11 @@ type ChatInput = InferInput['chat']['generate']
 
 function ChatInput() {
   const editor = useEditor('app-sidebar')
+  const tweetEditor = useEditor('tweet-editor')
   let { chatId, startNewChat } = useChat()
   const { handleInputChange, input, messages, handleSubmit, append } = useChat()
   const { currentTweet } = useTweets()
+  const { drafts, clearDrafts, draftCheckpoint } = useTweets()
 
   const { attachments, addChatAttachment, removeAttachment, hasUploading } =
     useAttachments()
@@ -107,6 +109,27 @@ function ChatInput() {
     if (!input.trim()) {
       console.log('no input')
       return
+    }
+
+    // Auto-accept current draft if there are active drafts
+    if (drafts.length > 0) {
+      const currentDraft = drafts[0] // Use first draft as current
+
+      if (currentDraft) {
+        // Apply the draft to the tweet editor
+        tweetEditor?.update(() => {
+          const root = $getRoot()
+          const p = $createParagraphNode()
+          const text = $createTextNode(currentDraft.improvedText)
+          p.append(text)
+          root.clear()
+          root.append(p)
+        })
+
+        // Clear drafts and checkpoint
+        clearDrafts()
+        draftCheckpoint.current = null
+      }
     }
 
     if (messages.length === 0 && !chatId) {
@@ -125,7 +148,8 @@ function ChatInput() {
     append(message, {
       body: {
         message,
-        tweet: currentTweet,
+        // do not transmit image
+        tweet: { ...currentTweet, image: undefined },
       },
     })
 
@@ -187,8 +211,24 @@ function ChatInputInner({
   const editor = useEditor('app-sidebar')
   const context = useContext(FileUploadContext)
   const isDragging = context?.isDragging ?? false
+  const [showTutorial, setShowTutorial] = useState(false)
+  const { open } = useSidebar()
 
   const { addKnowledgeAttachment, hasUploading } = useAttachments()
+
+  useEffect(() => {
+    const hasSeenTutorial = localStorage.getItem('chat-input-tutorial-seen')
+    if (!hasSeenTutorial && open) {
+      setShowTutorial(true)
+    } else {
+      setShowTutorial(false)
+    }
+  }, [open])
+
+  const handleTutorialComplete = () => {
+    localStorage.setItem('chat-input-tutorial-seen', 'true')
+    setShowTutorial(false)
+  }
 
   useEffect(() => {
     const removeCommand = editor?.registerCommand(
@@ -198,6 +238,7 @@ function ChatInputInner({
           event.preventDefault()
           if (hasUploading) return true
 
+          handleTutorialComplete()
           onSubmit(event as any)
           return true
         }
@@ -215,6 +256,11 @@ function ChatInputInner({
     addKnowledgeAttachment(doc)
   }
 
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    handleTutorialComplete()
+    onSubmit(e)
+  }
+
   return (
     <div className="space-y-3">
       <div
@@ -228,47 +274,58 @@ function ChatInputInner({
           </div>
         )}
 
-        <form onSubmit={onSubmit} className="relative">
-          <div className="rounded-xl bg-white border-2 border-gray-200 shadow-[0_2px_0_#E5E7EB] font-medium transition-all duration-200 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-600">
-            <LexicalComposer initialConfig={initialConfig}>
-              <PlainTextPlugin
-                contentEditable={
-                  <ContentEditable
-                    autoFocus
-                    className="w-full px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
-                    style={{ minHeight: '4.5rem' }}
+        <Tooltip open={showTutorial}>
+          <TooltipTrigger asChild>
+            <form onSubmit={handleFormSubmit} className="relative">
+              <div className="rounded-xl bg-white border-2 border-gray-200 shadow-[0_2px_0_#E5E7EB] font-medium transition-all duration-200 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-600">
+                <LexicalComposer initialConfig={initialConfig}>
+                  <PlainTextPlugin
+                    contentEditable={
+                      <ContentEditable
+                        autoFocus
+                        className="w-full px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
+                        style={{ minHeight: '4.5rem' }}
+                        onClick={handleTutorialComplete}
+                        onFocus={handleTutorialComplete}
+                      />
+                    }
+                    ErrorBoundary={LexicalErrorBoundary}
                   />
-                }
-                ErrorBoundary={LexicalErrorBoundary}
-              />
-              <PlaceholderPlugin placeholder="What do you want to tweet?" />
-              <HistoryPlugin />
-              <MultipleEditorStorePlugin id="app-sidebar" />
-            </LexicalComposer>
+                  <PlaceholderPlugin placeholder="What do you want to tweet?" />
+                  <HistoryPlugin />
+                  <MultipleEditorStorePlugin id="app-sidebar" />
+                </LexicalComposer>
 
-            <div className="flex items-center justify-between px-3 pb-3">
-              <div className="flex gap-1.5 items-center">
-                <FileUploadTrigger asChild>
-                  <DuolingoButton type="button" variant="secondary" size="icon">
-                    <Paperclip className="text-stone-600 size-5" />
+                <div className="flex items-center justify-between px-3 pb-3">
+                  <div className="flex gap-1.5 items-center">
+                    <FileUploadTrigger asChild>
+                      <DuolingoButton type="button" variant="secondary" size="icon">
+                        <Paperclip className="text-stone-600 size-5" />
+                      </DuolingoButton>
+                    </FileUploadTrigger>
+
+                    <KnowledgeSelector onSelectDocument={handleAddKnowledgeDoc} />
+                  </div>
+
+                  <DuolingoButton
+                    // loading={status === 'streaming' || status === 'submitted'}
+                    disabled={hasUploading}
+                    variant="icon"
+                    size="icon"
+                    aria-label="Send message"
+                  >
+                    <ArrowUp className="size-5" />
                   </DuolingoButton>
-                </FileUploadTrigger>
-
-                <KnowledgeSelector onSelectDocument={handleAddKnowledgeDoc} />
+                </div>
               </div>
-
-              <DuolingoButton
-                // loading={status === 'streaming' || status === 'submitted'}
-                disabled={hasUploading}
-                variant="icon"
-                size="icon"
-                aria-label="Send message"
-              >
-                <ArrowUp className="size-5" />
-              </DuolingoButton>
-            </div>
-          </div>
-        </form>
+            </form>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <p className="text-center text-base">
+            👇 Type your tweet idea here👇
+            </p>
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   )
@@ -290,6 +347,31 @@ export function TweetSuggestionLoader() {
             <div className="text-base leading-relaxed">
               <TextShimmer className=" [--base-gradient-color:#78716c]" duration={0.7}>
                 Ghostwriters at work...
+              </TextShimmer>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function DraftsLoadingState() {
+  return (
+    <div className="w-full h-32">
+      <div className="my-3 h-full rounded-lg bg-white border border-dashed border-stone-200 shadow-sm overflow-hidden">
+        <div className="h-full flex items-center justify-start gap-3 p-2">
+          <div className="relative h-28 w-28 overflow-hidden rounded-md">
+            <img
+              src="/images/typing-cat.gif"
+              alt="Typing cat"
+              className="scale-[1.3] object-cover object-right"
+            />
+          </div>
+          <div className="flex flex-col">
+            <div className="text-base leading-relaxed">
+              <TextShimmer className=" [--base-gradient-color:#78716c]" duration={0.7}>
+                Cooking up some bangers...
               </TextShimmer>
             </div>
           </div>
@@ -389,27 +471,34 @@ const TweetCard = ({ name, username, src, text }: TweetCard) => {
   )
 }
 
-export function TweetSuggestion({ id, suggestion }: { id: string; suggestion: string }) {
-  // const { updateTweet } = useTweetContext()
+export function TweetSuggestion({ id, content }: { id: string; content: string }) {
   const [connectedAccount] = useLocalStorage(
     'connected-account',
     DEFAULT_CONNECTED_ACCOUNT,
   )
+  const editor = useEditor('tweet-editor')
 
-  // const reapply = () => {
-  //   updateTweet(suggestion)
-  // }
+  const reapply = () => {
+    editor?.update(() => {
+      const root = $getRoot()
+      const p = $createParagraphNode()
+      const text = $createTextNode(content)
+      p.append(text)
+      root.clear()
+      root.append(p)
+    })
+  }
 
   return (
     <div className="relative w-full">
-      <div className="relative text-left rounded-[calc(6px)] bg-white shadow overflow-hidden">
+      <div className="relative text-left rounded-[calc(6px)] bg-gray-50 border border-gray-200 border-opacity-50 bg-clip-padding shadow-sm overflow-hidden">
         <div className="absolute top-5 right-5">
           <button
-            // onClick={reapply}
+            onClick={reapply}
             className="transition-all flex items-center gap-0.5 px-2 py-1 text-xs rounded-md bg-light-gray text-primary hover:bg-stone-200"
           >
             <ChevronsLeft className="size-4" />
-            <span>re-apply</span>
+            <span>apply</span>
           </button>
         </div>
         <div className="flex items-start gap-3 p-6">
@@ -435,7 +524,7 @@ export function TweetSuggestion({ id, suggestion }: { id: string; suggestion: st
               )}
             </div>
             <div className="mt-1 text-base leading-relaxed whitespace-pre-line">
-              {suggestion}
+              {content}
             </div>
           </div>
         </div>
@@ -445,14 +534,12 @@ export function TweetSuggestion({ id, suggestion }: { id: string; suggestion: st
 }
 
 export function AppSidebar({ children }: { children: React.ReactNode }) {
-  // const { addImprovements, queueImprovements } = useTweetContext()
   const { toggleSidebar } = useSidebar()
   const { messages, status, startNewChat } = useChat()
   const { addKnowledgeAttachment, attachments, removeAttachment } = useAttachments()
   const editor = useEditor('app-sidebar')
 
   const resultMap = new Map<string, boolean>()
-  const resultRef = useRef(resultMap)
 
   const [activeTab, setActiveTab] = useQueryState<'assistant' | 'settings'>('tab', {
     defaultValue: 'assistant',
@@ -462,30 +549,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     },
     serialize: (value) => value,
   })
-
-  // useEffect(() => {
-  //   const lastMessage = messages[messages.length - 1]
-
-  //   lastMessage?.parts.forEach(async (part) => {
-  //     if (part.type === 'tool-invocation') {
-  //       const hasFired = resultRef.current.get(part.toolInvocation.toolCallId)
-
-  //       if (
-  //         !hasFired &&
-  //         part.toolInvocation.state === 'result' &&
-  //         part.toolInvocation.toolName === 'edit_tweet'
-  //       ) {
-  //         // tool is done generating tweet
-  //         const { id: triggeredForTweetId, diffs } = part.toolInvocation
-  //           .result as EditTweetToolResult
-
-  //         console.log('id, triggeredfor', id, triggeredForTweetId)
-
-  //         resultRef.current.set(part.toolInvocation.toolCallId, true)
-  //       }
-  //     }
-  //   })
-  // }, [messages, resultRef, id])
 
   const [tweetLink, setTweetLink] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -631,16 +694,20 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
         switch (part.toolInvocation.state) {
           case 'partial-call':
           case 'call':
-            return part.toolInvocation.toolName === 'read_website_content' ? (
-              <ReadLinkLoader
-                status="pending"
-                title="Reading link..."
-                key={index}
-                url={part.toolInvocation.args?.website_url}
-              />
-            ) : (
-              <TweetSuggestionLoader key={index} />
-            )
+            if (part.toolInvocation.toolName === 'read_website_content') {
+              return (
+                <ReadLinkLoader
+                  status="pending"
+                  title="Reading link..."
+                  key={index}
+                  url={part.toolInvocation.args?.website_url}
+                />
+              )
+            } else if (part.toolInvocation.toolName === 'three_drafts') {
+              return <DraftsLoadingState key={index} />
+            } else {
+              return <TweetSuggestionLoader key={index} />
+            }
           case 'result':
             if (part.toolInvocation.toolName === 'read_website_content') {
               return (
@@ -651,21 +718,15 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                   url={part.toolInvocation.args?.website_url}
                 />
               )
+            } else if (part.toolInvocation.toolName === 'three_drafts') {
+              return (
+                <div key={index} className="w-full">
+                  <p className="text-base text-emerald-600 font-medium">
+                    Ready! I've prepared 3 drafts for you. Choose your favorite below.
+                  </p>
+                </div>
+              )
             }
-
-          // if (part.toolInvocation.toolName === 'edit_tweet') {
-          //   const result = part.toolInvocation.result
-          //   return (
-          //     <div
-          //       key={result.id}
-          //       className="bg-white shadow-[0_2px_0_#E5E7EB] rounded-lg p-3 border border-gray-200"
-          //     >
-          //       <div className="flex flex-col gap-2 text-sm/6">
-
-          //       </div>
-          //     </div>
-          //   )
-          // }
 
           default:
             return null
@@ -819,7 +880,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
 
                       <div className="w-2/3 mt-8 mb-4 flex items-center gap-3">
                         <div className="h-px flex-1 bg-stone-200"></div>
-                        <p className="text-xs text-stone-500">Examples</p>
+                        <p className="text-xs text-stone-500">Click to select example 👇</p>
                         <div className="h-px flex-1 bg-stone-200"></div>
                       </div>
 
@@ -1058,7 +1119,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
           </SidebarContent>
 
           {activeTab === 'assistant' ? (
-            <SidebarFooter className="relative p-3 border-t">
+            <SidebarFooter className="relative p-3 border-t border-t-gray-300 bg-gray-100">
               <Improvements />
               <ChatInput />
             </SidebarFooter>

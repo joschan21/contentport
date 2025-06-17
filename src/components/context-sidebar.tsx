@@ -8,12 +8,7 @@ import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
 import { $getRoot } from 'lexical'
-import {
-  ArrowLeftFromLine,
-  ArrowRightFromLine,
-  PanelLeft,
-  Plus
-} from 'lucide-react'
+import { ArrowLeftFromLine, ArrowRightFromLine, PanelLeft, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createSerializer, parseAsString } from 'nuqs'
@@ -27,6 +22,7 @@ import {
   SidebarHeader,
   useSidebar,
 } from './ui/sidebar'
+import { nanoid } from 'nanoid'
 
 const searchParams = {
   tweetId: parseAsString,
@@ -39,7 +35,7 @@ export const LeftSidebar = () => {
   const { state } = useSidebar()
   const queryClient = useQueryClient()
   const { data } = authClient.useSession()
-  const { resetImprovements } = useTweets()
+  const { resetImprovements, setCurrentTweet } = useTweets()
   const router = useRouter()
   const editor = useEditor('tweet-editor')
 
@@ -88,6 +84,7 @@ export const LeftSidebar = () => {
               onClick={() => {
                 router.push('/studio')
                 resetImprovements()
+                setCurrentTweet({ id: nanoid(), content: '', image: undefined })
                 editor?.update(() => {
                   const root = $getRoot()
                   root.clear()

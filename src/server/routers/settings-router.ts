@@ -1,14 +1,17 @@
-import { z } from "zod"
-import { j, privateProcedure } from "../jstack"
-import { redis } from "@/lib/redis"
-import { TwitterApi, UserV2 } from "twitter-api-v2"
-import { HTTPException } from "hono/http-exception"
-import { chatLimiter } from "@/lib/chat-limiter"
-import { ConnectedAccount } from "@/components/tweet-editor/tweet-editor"
-import { Style } from "./style-router"
-import { DEFAULT_TWEETS } from "@/constants/default-tweet-preset"
-import { db } from "@/db"
-import { knowledgeDocument } from "@/db/schema"
+import { z } from 'zod'
+import { j, privateProcedure } from '../jstack'
+import { redis } from '@/lib/redis'
+import { TwitterApi, UserV2 } from 'twitter-api-v2'
+import { HTTPException } from 'hono/http-exception'
+import { chatLimiter } from '@/lib/chat-limiter'
+import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
+import { Style } from './style-router'
+import { DEFAULT_TWEETS } from '@/constants/default-tweet-preset'
+import { db } from '@/db'
+import { knowledgeDocument } from '@/db/schema'
+import { anthropic } from '@ai-sdk/anthropic'
+import { generateText } from 'ai'
+import { xai } from '@ai-sdk/xai'
 
 const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
 
@@ -19,7 +22,7 @@ interface Settings {
     username: string
     id: string
     verified: boolean
-    verified_type: "string"
+    verified_type: 'string'
   }
 }
 
@@ -29,6 +32,112 @@ interface TweetWithStats {
   likes: number
   retweets: number
   created_at: string
+}
+
+interface StyleAnalysis {
+  overall: string
+  first_third: string
+  second_third: string
+  third_third: string
+  [key: string]: string
+}
+
+async function analyzeUserStyle(tweets: any[]): Promise<StyleAnalysis> {
+  const systemPrompt = `You are an expert at analyzing writing styles from social media posts. Analyze the given tweets and provide a concise summary of the writing style, tone, voice, common themes, and characteristic patterns. Include examples where it makes sense. Focus on what makes this person's writing unique and distinctive. Keep your analysis under 200 words and do it in 5-10 bullet points. Write it as instructions for someone else to write, e.g. NOT ("this user writes...", but "write like...").
+
+Also, please keep your analysis in simple, easy language at 6-th grade reading level. no fancy words like "utilize this" or "leverage that". 
+
+The goal is that with your analysis, another LLM will be able to replicate the exact style. So picture the style as clearly as possible.
+  
+EXAMPLE: 
+- write in lowercase only, avoiding capitalization on personal pronouns and sentence starts. Example: "i'm not using the next.js app router navigation for @contentport anymore, the results are kinda amazing"
+- separate ideas with double line breaks for clarity and emphasis. Example: "a few days ago i posted about moving away from next.js navigation 👀
+◆ pages load instantly now"
+
+- use simple punctuation: periods to end statements and emojis to add tone. avoid commas.
+- use bulleted lists using the symbol ◆ to break down key points concisely. Example: "◆ pages load instantly now ◆ whole app feels way faster"
+- make use of sentence fragments and brief statements to create a punchy, direct style. Example: "dear @neondatabase, you're so easy to set up and have a great free tier"
+- occasionally use casual, conversational vocabulary including slang and mild profanity to convey authenticity and enthusiasm. Example: "man i just fucking love aws s3"
+- use rhetorical questions to engage readers. Example: "why didn't anyone tell me that talking to users is actually fun"
+- use a friendly, informal tone with a mix of humor and straightforwardness, often expressing excitement or frustration openly.
+- use emojis sparingly but purposefully to highlight emotion or humor (e.g., 🎉 for celebration, 👀 for attention, 🤡 for self-deprecation). Not every post contains emojis, but when used, they reinforce tone.
+- keep sentence structures mostly simple with occasional casual connectors like "but," "so," or "and" leading thoughts without formal conjunctions.`
+
+  const formatTweetAnalysis = (tweets: any[]) => {
+    return tweets.map((tweet, index) => `${index + 1}. ${tweet.text}`).join('\n\n')
+  }
+
+  const thirdSize = Math.ceil(tweets.length / 3)
+  const firstThird = tweets.slice(0, thirdSize)
+  const secondThird = tweets.slice(thirdSize, thirdSize * 2)
+  const thirdThird = tweets.slice(thirdSize * 2)
+
+  const [overallAnalysis, firstThirdAnalysis, secondThirdAnalysis, thirdThirdAnalysis] =
+    await Promise.all([
+      generateText({
+        model: xai('grok-3-latest'),
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: `Analyze the overall writing style from these tweets:\n\n${formatTweetAnalysis(tweets)}`,
+          },
+        ],
+      }),
+      generateText({
+        model: xai('grok-3-latest'),
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: `Analyze the writing style from these tweets:\n\n${formatTweetAnalysis(firstThird)}`,
+          },
+        ],
+      }),
+      generateText({
+        model: xai('grok-3-latest'),
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: `Analyze the writing style from these tweets:\n\n${formatTweetAnalysis(secondThird)}`,
+          },
+        ],
+      }),
+      generateText({
+        model: xai('grok-3-latest'),
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: `Analyze the writing style from these tweets:\n\n${formatTweetAnalysis(thirdThird)}`,
+          },
+        ],
+      }),
+    ])
+
+  return {
+    overall: overallAnalysis.text,
+    first_third: firstThirdAnalysis.text,
+    second_third: secondThirdAnalysis.text,
+    third_third: thirdThirdAnalysis.text,
+  }
 }
 
 export const settingsRouter = j.router({
@@ -43,7 +152,7 @@ export const settingsRouter = j.router({
     .input(
       z.object({
         username: z.string(),
-      })
+      }),
     )
     .post(async ({ c, ctx, input }) => {
       const { username } = input
@@ -52,19 +161,16 @@ export const settingsRouter = j.router({
       let userData: UserV2 | undefined = undefined
 
       try {
-        const { data } = await client.v2.userByUsername(
-          username.replace("@", ""),
-          {
-            "user.fields": [
-              "profile_image_url",
-              "name",
-              "username",
-              "id",
-              "verified",
-              "verified_type",
-            ],
-          }
-        )
+        const { data } = await client.v2.userByUsername(username.replace('@', ''), {
+          'user.fields': [
+            'profile_image_url',
+            'name',
+            'username',
+            'id',
+            'verified',
+            'verified_type',
+          ],
+        })
 
         userData = data
       } catch (err) {
@@ -79,25 +185,25 @@ export const settingsRouter = j.router({
         })
       }
 
-      await redis.json.set(`connected-account:${user.email}`, "$", {
+      await redis.json.set(`connected-account:${user.email}`, '$', {
         ...userData,
       })
 
       const userTweets = await client.v2.userTimeline(userData.id, {
         max_results: 30,
-        "tweet.fields": [
-          "public_metrics",
-          "created_at",
-          "text",
-          "author_id",
-          "note_tweet",
-          "edit_history_tweet_ids",
-          "in_reply_to_user_id",
-          "referenced_tweets",
+        'tweet.fields': [
+          'public_metrics',
+          'created_at',
+          'text',
+          'author_id',
+          'note_tweet',
+          'edit_history_tweet_ids',
+          'in_reply_to_user_id',
+          'referenced_tweets',
         ],
-        "user.fields": ["username", "profile_image_url", "name"],
-        exclude: ["retweets", "replies"],
-        expansions: ["author_id"],
+        'user.fields': ['username', 'profile_image_url', 'name'],
+        exclude: ['retweets', 'replies'],
+        expansions: ['author_id'],
       })
 
       const styleKey = `style:${user.email}`
@@ -107,9 +213,9 @@ export const settingsRouter = j.router({
       if (!userTweets.data.data) {
         isPreset = true
 
-        await redis.json.set(styleKey, "$", {
+        await redis.json.set(styleKey, '$', {
           tweets: DEFAULT_TWEETS,
-          prompt: "",
+          prompt: '',
         })
       } else {
         isPreset = false
@@ -117,18 +223,16 @@ export const settingsRouter = j.router({
         const filteredTweets = userTweets.data.data?.filter(
           (tweet) =>
             !tweet.in_reply_to_user_id &&
-            !tweet.referenced_tweets?.some((ref) => ref.type === "replied_to")
+            !tweet.referenced_tweets?.some((ref) => ref.type === 'replied_to'),
         )
 
-        const tweetsWithStats: TweetWithStats[] = filteredTweets.map(
-          (tweet) => ({
-            id: tweet.id,
-            text: tweet.text,
-            likes: tweet.public_metrics?.like_count || 0,
-            retweets: tweet.public_metrics?.retweet_count || 0,
-            created_at: tweet.created_at || "",
-          })
-        )
+        const tweetsWithStats: TweetWithStats[] = filteredTweets.map((tweet) => ({
+          id: tweet.id,
+          text: tweet.text,
+          likes: tweet.public_metrics?.like_count || 0,
+          retweets: tweet.public_metrics?.retweet_count || 0,
+          created_at: tweet.created_at || '',
+        }))
 
         const sortedTweets = tweetsWithStats.sort((a, b) => b.likes - a.likes)
 
@@ -136,9 +240,7 @@ export const settingsRouter = j.router({
 
         const author = userTweets.includes.users?.[0]
         let formattedTweets = topTweets.map((tweet) => {
-          const cleanedText = tweet.text
-            .replace(/https:\/\/t\.co\/\w+/g, "")
-            .trim()
+          const cleanedText = tweet.text.replace(/https:\/\/t\.co\/\w+/g, '').trim()
 
           return {
             id: tweet.id,
@@ -169,32 +271,37 @@ export const settingsRouter = j.router({
           }
         }
 
-        await redis.json.set(styleKey, "$", {
+        await redis.json.set(styleKey, '$', {
           tweets: formattedTweets.reverse(),
-          prompt: "",
+          prompt: '',
         })
+
+        const styleAnalysis = await analyzeUserStyle(formattedTweets)
+        const draftStyleKey = `draft-style:${user.email}`
+        await redis.json.set(draftStyleKey, '$', styleAnalysis)
       }
 
       await db.insert(knowledgeDocument).values([
         {
           userId: user.id,
-          fileName: "",
-          type: "url",
-          s3Key: "",
-          title: "Introducing Zod 4",
-          description: "An article about the Zod 4.0 release. After a year of active development: Zod 4 is now stable! It's faster, slimmer, more tsc-efficient, and implements some long-requested features.",
+          fileName: '',
+          type: 'url',
+          s3Key: '',
+          title: 'Introducing Zod 4',
+          description:
+            "An article about the Zod 4.0 release. After a year of active development: Zod 4 is now stable! It's faster, slimmer, more tsc-efficient, and implements some long-requested features.",
           isExample: true,
-          sourceUrl: "https://zod.dev/v4",
+          sourceUrl: 'https://zod.dev/v4',
         },
         {
           userId: user.id,
-          fileName: "data-fetching.png",
-          type: "image",
-          s3Key: "knowledge/4bBacfDWPhQzOzN479b605xuippnbKzF/Lsv-t_5_EMwNXW8jptBYG.png",
-          title: "React Hooks Cheatsheet - Visual Guide",
+          fileName: 'data-fetching.png',
+          type: 'image',
+          s3Key: 'knowledge/4bBacfDWPhQzOzN479b605xuippnbKzF/Lsv-t_5_EMwNXW8jptBYG.png',
+          title: 'React Hooks Cheatsheet - Visual Guide',
           isExample: true,
-          sourceUrl: "",
-        }
+          sourceUrl: '',
+        },
       ])
 
       return c.json({
@@ -214,24 +321,24 @@ export const settingsRouter = j.router({
     .input(
       z.object({
         username: z.string(),
-      })
+      }),
     )
     .post(async ({ c, ctx, input }) => {
       const { username } = input
       const { user } = ctx
 
       const { data: userData } = await client.v2.userByUsername(
-        username.replace("@", ""),
+        username.replace('@', ''),
         {
-          "user.fields": [
-            "profile_image_url",
-            "name",
-            "username",
-            "id",
-            "verified",
-            "verified_type",
+          'user.fields': [
+            'profile_image_url',
+            'name',
+            'username',
+            'id',
+            'verified',
+            'verified_type',
           ],
-        }
+        },
       )
 
       if (!userData) {
@@ -240,7 +347,7 @@ export const settingsRouter = j.router({
         })
       }
 
-      await redis.json.set(`connected-account:${user.email}`, "$", {
+      await redis.json.set(`connected-account:${user.email}`, '$', {
         ...userData,
       })
 
@@ -259,7 +366,7 @@ export const settingsRouter = j.router({
     const { user } = ctx
 
     const account = await redis.json.get<ConnectedAccount>(
-      `connected-account:${user.email}`
+      `connected-account:${user.email}`,
     )
 
     return c.json({ account })

@@ -9,6 +9,7 @@ import { createContext, PropsWithChildren, useContext, useEffect, useRef } from 
 import toast from 'react-hot-toast'
 import { useTweets } from './use-tweets'
 import { ChatRequestOptions } from 'ai'
+import type { ThreeDrafts } from '@/server/routers/chat/create-three-drafts'
 
 interface StartNewChatOpts {
   newId?: string
@@ -26,7 +27,7 @@ const ChatContext = createContext<TChatContext | null>(null)
 
 export const ChatProvider = ({ children }: PropsWithChildren) => {
   const [chatId, setChatId] = useQueryState('chatId')
-  const { tweetId, listImprovements, showImprovementsInEditor } = useTweets()
+  const { currentTweet, draftCheckpoint,tweetId, listImprovements, showImprovementsInEditor, setDrafts, setToolError, clearToolError } = useTweets()
 
   const tweetIdRef = useRef(tweetId)
 
@@ -61,6 +62,12 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
     onResponse(res) {
       const response = res.clone()
       registerStreamHooks(response, {
+        onThreeDrafts: async (data: ThreeDrafts) => {
+          console.log('drafts are here', data);
+          draftCheckpoint.current = currentTweet.content
+          setDrafts(data)
+          clearToolError('three_drafts')
+        },
         onTweetResult: async ({
           id,
           diffs,
@@ -71,7 +78,29 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
           improvedText: string
         }) => {
           listImprovements(diffs)
-          showImprovementsInEditor(id, diffs)
+          showImprovementsInEditor(diffs)
+          clearToolError('edit_tweet')
+        },
+        onDraftsError: async ({ error, toolName }: { error: string; toolName: string }) => {
+          console.error(`Tool ${toolName} failed:`, error)
+          const friendlyError = error.includes('Overloaded') 
+            ? 'AI service is overloaded. Please try again in a moment.' 
+            : error
+          setToolError(toolName, friendlyError)
+          toast.error(`Failed to create drafts: ${friendlyError}`)
+        },
+        onTweetError: async ({ error, toolName }: { error: string; toolName: string }) => {
+          console.error(`Tool ${toolName} failed:`, error)
+          const friendlyError = error.includes('Overloaded') 
+            ? 'AI service is overloaded. Please try again in a moment.' 
+            : error
+          setToolError(toolName, friendlyError)
+          toast.error(`Failed to edit tweet: ${friendlyError}`)
+        },
+        onWebsiteError: async ({ error, toolName }: { error: string; toolName: string }) => {
+          console.error(`Tool ${toolName} failed:`, error)
+          setToolError(toolName, error)
+          toast.error(`Failed to read website: ${error}`)
         },
       })
     },
@@ -84,20 +113,6 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
         ...requestBody,
       }
     },
-    // experimental_prepareRequestBody({ messages, requestBody }) {
-    //   const lastMessage = messages[messages.length - 1] as TestUIMessage
-    //   return {
-    //     message: {
-    //       ...lastMessage,
-    //       role: 'user',
-    //       id: lastMessage?.id ?? nanoid(),
-    //       content: (lastMessage?.content as string).trimEnd(),
-    //       metadata: lastMessage?.metadata,
-    //     } satisfies TestUIMessage,
-    //     tweet: lastMessage.tweet,
-    //     ...requestBody,
-    //   }
-    // },
   })
 
   return (

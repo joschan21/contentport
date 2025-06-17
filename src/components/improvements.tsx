@@ -1,8 +1,15 @@
 import { useTweets } from '@/hooks/use-tweets'
 import { cn, DiffWithReplacement } from '@/lib/utils'
-import { Check, ChevronRight, X } from 'lucide-react'
+import { Check, ChevronRight, X, ChevronLeft, Trash, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import DuolingoButton from './ui/duolingo-button'
+import { useEditor } from '@/hooks/use-editors'
+import { useLocalStorage } from '@/hooks/use-local-storage'
+import { ConnectedAccount, DEFAULT_CONNECTED_ACCOUNT } from './tweet-editor/tweet-editor'
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
+import { Icons } from './icons'
+import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import toast from 'react-hot-toast'
 
 const CATEGORY_LABELS: Record<string, string> = {
   'write-initial-content': 'Initial Content',
@@ -126,8 +133,197 @@ function ContextAfter({ diff, text }: { diff: DiffWithReplacement; text: string 
   return <span className="text-stone-700">{text}</span>
 }
 
+interface Draft {
+  id: string
+  improvedText: string
+  diffs: any[]
+}
+
+function DraftsSelector({ drafts }: { drafts: Draft[] }) {
+  const [selectedDraftIndex, setSelectedDraftIndex] = useState(0)
+  const [draftDecisionMade, setDraftDecisionMade] = useState<
+    'applied' | 'rejected' | null
+  >(null)
+  const [connectedAccount] = useLocalStorage(
+    'connected-account',
+    DEFAULT_CONNECTED_ACCOUNT,
+  )
+  const { showImprovementsInEditor, resetImprovements, clearDrafts, draftCheckpoint } =
+    useTweets()
+  const editor = useEditor('tweet-editor')
+
+  const currentDraft = drafts[selectedDraftIndex]
+
+  const applyDraft = (content: string, index: number) => {
+    editor?.update(() => {
+      const root = $getRoot()
+      const p = $createParagraphNode()
+      const text = $createTextNode(content)
+      p.append(text)
+      root.clear()
+      root.append(p)
+    })
+
+    setSelectedDraftIndex(index)
+    setDraftDecisionMade('applied')
+  }
+
+  const handleApplyCurrentDraft = () => {
+    if (currentDraft) {
+      applyDraft(currentDraft.improvedText, selectedDraftIndex)
+      clearDrafts()
+    }
+  }
+
+  const handleRejectAllDrafts = () => {
+    resetImprovements()
+
+    editor?.update(() => {
+      const root = $getRoot()
+      const p = $createParagraphNode()
+      const text = $createTextNode(draftCheckpoint.current ?? '')
+      p.append(text)
+      root.clear()
+      root.append(p)
+    })
+
+    draftCheckpoint.current = null
+
+    setDraftDecisionMade('rejected')
+    clearDrafts()
+  }
+
+  useEffect(() => {
+    if (drafts.length > 0 && editor && drafts[0]) {
+      showImprovementsInEditor(drafts[0].diffs)
+    }
+  }, [drafts, editor])
+
+  const cycleDraft = (direction: 'next' | 'prev') => {
+    const newIndex =
+      direction === 'next'
+        ? (selectedDraftIndex + 1) % drafts.length
+        : (selectedDraftIndex - 1 + drafts.length) % drafts.length
+    if (editor && drafts[newIndex]) {
+      showImprovementsInEditor(drafts[newIndex].diffs)
+      setSelectedDraftIndex(newIndex)
+    }
+  }
+
+  if (!currentDraft) return null
+
+  return (
+    <div className="relative w-full space-y-3">
+      <div className="relative rounded-lg w-full">
+        {!draftDecisionMade && (
+          <div className="flex justify-center absolute top-4 right-4 items-center z-[99]">
+            {drafts.length > 1 && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <DuolingoButton
+                    size="icon"
+                    variant="secondary"
+                    onClick={() => cycleDraft('prev')}
+                    className="h-7 w-7"
+                  >
+                    <ChevronLeft className="size-3" />
+                  </DuolingoButton>
+                  <span className="text-xs text-stone-500 px-2">
+                    {selectedDraftIndex + 1}/{drafts.length}
+                  </span>
+                  <DuolingoButton
+                    size="icon"
+                    variant="secondary"
+                    onClick={() => cycleDraft('next')}
+                    className="h-7 w-7"
+                  >
+                    <ChevronRight className="size-3" />
+                  </DuolingoButton>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="relative text-left rounded-md bg-white border border-gray-200 shadow-md bg-clip-padding overflow-hidden">
+          <div className="flex items-start gap-3 p-6">
+            <Avatar className="h-10 w-10 rounded-full border border-border/30">
+              <AvatarImage
+                src={connectedAccount.profile_image_url}
+                alt={`@${connectedAccount.username}`}
+              />
+              <AvatarFallback className="bg-primary/10 text-primary text-sm/6">
+                {connectedAccount.name.slice(0, 1).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-base leading-relaxed font-semibold">
+                  {connectedAccount.name}
+                </span>
+                <span className="text-sm/6 text-muted-foreground">
+                  @{connectedAccount.username}
+                </span>
+                {connectedAccount.verified && (
+                  <Icons.verificationBadge className="h-4 w-4" />
+                )}
+              </div>
+              <div className="mt-1 text-base leading-relaxed whitespace-pre-line">
+                {currentDraft.improvedText}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {!draftDecisionMade && (
+        <div className="w-full flex items-center justify-between">
+          <div className="w-full flex flex-col gap-1.5">
+            <div className="w-full flex gap-1.5">
+              <DuolingoButton
+                className="flex items-center gap-1.5 text-xs"
+                onClick={handleApplyCurrentDraft}
+              >
+                <Check className="size-4" />
+                Apply
+              </DuolingoButton>
+              <DuolingoButton
+                variant="destructive"
+                className="flex items-center gap-1.5 text-xs"
+                onClick={handleRejectAllDrafts}
+              >
+                <Trash className="size-4" />
+                Reject all
+              </DuolingoButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {draftDecisionMade === 'applied' && (
+        <div className="w-full flex items-center justify-center pt-2">
+          <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
+            <Check className="size-4" />
+            <span className="text-sm font-medium">Draft applied</span>
+          </div>
+        </div>
+      )}
+
+      {draftDecisionMade === 'rejected' && (
+        <div className="w-full flex items-center justify-center pt-4">
+          <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
+            <Trash className="size-4" />
+            <span className="text-sm font-medium">All drafts rejected</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export const Improvements = ({ empty }: { empty?: boolean }) => {
-  const { tweetId, improvements, acceptImprovement, rejectImprovement } = useTweets()
+  const { tweetId, improvements, acceptImprovement, rejectImprovement, drafts } =
+    useTweets()
 
   const visibleImprovements = empty ? [] : improvements.filter((i) => i.type !== 0)
 
@@ -139,12 +335,21 @@ export const Improvements = ({ empty }: { empty?: boolean }) => {
     rejectImprovement(diff)
   }
 
-  if (visibleImprovements.length === 0) return null
+  const showDrafts = drafts.length > 0
+  const showImprovements = visibleImprovements.length > 0
+
+  if (!showDrafts && !showImprovements) return null
 
   return (
-    <div className="relative w-full">
-      <div className="h-full w-full">
-        {visibleImprovements && visibleImprovements.length ? (
+    <div className="relative w-full space-y-4">
+      {showDrafts && (
+        <div className="h-full w-full">
+          <DraftsSelector drafts={drafts} />
+        </div>
+      )}
+
+      {showImprovements && (
+        <div className="h-full w-full">
           <div className="space-y-1">
             <p className="text-sm/7 font-medium text-black">Improvements</p>
             {visibleImprovements.map((diff, index) => {
@@ -154,27 +359,17 @@ export const Improvements = ({ empty }: { empty?: boolean }) => {
                   diff={diff}
                   expanded={index === 0}
                   onAccept={() => {
-                    // accepting while viewing a different tweet
-                    // if (diff.tweetId !== tweetId) {
-                    //   navigateToTweet(diff.tweetId)
-                    // }
-
                     handleAcceptImprovement(diff)
                   }}
                   onReject={() => {
-                    // rejecting while viewing a different tweet
-                    // if (diff.tweetId !== tweetId) {
-                    //   setTweetId(diff.tweetId)
-                    // }
-
                     handleRejectImprovement(diff)
                   }}
                 />
               )
             })}
           </div>
-        ) : null}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -22,6 +22,7 @@ import { create_read_website_content } from './read-website-content'
 import { parseAttachments, PromptBuilder } from './utils'
 import { Ratelimit } from '@upstash/ratelimit'
 import { HTTPException } from 'hono/http-exception'
+import { create_three_drafts } from './create-three-drafts'
 
 // ==================== Types ====================
 
@@ -183,15 +184,22 @@ export const chatRouter = j.router({
         role: 'system',
       }
 
+      const editorState = new PromptBuilder()
+        .add(
+          `<important_info>This is a system attachment to the user request. The purpose of this attachment is to keep you informed about the user's latest tweet editor state at all times. It might be empty or already contain text.</important_info>`,
+        )
+        .add(`<current_tweet>${tweet.content}</current_tweet>`)
+
+      if (isConversationEmpty) {
+        editorState.add(
+          `This is the first message in your conversation. Therefore, only for the first message, create THREE drafts by calling the edit_tweet tool THREE times. The user can choose the draft they like most.`,
+        )
+      }
+
       const editorStateMessage: TestUIMessage = {
         role: 'user',
         id: `meta:editor-state:${nanoid()}`,
-        content: `<system_attachment>
-<important_info>This is a system attachment to the user request. The purpose of this attachment is to keep you informed about the user's latest tweet editor state at all times. It might be empty or already contain text.</important_info>
-
-<current_tweet>${tweet.content}</current_tweet>
-
-</system_attachment>`,
+        content: `<system_attachment>${editorState.build()}</system_attachment>`,
       }
 
       const content = new PromptBuilder()
@@ -234,11 +242,27 @@ export const chatRouter = j.router({
         chatId: chatId,
         userMessage,
         tweet,
+        isDraftMode: isConversationEmpty,
         redisKeys: {
           chat: `chat:tool:${user.email}:${chatId}`,
           account: `connected-account:${user.email}`,
           style: `style:${user.email}`,
         },
+      })
+
+      /**
+       * draft tool construction
+       */
+      const three_drafts = create_three_drafts({
+        userEmail: user.email,
+        redisKeys: {
+          chat: `chat:tool:${user.email}:${chatId}`,
+          account: `connected-account:${user.email}`,
+          style: `style:${user.email}`,
+        },
+        chatId,
+        userMessage,
+        tweet,
       })
 
       const read_website_content = create_read_website_content({ chatId: chatId })
@@ -247,7 +271,7 @@ export const chatRouter = j.router({
         execute: (stream) => {
           const result = streamText({
             system: assistantPrompt({ tweet }),
-            tools: { read_website_content, edit_tweet },
+            tools: { read_website_content, edit_tweet, three_drafts },
             toolChoice: 'auto',
             maxSteps: 6,
             experimental_transform: smoothStream({ delayInMs: 20 }),
@@ -261,9 +285,54 @@ export const chatRouter = j.router({
               })
             },
             onStepFinish: ({ toolResults }) => {
-              toolResults.some((result) => {
+              toolResults.forEach((result) => {
                 if (result.toolName === 'edit_tweet') {
-                  stream.writeData({ hook: 'onTweetResult', data: result.result })
+                  if ('error' in result && result.error) {
+                    const errorMessage = typeof result.error === 'object' && result.error !== null && 'message' in result.error 
+                      ? (result.error as { message: string }).message 
+                      : 'Failed to edit tweet'
+                    stream.writeData({ 
+                      hook: 'onTweetError', 
+                      data: { 
+                        toolName: 'edit_tweet',
+                        error: errorMessage
+                      } 
+                    })
+                  } else if ('result' in result && result.result) {
+                    stream.writeData({ hook: 'onTweetResult', data: result.result })
+                  }
+                }
+
+                if (result.toolName === 'three_drafts') {
+                  if ('error' in result && result.error) {
+                    const errorMessage = typeof result.error === 'object' && result.error !== null && 'message' in result.error 
+                      ? (result.error as { message: string }).message 
+                      : 'Failed to create drafts'
+                    stream.writeData({ 
+                      hook: 'onDraftsError', 
+                      data: { 
+                        toolName: 'three_drafts',
+                        error: errorMessage
+                      } 
+                    })
+                  } else if ('result' in result && result.result) {
+                    stream.writeData({ hook: 'onThreeDrafts', data: result.result })
+                  }
+                }
+
+                if (result.toolName === 'read_website_content') {
+                  if ('error' in result && result.error) {
+                    const errorMessage = typeof result.error === 'object' && result.error !== null && 'message' in result.error 
+                      ? (result.error as { message: string }).message 
+                      : 'Failed to read website'
+                    stream.writeData({ 
+                      hook: 'onWebsiteError', 
+                      data: { 
+                        toolName: 'read_website_content',
+                        error: errorMessage
+                      } 
+                    })
+                  }
                 }
               })
             },

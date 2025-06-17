@@ -4,6 +4,8 @@ import { client } from '@/lib/client'
 import { useQuery } from '@tanstack/react-query'
 import Tweet from './tweet'
 import { InitialConfigType } from '@lexical/react/LexicalComposer'
+import { cn } from '@/lib/utils'
+import { HTMLAttributes } from 'react'
 
 export type ConnectedAccount = {
   username: string
@@ -19,13 +21,19 @@ export const DEFAULT_CONNECTED_ACCOUNT: ConnectedAccount = {
   verified: true,
 }
 
+interface TweetEditorProps extends HTMLAttributes<HTMLDivElement> {
+  id?: string | undefined
+  initialContent?: string
+  selectionMode?: boolean
+}
+
 export default function TweetEditor({
-  tweetId,
-  initialEditorString,
-}: {
-  tweetId: string | null
-  initialEditorString: string
-}) {
+  id,
+  initialContent,
+  className,
+  selectionMode = false,
+  ...rest
+}: TweetEditorProps) {
   const { data } = useQuery<ConnectedAccount>({
     queryKey: ['get-connected-account'],
     queryFn: async () => {
@@ -46,7 +54,6 @@ export default function TweetEditor({
     refetchOnWindowFocus: false,
   })
 
-  // idk why but sometimes alwaysDefinedData.profile_image_url threw because data is undefined???
   const alwaysDefinedData = data ?? DEFAULT_CONNECTED_ACCOUNT
 
   const account = {
@@ -58,9 +65,17 @@ export default function TweetEditor({
   }
 
   return (
-    <div className="relative z-10 w-full rounded-lg p-4 font-sans">
+    <div
+      className={cn('relative z-10 w-full rounded-lg font-sans', className)}
+      {...rest}
+    >
       <div className="space-y-4 w-full">
-        <Tweet initialEditorString={initialEditorString} account={account} />
+        <Tweet
+          id={id}
+          initialContent={initialContent}
+          account={account}
+          selectionMode={selectionMode}
+        />
       </div>
     </div>
   )

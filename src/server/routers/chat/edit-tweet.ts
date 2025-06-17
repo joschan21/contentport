@@ -1,4 +1,3 @@
-import { xai } from '@ai-sdk/xai'
 import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
 import { diff_wordMode } from '@/lib/diff-utils'
 import { editToolStyleMessage, editToolSystemPrompt } from '@/lib/prompt-utils'
@@ -14,8 +13,6 @@ import { z } from 'zod'
 import { chunkDiffs } from '../../../../diff'
 import { Style } from '../style-router'
 import { PromptBuilder } from './utils'
-import { openai } from '@ai-sdk/openai'
-import { google } from '@ai-sdk/google'
 
 interface CreateEditTweetArgs {
   chatId: string
@@ -26,6 +23,8 @@ interface CreateEditTweetArgs {
     chat: string
   }
   userMessage: TestUIMessage
+  isDraftMode?: boolean
+  temperature?: number
 }
 
 export const create_edit_tweet = ({
@@ -33,6 +32,8 @@ export const create_edit_tweet = ({
   tweet,
   redisKeys,
   userMessage,
+  isDraftMode = false,
+  temperature,
 }: CreateEditTweetArgs) =>
   tool({
     description: 'Create, edit or change a tweet',
@@ -96,9 +97,7 @@ export const create_edit_tweet = ({
       ]
 
       const result = await generateText({
-        // model: openai("gpt-4o"),
-        // model: google("gemini-2.5-pro-preview-05-06"),
-        // model: xai('grok-3-latest'),
+        // model: xai("grok-3-latest"),
         model: anthropic('claude-4-opus-20250514'),
         system: editToolSystemPrompt,
         messages: messages as CoreMessage[],
@@ -119,7 +118,8 @@ export const create_edit_tweet = ({
       ])
 
       return {
-        id: tweet.id,
+        // TODO: might be bug
+        id: nanoid(),
         improvedText,
         diffs,
       }
@@ -131,10 +131,7 @@ function append(messages: TestUIMessage[], message: TestUIMessage) {
   return messages
 }
 
-function diff(
-  currentContent: string,
-  newContent: string,
-): DiffWithReplacement[] {
+function diff(currentContent: string, newContent: string): DiffWithReplacement[] {
   const rawDiffs = diff_wordMode(currentContent, newContent)
   const chunkedDiffs = chunkDiffs(rawDiffs)
   return processDiffs(chunkedDiffs)
@@ -221,37 +218,3 @@ async function analyzeRejectedText(currentTweet: string, lastSuggestion: string)
 
   return { rejectedElements, debugInfo: rejectedDiffs }
 }
-
-// const { chatId, tweet, toolMessages, userMessage, scrapedLinks, isFirstMessage } =
-//   context
-// let updatedToolMessages = [...toolMessages]
-// // Add scraped links if any
-// if (scrapedLinks.build()) {
-//   updatedToolMessages = appendMessage(
-//     updatedToolMessages,
-//     createUserMessage(
-//       `<attached_links>${scrapedLinks.build()}</attached_links>`,
-//       'meta:attached-links',
-//     ),
-//   )
-// }
-// updatedToolMessages = appendMessage(updatedToolMessages, userMessage)
-// // Build context for the AI
-// const contextPrompt = await buildEditTweetContext(chatId, tweet, isFirstMessage)
-// updatedToolMessages = appendMessage(
-//   updatedToolMessages,
-//   createUserMessage(
-//     `<system_attachment>\n${contextPrompt}\n</system_attachment>`,
-//     `meta:current-tweet:${nanoid()}`,
-//   ),
-// )
-// const improvedText = sanitizeTweetOutput(result.text)
-// const diffs = generateDiffAnalysis(tweet.content, improvedText)
-// // Save the suggestion and update messages
-// await redis.set(REDIS_KEYS.lastSuggestion(chatId), improvedText)
-// updatedToolMessages = appendMessage(
-//   updatedToolMessages,
-//   createAssistantMessage(improvedText),
-// )
-// // Update tool messages in parent scope
-// context.toolMessages = updatedToolMessages

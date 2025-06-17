@@ -6,20 +6,20 @@ import DuolingoButton from '@/components/ui/duolingo-button'
 import DuolingoInput from '@/components/ui/duolingo-input'
 import { Progress } from '@/components/ui/progress'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+import { useConfetti } from '@/hooks/use-confetti'
 import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, AtSign } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import type SwiperType from 'swiper'
 import { EffectCreative } from 'swiper/modules'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { TWITTER_HANDLE_VALIDATOR, TwitterHandleForm } from '../lib/validators'
-import Confetti, { ConfettiRef } from './confetti'
 import './swiper-bundle.css'
 
 enum SLIDES {
@@ -56,15 +56,13 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
   const [swiperRef, setSwiperRef] = useState<null | SwiperType>(null)
   const [progress, setProgress] = useState<number>(0)
   const [isOpen, setIsOpen] = useState<boolean>(true)
-  const confettiRef = useRef<ConfettiRef>(null)
+  const { fire } = useConfetti()
   const router = useRouter()
   const [exampleDocsCreated, setExampleDocsCreated] = useState(false)
 
   useEffect(() => {
-    if (confettiRef.current) {
-      confettiRef.current.fire()
-    }
-  }, [])
+    fire()
+  }, [fire])
 
   // Update parent component when modal is closed
   useEffect(() => {
@@ -167,12 +165,12 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
   }, [swiperRef?.activeIndex])
 
   useEffect(() => {
-    if (swiperRef?.activeIndex === SLIDES.COMPLETED_SLIDE && confettiRef.current) {
-      confettiRef.current.fire({ angle: 75, spread: 90 })
-      confettiRef.current.fire({ angle: 90, spread: 90 })
-      confettiRef.current.fire({ angle: 105, spread: 90 })
+    if (swiperRef?.activeIndex === SLIDES.COMPLETED_SLIDE) {
+      fire({ angle: 75, spread: 90 })
+      fire({ angle: 90, spread: 90 })
+      fire({ angle: 105, spread: 90 })
     }
-  }, [swiperRef?.activeIndex])
+  }, [swiperRef?.activeIndex, fire])
 
   // Determine if the button should be disabled
   const isButtonDisabled = () => {
@@ -184,12 +182,6 @@ export const OnboardingModal = ({ onOpenChange }: OnboardingModalProps) => {
 
   return (
     <>
-      <Confetti
-        ref={confettiRef}
-        aria-hidden="true"
-        className="pointer-events-none absolute left-0 top-0 z-[1000] h-full w-full"
-      />
-
       <Dialog
         open={isOpen}
         onOpenChange={(open) => {

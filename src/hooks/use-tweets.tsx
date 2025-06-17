@@ -63,17 +63,25 @@ interface TweetImage {
 
 export type Tweet = InferOutput['tweet']['getTweet']['tweet'] & { image?: TweetImage }
 
+interface Draft {
+  id: string
+  improvedText: string
+  diffs: any[]
+}
+
 interface TweetContextType {
   // tweets: Tweet[]
   currentTweet: { id: string; content: string; image?: TweetImage }
   tweetId: string | null
   improvements: DiffWithReplacement[]
+  drafts: Draft[]
+  toolErrors: Record<string, string>
   // setTweetId: (id: string) => void
   setTweetContent: (content: string) => void
   setTweetImage: (image: TweetImage) => void
   removeTweetImage: () => void
   listImprovements: (diffs: DiffWithReplacement[]) => void
-  showImprovementsInEditor: (tweetId: string, diffs: DiffWithReplacement[]) => void
+  showImprovementsInEditor: (diffs: DiffWithReplacement[]) => void
   acceptImprovement: (diff: DiffWithReplacement, opts?: { isInitial: boolean }) => void
   rejectImprovement: (diff: DiffWithReplacement) => void
   queuedImprovements: Record<string, DiffWithReplacement[]>
@@ -81,17 +89,41 @@ interface TweetContextType {
     React.SetStateAction<Record<string, DiffWithReplacement[]>>
   >
   resetImprovements: () => void
+  setCurrentTweet: React.Dispatch<React.SetStateAction<CurrentTweet>>
+  setDrafts: (drafts: Draft[]) => void
+  clearDrafts: () => void
+  setToolError: (toolName: string, error: string) => void
+  clearToolError: (toolName: string) => void
+  draftCheckpoint: React.RefObject<string | null>
 }
 
 const TweetContext = createContext<TweetContextType | undefined>(undefined)
+
+export type CurrentTweet = {
+  id: string
+  content: string
+  image?: TweetImage
+}
 
 export function TweetProvider({ children }: PropsWithChildren) {
   const { tweetId } = useParams() as { tweetId: string | null }
   const queryClient = useQueryClient()
   const hasLoaded = useRef(false)
 
+  // fallback after rejecting all drafts
+  const draftCheckpoint = useRef<string | null>(null)
+
+  const [currentTweet, setCurrentTweet] = useState<CurrentTweet>({
+    id: nanoid(),
+    content: '',
+  })
+
+  console.log('current tweet', currentTweet)
+
   const editor = useEditor('tweet-editor')
   const [improvements, setImprovements] = useState<DiffWithReplacement[]>([])
+  const [drafts, setDrafts] = useState<Draft[]>([])
+  const [toolErrors, setToolErrors] = useState<Record<string, string>>({})
   const [queuedImprovements, setQueuedImprovements] = useState<
     Record<string, DiffWithReplacement[]>
   >({})
@@ -100,13 +132,27 @@ export function TweetProvider({ children }: PropsWithChildren) {
     setImprovements([])
   }
 
-  const improvementKeys = useRef(new Map<string, string>())
+  const clearDrafts = () => {
+    setDrafts([])
+  }
 
-  const [currentTweet, setCurrentTweet] = useState<{
-    id: string
-    content: string
-    image?: TweetImage
-  }>({ id: nanoid(), content: '' })
+  const setToolError = (toolName: string, error: string) => {
+    setToolErrors(prev => ({ ...prev, [toolName]: error }))
+    // Clear drafts if the three_drafts tool failed
+    if (toolName === 'three_drafts') {
+      setDrafts([])
+    }
+  }
+
+  const clearToolError = (toolName: string) => {
+    setToolErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors[toolName]
+      return newErrors
+    })
+  }
+
+  const improvementKeys = useRef(new Map<string, string>())
 
   const setTweetContent = (content: string) => {
     setCurrentTweet((prev) => ({ ...prev, content }))
@@ -143,10 +189,7 @@ export function TweetProvider({ children }: PropsWithChildren) {
     setImprovements(diffs)
   }
 
-  const showImprovementsInEditor = async (
-    tweetId: string,
-    diffs: DiffWithReplacement[],
-  ) => {
+  const showImprovementsInEditor = async (diffs: DiffWithReplacement[]) => {
     editor?.update(
       () => {
         const p = $createParagraphNode()
@@ -386,7 +429,9 @@ export function TweetProvider({ children }: PropsWithChildren) {
       value={{
         // tweets,
         improvements,
+        drafts,
         currentTweet,
+        setCurrentTweet,
         tweetId,
         // setTweetId,
         setTweetContent,
@@ -399,6 +444,12 @@ export function TweetProvider({ children }: PropsWithChildren) {
         queuedImprovements,
         setQueuedImprovements,
         resetImprovements,
+        setDrafts,
+        clearDrafts,
+        draftCheckpoint,
+        toolErrors,
+        setToolError,
+        clearToolError,
       }}
     >
       {children}

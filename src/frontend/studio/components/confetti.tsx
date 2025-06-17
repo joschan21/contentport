@@ -1,6 +1,6 @@
 "use client"
 
-import React, { forwardRef, useImperativeHandle, useRef } from "react"
+import React, { forwardRef, useImperativeHandle, useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import confetti from "canvas-confetti"
@@ -17,6 +17,14 @@ type ConfettiProps = {
 const Confetti = forwardRef<ConfettiRef, ConfettiProps>(
   ({ className, ...props }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null)
+
+    useEffect(() => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+    }, [])
 
     useImperativeHandle(ref, () => ({
       fire: (options) => {
@@ -42,7 +50,7 @@ const Confetti = forwardRef<ConfettiRef, ConfettiProps>(
     return createPortal(
       <canvas
         ref={canvasRef}
-        className={cn("fixed inset-0 z-[1000] pointer-events-none", className)}
+        className={cn("fixed inset-0 z-[1000] pointer-events-none w-full h-full", className)}
         {...props}
       />,
       document.body
