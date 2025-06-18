@@ -6,6 +6,7 @@ import { Providers } from '@/components/providers/providers'
 import ClientLayout from '@/frontend/studio/layout'
 import { cookies } from 'next/headers'
 import { Toaster } from 'react-hot-toast'
+import { Analytics } from '@vercel/analytics/next'
 
 export const metadata: Metadata = {
   title: 'contentport',
@@ -42,6 +43,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body
         className={`${rubik.className} ${elegant.variable} ${jetBrainsMono.variable} antialiased light`}
       >
+        <Analytics />
         <Suspense>
           <Toaster position="top-center" />
 
