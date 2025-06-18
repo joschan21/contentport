@@ -112,7 +112,7 @@ function filterVisibleMessages(messages: UIMessage[]): UIMessage[] {
 
 async function incrementChatCount(userEmail: string): Promise<void> {
   const today = format(new Date(), 'yyyy-MM-dd')
-  const key = REDIS_KEYS.chatCount(userEmail)
+  const key = `chat:count:batch-2:${userEmail}`
   await redis.hincrby(key, today, 1)
 }
 
