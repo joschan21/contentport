@@ -46,7 +46,7 @@ PRIORITY
 - [ ] Drafts (3 to choose from)
 - [ ] Offer option to save as knowledge doc EASY
       LET IN BATCH
-- [] Image editor fixes HARD
+- [ ] Image editor fixes HARD
 - [ ] Image tool doesnt work anymore
       LET IN BATCH
 
