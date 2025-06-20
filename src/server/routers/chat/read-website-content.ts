@@ -19,6 +19,14 @@ export const create_read_website_content  = ({chatId}: {chatId: string}) => tool
   description: 'Scrape website content by URL',
   parameters: z.object({ website_url: z.string() }),
   execute: async ({ website_url }) => {
+    const cacheKey = `website-cache:${encodeURIComponent(website_url)}`
+    
+    const cachedContent = await redis.get(cacheKey)
+    if (cachedContent) {
+      await redis.lpush(`website-contents:${chatId}`, cachedContent)
+      return cachedContent as {url:string,title:string,content:string}
+    }
+
     if (isTwitterUrl(website_url)) {
       const tweetId = extractTweetId(website_url)
 
@@ -44,6 +52,7 @@ export const create_read_website_content  = ({chatId}: {chatId: string}) => tool
           content: `**${author?.name || 'Unknown'} (@${author?.username || 'unknown'})**\n\n${tweet?.text}`,
         }
 
+        await redis.setex(cacheKey, 86400, tweetContent)
         await redis.lpush(`website-contents:${chatId}`, tweetContent)
 
         return tweetContent
@@ -67,6 +76,7 @@ export const create_read_website_content  = ({chatId}: {chatId: string}) => tool
         content: response.markdown,
       }
       
+      await redis.setex(cacheKey, 86400, websiteContent)
       await redis.lpush(`website-contents:${chatId}`, websiteContent)
       
       return websiteContent

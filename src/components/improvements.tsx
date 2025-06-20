@@ -215,36 +215,6 @@ function DraftsSelector({ drafts }: { drafts: Draft[] }) {
   return (
     <div className="relative w-full space-y-3">
       <div className="relative rounded-lg w-full">
-        {!draftDecisionMade && (
-          <div className="flex justify-center absolute top-4 right-4 items-center z-[99]">
-            {drafts.length > 1 && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  <DuolingoButton
-                    size="icon"
-                    variant="secondary"
-                    onClick={() => cycleDraft('prev')}
-                    className="h-7 w-7"
-                  >
-                    <ChevronLeft className="size-3" />
-                  </DuolingoButton>
-                  <span className="text-xs text-stone-500 px-2">
-                    {selectedDraftIndex + 1}/{drafts.length}
-                  </span>
-                  <DuolingoButton
-                    size="icon"
-                    variant="secondary"
-                    onClick={() => cycleDraft('next')}
-                    className="h-7 w-7"
-                  >
-                    <ChevronRight className="size-3" />
-                  </DuolingoButton>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         <div className="relative text-left rounded-md bg-white border border-gray-200 shadow-md bg-clip-padding overflow-hidden">
           <div className="flex items-start gap-3 p-6">
             <Avatar className="h-10 w-10 rounded-full border border-border/30">
@@ -275,6 +245,36 @@ function DraftsSelector({ drafts }: { drafts: Draft[] }) {
           </div>
         </div>
       </div>
+
+      {!draftDecisionMade && (
+        <div className="flex justify-center items-center z-[99]">
+          {drafts.length > 1 && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <DuolingoButton
+                  size="icon"
+                  variant="secondary"
+                  onClick={() => cycleDraft('prev')}
+                  className="h-7 w-7"
+                >
+                  <ChevronLeft className="size-3" />
+                </DuolingoButton>
+                <span className="text-xs text-stone-500 px-2">
+                  {selectedDraftIndex + 1}/{drafts.length}
+                </span>
+                <DuolingoButton
+                  size="icon"
+                  variant="secondary"
+                  onClick={() => cycleDraft('next')}
+                  className="h-7 w-7"
+                >
+                  <ChevronRight className="size-3" />
+                </DuolingoButton>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {!draftDecisionMade && (
         <div className="w-full flex items-center justify-between">

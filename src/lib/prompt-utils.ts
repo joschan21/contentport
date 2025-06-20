@@ -2,7 +2,6 @@ import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
 import { Style } from '@/server/routers/style-router'
 import { nanoid } from 'nanoid'
 import { Tweet } from './validators'
-import { TestUIMessage } from '@/types/message'
 
 interface AssistantPrompt {
   tweet: Tweet
@@ -111,7 +110,6 @@ Your main goal is to follow the my instructions and help me create clear and sty
 </extra_important>
 
 <rules>
-- If the current tweet is empty
 - Your output will replace the existing tweet 1:1
 - If I say to change only a specific part of the tweet (e.g. "edit the last part", "change the first sentence"), then ONLY change that part — leave the rest 100% untouched, even if you think improvements are possible.
 - ALWAYS keep the tweet short (under 160 characters) unless I SPECIFICALLY requests otherwise.
@@ -121,10 +119,11 @@ Your main goal is to follow the my instructions and help me create clear and sty
 - Stick to a 6th-grade reading level: clean, clear, and catchy.
 - ALWAYS match my preferred tone or examples. Your tweet should sound exactly like it was written by ME.
 - Use easy to understand language that can easily be skimmed through and that flows well
+- Please avoid over-the-top sensationalist phrasing like "absolutely wild", "this is INSANE", etc.
 </rules>
 
 <prohibited_words>
-Write your tweet at a clear, easily readable 6-th grade reading level. NEVER UNDER ANY CIRCUMSTANCES use the following types of language or words: 'meticulous', 'seamless', 'dive', 'deep dive', 'testament to', 'foster', 'beacon', 'journey', 'elevate', 'flawless', 'streamline', 'navigating', 'delve into', 'complexities', 'a breeze', 'realm', 'bespoke', 'tailored', 'towards', 'redefine', 'underpins', 'embrace', 'to navigate xyz', 'game-changing', 'empower', 'the xzy landscape', 'ensure', 'comphrehensive', 'supercharge', 'ever-changing', 'ever-evolving', 'the world of', 'not only', 'seeking more than just', 'designed to enhance', 'it's not merely', 'our suite', 'it is advisable', 'daunting', 'in the heart of', 'when it comes to', 'in the realm of', 'amongst', 'unlock the secrets', 'harness power', 'unveil the secrets', 'transforms' and 'robust'.
+Write your tweet at a clear, easily readable 6-th grade reading level. NEVER UNDER ANY CIRCUMSTANCES use the following types of language or words: 'meticulous', 'seamless', 'dive', 'headache', 'headaches', 'deep dive', 'testament to', 'foster', 'beacon', 'journey', 'elevate', 'flawless', 'streamline', 'navigating', 'delve into', 'complexities', 'a breeze', 'realm', 'bespoke', 'tailored', 'towards', 'redefine', 'underpins', 'embrace', 'to navigate xyz', 'game-changing', 'game-changer', 'empower', 'the xzy landscape', 'ensure', 'comphrehensive', 'supercharge', 'ever-changing', 'ever-evolving', 'the world of', 'not only', 'seeking more than just', 'designed to enhance', 'no ..., just ...', 'it's not merely', 'our suite', 'it is advisable', 'daunting', 'in the heart of', 'when it comes to', 'in the realm of', 'amongst', 'unlock the secrets', 'harness power', 'unveil the secrets', 'transforms' and 'robust'.
 </prohibited_words>
 
 <conciseness_examples>
@@ -157,9 +156,11 @@ Write your tweet at a clear, easily readable 6-th grade reading level. NEVER UND
 export const editToolStyleMessage = ({
   style,
   account,
+  examples,
 }: {
   style: Style
   account: ConnectedAccount | null
+  examples?: string
 }): any => {
   const { tweets, prompt } = style
 
@@ -254,6 +255,10 @@ ${tweets?.map((tweet) => `<tweet>${tweet.text}</tweet>`)}
 </example_tweets>
 
 ${prompt ? promptPart : ''}
+
+${examples ? `Follow these examples for style reference:
+  
+${examples}` : ''}
 </desired_tweet_style>`,
   }
 }

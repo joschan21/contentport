@@ -2,7 +2,7 @@ import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
 import { diff_wordMode } from '@/lib/diff-utils'
 import { editToolStyleMessage, editToolSystemPrompt } from '@/lib/prompt-utils'
 import { redis } from '@/lib/redis'
-import { DiffWithReplacement, processDiffs } from '@/lib/utils'
+import { chunkDiffs, DiffWithReplacement, processDiffs } from '@/lib/utils'
 import { Tweet } from '@/lib/validators'
 import { TestUIMessage } from '@/types/message'
 import { anthropic } from '@ai-sdk/anthropic'
@@ -10,7 +10,6 @@ import { CoreMessage, FilePart, generateText, ImagePart, TextPart, tool } from '
 import { diff_match_patch } from 'diff-match-patch'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
-import { chunkDiffs } from '../../../../diff'
 import { Style } from '../style-router'
 import { PromptBuilder } from './utils'
 
@@ -147,7 +146,7 @@ function sanitizeTweetOutput(text: string): string {
     .trim()
 }
 
-async function buildEditorStateMessage(
+export async function buildEditorStateMessage(
   chatId: string,
   tweet: { content: string },
   isConversationEmpty: boolean,

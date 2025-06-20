@@ -1,15 +1,15 @@
-import { tool, Tool } from 'ai'
-import { z } from 'zod'
+import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
+import { diff_wordMode } from '@/lib/diff-utils'
+import { editToolStyleMessage, editToolSystemPrompt } from '@/lib/prompt-utils'
 import { redis } from '@/lib/redis'
+import { chunkDiffs, DiffWithReplacement, processDiffs } from '@/lib/utils'
 import { TestUIMessage } from '@/types/message'
 import { anthropic } from '@ai-sdk/anthropic'
-import { generateText, CoreMessage, FilePart, TextPart, ImagePart } from 'ai'
-import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
+import { CoreMessage, FilePart, generateText, ImagePart, TextPart, tool, Tool } from 'ai'
 import { nanoid } from 'nanoid'
-import { diff_wordMode } from '@/lib/diff-utils'
-import { DiffWithReplacement, processDiffs } from '@/lib/utils'
-import { chunkDiffs } from '../../../../diff'
-import { assistantPrompt, editToolSystemPrompt } from '@/lib/prompt-utils'
+import { z } from 'zod'
+import { Style } from '../style-router'
+import { buildEditorStateMessage } from './edit-tweet'
 
 interface StyleAnalysis {
   overall: string
@@ -42,20 +42,22 @@ export const create_three_drafts = ({
     description: 'create 3 initial tweet drafts',
     parameters: z.object({}),
     execute: async () => {
-      const [account, unseenAttachments, websiteContent, draftStyle] = await Promise.all([
-        redis.json.get<ConnectedAccount>(redisKeys.account),
-        redis.lrange<(FilePart | TextPart | ImagePart)[]>(
-          `unseen-attachments:${chatId}`,
-          0,
-          -1,
-        ),
-        redis.lrange<{ url: string; title: string; content: string }>(
-          `website-contents:${chatId}`,
-          0,
-          -1,
-        ),
-        redis.json.get<StyleAnalysis>(`draft-style:${userEmail}`),
-      ])
+      const [style, account, unseenAttachments, websiteContent, draftStyle] =
+        await Promise.all([
+          redis.json.get<Style>(redisKeys.style),
+          redis.json.get<ConnectedAccount>(redisKeys.account),
+          redis.lrange<(FilePart | TextPart | ImagePart)[]>(
+            `unseen-attachments:${chatId}`,
+            0,
+            -1,
+          ),
+          redis.lrange<{ url: string; title: string; content: string }>(
+            `website-contents:${chatId}`,
+            0,
+            -1,
+          ),
+          redis.json.get<StyleAnalysis>(`draft-style:${userEmail}`),
+        ])
 
       if (Boolean(unseenAttachments.length)) {
         await redis.del(`unseen-attachments:${chatId}`)
@@ -70,25 +72,67 @@ export const create_three_drafts = ({
         text: `<attached_website_content url="${content.url}">${content.content}</attached_website_content>`,
       }))
 
-      const createDraftMessages = (styleAnalysis: string): CoreMessage[] => [
-        {
-          role: 'system',
-          content: `${editToolSystemPrompt}
----
-Here's the writing style to match. It frequenly uses example quotes from analyzed tweets. Use these quotes as inspiration for style, avoid directly copying them 1:1.
+      const editorStateMessage: TestUIMessage = {
+        role: 'user',
+        id: `meta:editor-state:${nanoid()}`,
+        content: await buildEditorStateMessage(chatId, tweet, true),
+      }
 
-WRITING STYLE TO MATCH:
-${styleAnalysis}
----
-
-${account ? `User's Twitter Profile: @${account.username} (${account.name})` : ''}`,
-        },
+      let firstDraftMessages: TestUIMessage[] = [
+        ...(style
+          ? [
+              editToolStyleMessage({
+                style,
+                account,
+                examples: draftStyle?.first_third || draftStyle?.overall || '',
+              }),
+            ]
+          : []),
+        editorStateMessage,
         {
-          role: 'user',
+          ...userMessage,
           content: [
-            ...(Array.isArray(userMessage.content)
-              ? userMessage.content
-              : [{ type: 'text' as const, text: userMessage.content }]),
+            ...userMessage.content,
+            ...unseenAttachments.flat(),
+            ...websiteContentMessage,
+          ],
+        },
+      ]
+      let secondDraftMessages: TestUIMessage[] = [
+        ...(style
+          ? [
+              editToolStyleMessage({
+                style,
+                account,
+                examples: draftStyle?.second_third || draftStyle?.overall || '',
+              }),
+            ]
+          : []),
+        editorStateMessage,
+        {
+          ...userMessage,
+          content: [
+            ...userMessage.content,
+            ...unseenAttachments.flat(),
+            ...websiteContentMessage,
+          ],
+        },
+      ]
+      let thirdDraftMessages: TestUIMessage[] = [
+        ...(style
+          ? [
+              editToolStyleMessage({
+                style,
+                account,
+                examples: draftStyle?.third_third || draftStyle?.overall || '',
+              }),
+            ]
+          : []),
+        editorStateMessage,
+        {
+          ...userMessage,
+          content: [
+            ...userMessage.content,
             ...unseenAttachments.flat(),
             ...websiteContentMessage,
           ],
@@ -98,21 +142,24 @@ ${account ? `User's Twitter Profile: @${account.username} (${account.name})` : '
       const [draft1, draft2, draft3] = await Promise.all([
         generateText({
           model: anthropic('claude-4-opus-20250514'),
-          messages: createDraftMessages(
-            draftStyle?.first_third || draftStyle?.overall || '',
-          ),
+          temperature: 0.25,
+          system: editToolSystemPrompt,
+          // @ts-ignore
+          messages: firstDraftMessages,
         }),
         generateText({
           model: anthropic('claude-4-opus-20250514'),
-          messages: createDraftMessages(
-            draftStyle?.second_third || draftStyle?.overall || '',
-          ),
+          temperature: 0.25,
+          system: editToolSystemPrompt,
+          // @ts-ignore
+          messages: secondDraftMessages,
         }),
         generateText({
           model: anthropic('claude-4-opus-20250514'),
-          messages: createDraftMessages(
-            draftStyle?.third_third || draftStyle?.overall || '',
-          ),
+          temperature: 0.25,
+          system: editToolSystemPrompt,
+          // @ts-ignore
+          messages: thirdDraftMessages,
         }),
       ])
 

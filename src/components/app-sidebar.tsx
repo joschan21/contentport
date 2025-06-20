@@ -321,9 +321,7 @@ function ChatInputInner({
             </form>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
-            <p className="text-center text-base">
-            👇 Type your tweet idea here👇
-            </p>
+            <p className="text-center text-base">👇 Type your tweet idea here👇</p>
           </TooltipContent>
         </Tooltip>
       </div>
@@ -688,8 +686,8 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
             {part.text}
           </MessageContent>
         )
-      case 'step-start':
-        return index > 0 ? <Separator key={index} className="!my-4" /> : null
+      // case 'step-start':
+      //   return index > 0 ? <Separator key={index} className="!my-4" /> : null
       case 'tool-invocation':
         switch (part.toolInvocation.state) {
           case 'partial-call':
@@ -705,7 +703,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
               )
             } else if (part.toolInvocation.toolName === 'three_drafts') {
               return <DraftsLoadingState key={index} />
-            } else {
+            } else if (part.toolInvocation.toolName === 'edit_tweet') {
               return <TweetSuggestionLoader key={index} />
             }
           case 'result':
@@ -714,6 +712,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                 <ReadLinkLoader
                   status="success"
                   key={index}
+                  // @ts-ignore
                   title={part.toolInvocation.result.title}
                   url={part.toolInvocation.args?.website_url}
                 />
@@ -723,6 +722,14 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                 <div key={index} className="w-full">
                   <p className="text-base text-emerald-600 font-medium">
                     Ready! I've prepared 3 drafts for you. Choose your favorite below.
+                  </p>
+                </div>
+              )
+            } else if (part.toolInvocation.toolName === 'edit_tweet') {
+              return (
+                <div key={index} className="w-full">
+                  <p className="text-base text-emerald-600 font-medium">
+                    Ready! I've edited your tweet.
                   </p>
                 </div>
               )
@@ -792,7 +799,16 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                       const hasAssistantAfterUser = reversed
                         .slice(0, lastUserIdx)
                         .some((m) => m.role === 'assistant')
-                      const showTyping = status === 'submitted' && !hasAssistantAfterUser
+                      
+                      // Check if there's an active tool call that should take precedence over typing indicator
+                      const hasActiveToolCall = reversed.some((m) => 
+                        m.parts.some((part) => 
+                          part.type === 'tool-invocation' && 
+                          (part.toolInvocation.state === 'partial-call' || part.toolInvocation.state === 'call')
+                        )
+                      )
+                      
+                      const showTyping = status === 'submitted' && !hasAssistantAfterUser && !hasActiveToolCall
                       const renderList = [...reversed]
                       if (showTyping) {
                         renderList.splice(lastUserIdx, 0, {
@@ -880,7 +896,9 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
 
                       <div className="w-2/3 mt-8 mb-4 flex items-center gap-3">
                         <div className="h-px flex-1 bg-stone-200"></div>
-                        <p className="text-xs text-stone-500">Click to select example 👇</p>
+                        <p className="text-xs text-stone-500">
+                          Click to select example 👇
+                        </p>
                         <div className="h-px flex-1 bg-stone-200"></div>
                       </div>
 
