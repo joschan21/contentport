@@ -58,6 +58,7 @@ FEATURE IDEAS
 
 - Set the stripe secret and public keys to prod values
 - Check that the values in `src/constants/stripe-prodcuts.ts` have the values you want for the production product
+- Reset values of `src/constants/stripe-subscription.ts` to `null` so that seeding will populate the constant used in the code to production product values
 - Run the seed-stripe command
 - Commit the seeded product json file
 - Push to prod
