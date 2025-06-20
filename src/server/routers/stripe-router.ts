@@ -3,7 +3,7 @@ import { stripe } from '@/lib/stripe/client'
 import { j, privateProcedure } from '@/server/jstack'
 import type Stripe from 'stripe'
 
-const stripeRouter = j.router({
+export const stripeRouter = j.router({
   createCheckout: privateProcedure.query(async ({ c, ctx: { user } }) => {
     try {
       const url = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
