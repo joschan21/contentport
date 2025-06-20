@@ -53,3 +53,11 @@ PRIORITY
 FEATURE IDEAS
 
 - [ ] Show related documents to user query in chat (e.g. typed in ...about contentport) -> suggest docs related to contentport above certain threshold (0.9)
+
+### Before pushing to prod
+
+- Set the stripe secret and public keys to prod values
+- Check that the values in `src/constants/stripe-prodcuts.ts` have the values you want for the production product
+- Run the seed-stripe command
+- Commit the seeded product json file
+- Push to prod

@@ -45,3 +45,4 @@ next-env.d.ts
 certificates
 
 pnpm-lock.yaml
+pnpm-workspace.yaml
