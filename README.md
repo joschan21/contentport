@@ -1,49 +1,55 @@
 ## contentport
 
 MVP
-- style dropdown and config (X)
-- make assistant list improvements (X)
-- no refresh needed after new context doc (X)
-- remove save/history
+
+- [x] Style dropdown and config
+- [x] Make assistant list improvements
+- [x] No refresh needed after new context doc
+- [ ] Remove save/history
 
 style tab:
-- add new style
-- import tweets
-- custom prompt
+
+- [ ] Add new style
+- [ ] Import tweets
+- [ ] Custom prompt
 
 edit tool should just know about:
-- current message
-- previous suggestions
-- current tweet state
+
+- [ ] Current message
+- [ ] Previous suggestions
+- [ ] Current tweet state
 
 CURRENT
-- remove "al tweets" - just show all for simplicity
+
+- [ ] Remove "al tweets" - just show all for simplicity
 
 BUGS
-- safari image editor doesnt work
-- chrome edit image doesnt work
-- after some time most recent tweets are not shown in sidebar, only after reloading 
+
+- [ ] Safari image editor doesnt work
+- [ ] Chrome edit image doesnt work
+- [ ] After some time most recent tweets are not shown in sidebar, only after reloading
 
 NEED TO DO BEFORE NEXT SHIP:
 
 BUG FIXES
-- when clicking "new tweet", start a new chat
+
+- [ ] When clicking "new tweet", start a new chat
 
 PRIORITY
-- one tweet can override another in recents HARD
-- implement back rate-limiting EASY
-- allow navigation while chatting to asisstant (ideally just like openai desktop) HARD
-    HOTFIX: force nav to studio if not already there
-- refresh knowledge base after onboarding and after inserting new document EASY
-    LET IN BATCH - 50
-- drafts (3 to choose from)
-- offer option to save as knowledge doc EASY
-    LET IN BATCH
-- image editor fixes HARD
-    - image tool doesnt work anymore
-    LET IN BATCH
 
+- [ ] One tweet can override another in recents HARD
+- [ ] Implement back rate-limiting EASY
+- [ ] Allow navigation while chatting to asisstant (ideally just like openai desktop) HARD
+      HOTFIX: force nav to studio if not already there
+- [ ] Refresh knowledge base after onboarding and after inserting new document EASY
+      LET IN BATCH - 50
+- [ ] Drafts (3 to choose from)
+- [ ] Offer option to save as knowledge doc EASY
+      LET IN BATCH
+- [] Image editor fixes HARD
+- [ ] Image tool doesnt work anymore
+      LET IN BATCH
 
 FEATURE IDEAS
-- show related documents to user query in chat (e.g. typed in ...about contentport) -> suggest docs related to contentport above certain threshold (0.9)
 
+- [ ] Show related documents to user query in chat (e.g. typed in ...about contentport) -> suggest docs related to contentport above certain threshold (0.9)
