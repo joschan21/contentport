@@ -36,8 +36,7 @@ export const stripeRouter = j.router({
             payment_method_reuse_agreement: {
               position: 'auto',
             },
-            terms_of_service: 'required',
-            promotions: 'none',
+            //   terms_of_service: 'required',
           },
         })
         return c.json({ url: checkout.url ?? null })
