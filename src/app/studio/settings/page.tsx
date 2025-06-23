@@ -35,18 +35,43 @@ const Page = () => {
   }
 
   const router = useRouter()
+  /**
+   * Initiate a Stripe Checkout session for subscription upgrade.
+   * Calls the server API to retrieve a checkout URL and navigates the user to Stripe Checkout.
+   */
   const handleUpgrade = async () => {
     try {
-      const res = await client.stripe.createCheckout.$get()
+      const res = await client.stripe.checkout_session.$get()
       const data = await res.json()
       if ('error' in data) {
         console.error(data.error)
         return
       }
+
       // redirect to checkout
-      window.location.assign(data.url!)
+      router.push(data.url!)
     } catch (err) {
       console.error('Upgrade error:', err)
+    }
+  }
+
+  /**
+   * Initiate a Stripe Billing Portal session for subscription management.
+   * Calls the server API to retrieve a billing portal URL and navigates the user there.
+   */
+  const handleBillingPortal = async () => {
+    try {
+      const res = await client.stripe.billing_portal.$get()
+      const data = await res.json()
+      if ('error' in data) {
+        console.error(data.error)
+        return
+      }
+
+      // redirect to billing portal
+      router.push(data.url!)
+    } catch (err) {
+      console.error('Portal error:', err)
     }
   }
 
@@ -99,8 +124,9 @@ const Page = () => {
                 ? `${limit.remaining}/20 messages remaining`
                 : '- messages remaining'}
             </div>
-            <div className="flex items-center justify-center mt-2">
+            <div className="flex items-center justify-center mt-2 gap-2">
               <Button onClick={handleUpgrade}>Upgrade</Button>
+              <Button onClick={handleBillingPortal}>Manage plan</Button>
             </div>
           </div>
         </div>
