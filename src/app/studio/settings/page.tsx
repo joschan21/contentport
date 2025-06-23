@@ -9,6 +9,7 @@ import { client } from '@/lib/client'
 import { useQuery } from '@tanstack/react-query'
 import { format, isToday, isTomorrow } from 'date-fns'
 import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 
 const Page = () => {
   const { data } = authClient.useSession()
@@ -45,6 +46,7 @@ const Page = () => {
       const data = await res.json()
       if ('error' in data) {
         console.error(data.error)
+        toast.error(data.error)
         return
       }
 
@@ -52,6 +54,8 @@ const Page = () => {
       router.push(data.url!)
     } catch (err) {
       console.error('Upgrade error:', err)
+      toast.error('Something went wrong')
+      return
     }
   }
 
@@ -65,6 +69,7 @@ const Page = () => {
       const data = await res.json()
       if ('error' in data) {
         console.error(data.error)
+        toast.error(data.error)
         return
       }
 
@@ -72,6 +77,8 @@ const Page = () => {
       router.push(data.url!)
     } catch (err) {
       console.error('Portal error:', err)
+      toast.error('Something went wrong')
+      return
     }
   }
 
