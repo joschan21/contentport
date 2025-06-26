@@ -1,6 +1,7 @@
 import { db } from '@/db'
 import { user } from '@/db/schema'
 import { stripe } from '@/lib/stripe/client'
+import { redis } from '@/lib/redis'
 import type Stripe from 'stripe'
 import { and, eq } from 'drizzle-orm'
 import { STRIPE_SUBSCRIPTION_DATA } from '@/constants/stripe-subscription'
@@ -43,6 +44,15 @@ export const POST = async (req: Request) => {
       status: 403,
     })
   }
+  // Idempotency guard: prevent processing the same Stripe event more than once
+  const eventId = event.id
+  const cacheKey = `stripe:event:${eventId}`
+  const already = await redis.get(cacheKey)
+  if (already) {
+    return new Response('Event already processed', { status: 200 })
+  }
+  // mark event processed for 24 hours
+  await redis.set(cacheKey, '1', { ex: 86400 })
 
   const { data, type } = event
 
@@ -66,6 +76,7 @@ export const POST = async (req: Request) => {
         })
       }
     }
+
     /**
      * Handle customer.updated: update local user name when the Stripe customer name changes.
      */
@@ -76,6 +87,7 @@ export const POST = async (req: Request) => {
       if (!newName) {
         return new Response('Missing name in customer.updated webhook', { status: 400 })
       }
+
       try {
         // Find user and update name if changed
         const userToUpdateQuery = await db
@@ -83,16 +95,20 @@ export const POST = async (req: Request) => {
           .from(user)
           .where(eq(user.stripeId, updatedCustomer.id))
         const userToUpdate = userToUpdateQuery[0]
+
         if (!userToUpdate) {
           return new Response('User not found', { status: 404 })
         }
+
         if (userToUpdate.name !== newName) {
           await db
             .update(user)
             .set({ name: newName })
             .where(eq(user.stripeId, updatedCustomer.id))
+
           return new Response('User name updated', { status: 200 })
         }
+
         return new Response('Nothing to update for user', { status: 200 })
       } catch (err) {
         console.error('Error handling customer.updated webhook:', err)
@@ -101,6 +117,11 @@ export const POST = async (req: Request) => {
         })
       }
     }
+
+    /**
+     * Handle customer.subscription.created: upgrade user to pro plan when a valid subscription is created in Stripe.
+     * @returns {Promise<Response>} 200 when upgraded; 400 for missing/invalid data; 500 on internal error
+     */
     case 'customer.subscription.created': {
       const subscription = data.object as Stripe.Subscription
       const { status, items, customer } = subscription
@@ -145,25 +166,77 @@ export const POST = async (req: Request) => {
         })
       }
     }
-    case 'customer.subscription.deleted':
-      const customerSubscriptionDeleted = data.object
-      break
-    case 'customer.subscription.paused':
-      const customerSubscriptionPaused = data.object
-      break
-    case 'customer.subscription.resumed':
-      const customerSubscriptionResumed = data.object
-      break
-    case 'customer.subscription.updated':
-      const customerSubscriptionUpdated = data.object
-      break
-    case 'invoice.paid':
+
+    /**
+     * Handle customer.subscription.deleted: downgrade user to free plan when their subscription is deleted in Stripe.
+     * @returns {Promise<Response>} 200 when downgraded; 500 on internal error
+     */
+    case 'customer.subscription.deleted': {
+      const subscription = data.object as Stripe.Subscription
+      try {
+        // Downgrade user to free plan when subscription is deleted
+        await db
+          .update(user)
+          .set({ plan: 'free' })
+          .where(eq(user.stripeId, subscription.customer as string))
+
+        return new Response('Subscription deleted, user downgraded to free', {
+          status: 200,
+        })
+      } catch (err) {
+        console.error('Error handling customer.subscription.deleted:', err)
+        return new Response('Internal Server Error: could not downgrade plan', {
+          status: 500,
+        })
+      }
+    }
+
+    /**
+     * Handle customer.subscription.updated: sync user plan (pro/free) based on Stripe subscription status and price.
+     * @returns {Promise<Response>} 200 when plan synced or no change; 500 on internal error
+     */
+    case 'customer.subscription.updated': {
+      const subscription = data.object as Stripe.Subscription
+      const status = subscription.status
+      const firstItem = subscription.items?.data?.[0]
+
+      // Determine new plan based on status and price ID
+      let newPlan: 'pro' | 'free' = 'free'
+      if (
+        firstItem?.price.id === STRIPE_SUBSCRIPTION_DATA.priceId &&
+        ['active', 'trialing'].includes(status)
+      ) {
+        newPlan = 'pro'
+      }
+
+      try {
+        const { rowCount } = await db
+          .update(user)
+          .set({ plan: newPlan })
+          .where(eq(user.stripeId, subscription.customer as string))
+
+        if (rowCount === 0) {
+          return new Response('User not found or no plan change needed', { status: 200 })
+        }
+
+        return new Response(`User plan updated to ${newPlan}`, { status: 200 })
+      } catch (err) {
+        console.error('Error handling customer.subscription.updated:', err)
+        return new Response('Internal Server Error: could not update plan', {
+          status: 500,
+        })
+      }
+    }
+
+    case 'invoice.paid': {
       const invoicePaid = data.object
       const customerId = invoicePaid.customer
+
       const firstItem = invoicePaid.lines?.data?.[0]
       if (!firstItem) {
         return new Response('Invoice has no line items', { status: 400 })
       }
+
       // Only handle our Pro plan price
       if (firstItem.pricing?.price_details?.price !== STRIPE_SUBSCRIPTION_DATA.priceId) {
         return new Response(
@@ -173,6 +246,7 @@ export const POST = async (req: Request) => {
           }
         )
       }
+
       try {
         // Only upgrade if the user is still on "free"
         const { rowCount } = await db
@@ -192,8 +266,11 @@ export const POST = async (req: Request) => {
           status: 500,
         })
       }
-    default:
+    }
+
+    default: {
       return new Response('Unhandled event type', { status: 400 })
+    }
   }
 }
 

@@ -160,4 +160,5 @@ export const allowlist = [
   'onlineplattformjjs@gmail.com',
   'themujahidkhan2507@gmail.com',
   'irasubizadivinprince@gmail.com',
+  'Jayan110105@gmail.com',
 ]
