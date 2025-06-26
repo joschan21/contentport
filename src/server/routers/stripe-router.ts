@@ -60,8 +60,8 @@ export const stripeRouter = j.router({
           billing_address_collection: 'auto',
           line_items: [{ price: STRIPE_SUBSCRIPTION_DATA.priceId!, quantity: 1 }],
           customer: customer.id,
-          success_url: `${url}/success`,
-          cancel_url: `${url}/cancel`,
+          success_url: `${url}/studio/settings?s=processing`,
+          cancel_url: `${url}/studio/settings?s=cancelled`,
           payment_method_types: ['card', 'link', 'paypal'],
           adaptive_pricing: {
             enabled: true,

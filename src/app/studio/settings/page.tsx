@@ -8,11 +8,44 @@ import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
 import { useQuery } from '@tanstack/react-query'
 import { format, isToday, isTomorrow } from 'date-fns'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
 import toast from 'react-hot-toast'
 
 const Page = () => {
   const { data } = authClient.useSession()
+
+  const searchParams = useSearchParams()
+  const status = searchParams.get('s')
+
+  useEffect(() => {
+    if (status) {
+      if (status === 'cancelled') {
+        toast.error('Checkout cancelled.')
+      }
+
+      if (status === 'pending') {
+        const pollForUpgrade = async () => {
+          // implement proper polling of session to check user plan has been upgraded
+        }
+
+        toast.promise(
+          pollForUpgrade(),
+          {
+            loading: 'Waiting for plan to upgrade…',
+            success: 'Your plan has been upgraded! 🎉',
+            error: (err) =>
+              err.message === 'timeout'
+                ? 'Upgrade timed out. Please try again or contact support.'
+                : 'Upgrade failed. Please refresh and try again.',
+          },
+          {
+            duration: 10,
+          }
+        )
+      }
+    }
+  }, [status])
 
   const { data: limit } = useQuery({
     queryKey: ['get-limit'],
