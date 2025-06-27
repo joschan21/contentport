@@ -255,10 +255,10 @@ export function TweetProvider({ children }: PropsWithChildren) {
         const p = $createParagraphNode()
 
         diffs.forEach((diff) => {
-          console.log('comparison', { diff, acceptedDiff })
           if (diff.id === acceptedDiff.id) {
-            console.log('match!')
-            const text = $createTextNode(diff.replacement ?? diff.text)
+            const text = $createTextNode(
+              diff.type === -1 ? '' : (diff.replacement ?? diff.text),
+            )
             p.append(text)
 
             return

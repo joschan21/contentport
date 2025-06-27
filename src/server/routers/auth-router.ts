@@ -79,7 +79,6 @@ export const authRouter = j.router({
     }),
 
   callback: publicProcedure.get(async ({ c }) => {
-    console.log('CALLBACK IS RUNNING')
     const oauth_token = c.req.query('oauth_token')
     const oauth_verifier = c.req.query('oauth_verifier')
 
