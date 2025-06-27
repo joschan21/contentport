@@ -14,6 +14,7 @@ import { useEffect } from 'react'
 import toast from 'react-hot-toast'
 
 const Page = () => {
+  const router = useRouter()
   const { data } = authClient.useSession()
 
   const searchParams = useSearchParams()
@@ -25,28 +26,18 @@ const Page = () => {
         toast.error('Checkout cancelled.')
       }
 
-      if (status === 'pending') {
-        const pollForUpgrade = async () => {
-          // implement proper polling of session to check user plan has been upgraded
+      if (status === 'processing') {
+        if (data?.user.plan === 'pro') {
+          toast.success('Upgraded to pro.')
+          router.push('/studio/settings')
+          return
         }
 
-        toast.promise(
-          pollForUpgrade(),
-          {
-            loading: 'Waiting for plan to upgrade…',
-            success: 'Your plan has been upgraded! 🎉',
-            error: (err) =>
-              err.message === 'timeout'
-                ? 'Upgrade timed out. Please try again or contact support.'
-                : 'Upgrade failed. Please refresh and try again.',
-          },
-          {
-            duration: 10,
-          }
-        )
+        // Add optional refetching of session every set interval incase the upgrade takes a while to be logged in the db
+        return
       }
     }
-  }, [status])
+  }, [data])
 
   const { data: limit } = useQuery({
     queryKey: ['get-limit'],
@@ -69,7 +60,6 @@ const Page = () => {
     return `Resets ${format(date, 'MMM d')} at ${timeStr}`
   }
 
-  const router = useRouter()
   /**
    * Initiate a Stripe Billing Portal session for subscription management.
    * Calls the server API to retrieve a billing portal URL and navigates the user there.

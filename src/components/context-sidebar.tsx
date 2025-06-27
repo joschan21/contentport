@@ -309,9 +309,10 @@ export const LeftSidebar = () => {
           </div>
         </div>
 
+        {/* Doesn't look right with the other non-collapsed footer, can remove if cannot be fixed. */}
         <div
           className={cn(
-            'transition-all duration-200 ease-out overflow-hidden',
+            'transition-all duration-0 ease-out overflow-hidden',
             isCollapsed ? 'opacity-100 max-h-[1000px]' : 'opacity-0 max-h-0'
           )}
         >
@@ -323,7 +324,7 @@ export const LeftSidebar = () => {
               }}
               className={buttonVariants({
                 variant: 'ghost',
-                className: "text-muted-foreground hover:text-foreground"
+                className: 'text-muted-foreground hover:text-foreground',
               })}
             >
               <Settings className="size-6" />
