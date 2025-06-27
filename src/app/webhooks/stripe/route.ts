@@ -34,8 +34,11 @@ export const POST = async (req: Request) => {
     return new Response("Error: Missing 'stripe-signature' header", { status: 400 })
   }
 
+  // Read raw body for Stripe signature verification
+  const payload = await req.text()
+
   const { event } = await validateWebhook({
-    body: req.body,
+    body: payload,
     signature,
   })
 
@@ -151,6 +154,13 @@ export const POST = async (req: Request) => {
         })
       }
 
+      if (status === 'trialing') {
+        await db
+          .update(user)
+          .set({ hadTrial: true })
+          .where(eq(user.stripeId, String(customer)))
+      }
+
       try {
         // Promote the user to the "pro" plan
         await db
@@ -223,6 +233,56 @@ export const POST = async (req: Request) => {
       } catch (err) {
         console.error('Error handling customer.subscription.updated:', err)
         return new Response('Internal Server Error: could not update plan', {
+          status: 500,
+        })
+      }
+    }
+
+    case 'customer.subscription.paused': {
+      const subscription = data.object as Stripe.Subscription
+      try {
+        await db
+          .update(user)
+          .set({ plan: 'free' })
+          .where(eq(user.stripeId, subscription.customer as string))
+
+        return new Response('Subscription paused, user downgraded to free', {
+          status: 200,
+        })
+      } catch (err) {
+        console.error('Error handling customer.subscription.paused:', err)
+        return new Response('Internal Server Error: could not pause subscription', {
+          status: 500,
+        })
+      }
+    }
+
+    case 'customer.subscription.resumed': {
+      const subscription = data.object as Stripe.Subscription
+      const firstItem = subscription.items?.data?.[0]
+      if (!firstItem) {
+        return new Response('Resumed subscription contains no items', { status: 400 })
+      }
+
+      // Only handle our Pro plan price
+      if (firstItem.price.id !== STRIPE_SUBSCRIPTION_DATA.priceId) {
+        return new Response(`Unrecognized price ID "${firstItem.price.id}" on resume`, {
+          status: 200,
+        })
+      }
+
+      try {
+        await db
+          .update(user)
+          .set({ plan: 'pro' })
+          .where(eq(user.stripeId, subscription.customer as string))
+
+        return new Response('Subscription resumed, user upgraded to pro plan', {
+          status: 200,
+        })
+      } catch (err) {
+        console.error('Error handling customer.subscription.resumed:', err)
+        return new Response('Internal Server Error: could not resume subscription', {
           status: 500,
         })
       }

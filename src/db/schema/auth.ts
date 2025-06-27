@@ -12,6 +12,7 @@ export const user = pgTable('user', {
     .notNull()
     .default('free'),
   stripeId: text('stripe_id').unique(),
+  hadTrial: boolean('had_trial').default(false),
 })
 
 export const session = pgTable('session', {

@@ -40,11 +40,6 @@ const storedPriceId = stripeSubData.priceId ?? null
 
 // Check if product already exists and set the id in constant if it does and isn't already set.
 const checkExisting = async () => {
-  // If both product and price IDs are already stored, nothing to do
-  if (prodID && storedPriceId) {
-    console.log('Product and price IDs are already stored; skipping update.')
-    return
-  }
   let stored: boolean = false
   let onStripe: boolean = false
   let priceId: string | undefined
@@ -56,16 +51,24 @@ const checkExisting = async () => {
     product = await stripe.products.retrieve(prodID, {
       expand: ['default_price', 'marketing_features'],
     })
-    if (product) onStripe = true
+    if (product && !product.deleted && product.active) {
+      onStripe = true
+    } else {
+      console.log(`Stored product ${prodID} is archived or inactive, ignoring.`)
+      product = undefined
+    }
   } else {
     console.log("Product doesn't exist in stored constant")
     const productSearch = await stripe.products.search({
       query: `name:"${STRIPE_SUB_TEMPLATE.name}"`,
       expand: ['data.default_price', 'data.marketing_features'],
     })
-    if (productSearch.data[0]) {
+    const activeResults = productSearch.data.filter((p) => p.active && !p.deleted)
+    if (activeResults.length > 0) {
       onStripe = true
-      product = productSearch.data[0]
+      product = activeResults[0]
+    } else {
+      console.log(`No active products found matching "${STRIPE_SUB_TEMPLATE.name}".`)
     }
   }
 

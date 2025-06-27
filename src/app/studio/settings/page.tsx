@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import DuolingoBadge from '@/components/ui/duolingo-badge'
 import { Progress } from '@/components/ui/progress'
+import { UpgradeDrawer } from '@/components/upgrade-drawer'
 import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
 import { useQuery } from '@tanstack/react-query'
@@ -70,29 +71,6 @@ const Page = () => {
 
   const router = useRouter()
   /**
-   * Initiate a Stripe Checkout session for subscription upgrade.
-   * Calls the server API to retrieve a checkout URL and navigates the user to Stripe Checkout.
-   */
-  const handleUpgrade = async () => {
-    try {
-      const res = await client.stripe.checkout_session.$get()
-      const data = await res.json()
-      if ('error' in data) {
-        console.error(data.error)
-        toast.error(data.error)
-        return
-      }
-
-      // redirect to checkout
-      router.push(data.url!)
-    } catch (err) {
-      console.error('Upgrade error:', err)
-      toast.error('Something went wrong')
-      return
-    }
-  }
-
-  /**
    * Initiate a Stripe Billing Portal session for subscription management.
    * Calls the server API to retrieve a billing portal URL and navigates the user there.
    */
@@ -137,7 +115,7 @@ const Page = () => {
               <p className="text-sm text-gray-500">{data?.user.email}</p>
             </div>
             <DuolingoBadge className="mb-6 px-3">
-              {data?.user.plan === 'free' ? 'Free Plan' : null}
+              {data?.user.plan === 'free' ? 'Free Plan' : 'Pro Plan'}
             </DuolingoBadge>
           </div>
 
@@ -165,7 +143,7 @@ const Page = () => {
                 : '- messages remaining'}
             </div>
             <div className="flex items-center justify-center mt-2 gap-2">
-              <Button onClick={handleUpgrade}>Upgrade</Button>
+              {data?.user.plan === 'free' ? <UpgradeDrawer /> : null}
               <Button onClick={handleBillingPortal}>Manage plan</Button>
             </div>
           </div>

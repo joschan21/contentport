@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed-stripe": "tsx seed-stripe.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.12",

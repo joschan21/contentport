@@ -8,7 +8,13 @@ import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
 import { $getRoot } from 'lexical'
-import { ArrowLeftFromLine, ArrowRightFromLine, PanelLeft, Plus } from 'lucide-react'
+import {
+  ArrowLeftFromLine,
+  ArrowRightFromLine,
+  PanelLeft,
+  Plus,
+  Settings,
+} from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createSerializer, parseAsString } from 'nuqs'
@@ -67,7 +73,7 @@ export const LeftSidebar = () => {
           <p
             className={cn(
               'text-sm/6 text-stone-800 transition-all duration-200 ease-out',
-              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
             )}
           >
             contentport.
@@ -95,7 +101,7 @@ export const LeftSidebar = () => {
               <span
                 className={cn(
                   'transition-all opacity-0 duration-200 ease-out delay-200',
-                  isCollapsed ? 'opacity-0 w-0 overflow-hidden hidden' : 'opacity-100',
+                  isCollapsed ? 'opacity-0 w-0 overflow-hidden hidden' : 'opacity-100'
                 )}
               >
                 My Tweet
@@ -113,7 +119,7 @@ export const LeftSidebar = () => {
                   className: 'justify-start gap-2 px-3 py-2',
                 }),
                 pathname.includes('/studio/knowledge') &&
-                  'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
+                  'bg-stone-200 hover:bg-stone-200 text-accent-foreground'
               )}
             >
               <div className="size-6 flex items-center justify-center flex-shrink-0">
@@ -122,7 +128,7 @@ export const LeftSidebar = () => {
               <span
                 className={cn(
                   'transition-all duration-200 ease-out',
-                  isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+                  isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
                 )}
               >
                 Knowledge Base
@@ -255,7 +261,7 @@ export const LeftSidebar = () => {
         <div
           className={cn(
             'transition-all duration-200 ease-out overflow-hidden',
-            isCollapsed ? 'opacity-0 max-h-0' : 'opacity-100 max-h-[1000px]',
+            isCollapsed ? 'opacity-0 max-h-0' : 'opacity-100 max-h-[1000px]'
           )}
         >
           <div className="flex flex-col gap-2">
@@ -270,7 +276,7 @@ export const LeftSidebar = () => {
                     variant: 'outline',
                     className: 'flex items-center gap-2 justify-start px-3 py-2',
                   }),
-                  'h-16',
+                  'h-16'
                 )}
               >
                 <Avatar className="size-9 border-2 border-white shadow-md">
@@ -300,6 +306,28 @@ export const LeftSidebar = () => {
             >
               Feedback 🫶
             </a>
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            'transition-all duration-200 ease-out overflow-hidden',
+            isCollapsed ? 'opacity-100 max-h-[1000px]' : 'opacity-0 max-h-0'
+          )}
+        >
+          <div className="flex flex-col gap-2">
+            <Link
+              href={{
+                pathname: `/studio/settings`,
+                search: chatId ? `?chatId=${chatId}` : undefined,
+              }}
+              className={buttonVariants({
+                variant: 'ghost',
+                className: "text-muted-foreground hover:text-foreground"
+              })}
+            >
+              <Settings className="size-6" />
+            </Link>
           </div>
         </div>
       </SidebarFooter>

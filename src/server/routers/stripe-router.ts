@@ -17,6 +17,7 @@ import { stripe } from '@/lib/stripe/client'
 import { j, privateProcedure } from '@/server/jstack'
 import { eq } from 'drizzle-orm'
 import type Stripe from 'stripe'
+import { z } from 'zod'
 
 export const stripeRouter = j.router({
   /**
@@ -24,64 +25,86 @@ export const stripeRouter = j.router({
    * Ensures a Customer exists (creates one and updates user.stripeId in DB if missing).
    * @returns JSON with { url: string | null } for redirecting to Stripe Checkout.
    */
-  checkout_session: privateProcedure.query(
-    async ({
-      c,
-      ctx: {
-        user: { id, email, name, stripeId },
-      },
-    }) => {
-      try {
-        const url = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
-        let customer: Stripe.Customer | undefined
+  checkout_session: privateProcedure
+    .input(
+      z.object({
+        trial: z.boolean().optional(),
+      })
+    )
+    .query(
+      async ({
+        c,
+        ctx: {
+          user: { id, email, name, stripeId, hadTrial },
+        },
+        input: { trial },
+      }) => {
+        try {
+          const url = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
+          let customer: Stripe.Customer | undefined
 
-        if (stripeId) {
-          customer = (await stripe.customers.retrieve(stripeId)) as Stripe.Customer
-        } else {
-          const customerSearch = await stripe.customers.search({
-            query: `email: "${email}"`,
-          })
-          customer = customerSearch.data[0] as Stripe.Customer | undefined
-        }
-
-        if (!customer) {
-          customer = await stripe.customers.create({ name: name, email: email })
-
-          await db
-            .update(user)
-            .set({
-              stripeId: customer.id,
+          if (stripeId) {
+            customer = (await stripe.customers.retrieve(stripeId)) as Stripe.Customer
+          } else {
+            const customerSearch = await stripe.customers.search({
+              query: `email: "${email}"`,
             })
-            .where(eq(user.id, id))
-        }
+            customer = customerSearch.data[0] as Stripe.Customer | undefined
+          }
 
-        const checkout = await stripe.checkout.sessions.create({
-          mode: 'subscription',
-          billing_address_collection: 'auto',
-          line_items: [{ price: STRIPE_SUBSCRIPTION_DATA.priceId!, quantity: 1 }],
-          customer: customer.id,
-          success_url: `${url}/studio/settings?s=processing`,
-          cancel_url: `${url}/studio/settings?s=cancelled`,
-          payment_method_types: ['card', 'link', 'paypal'],
-          adaptive_pricing: {
-            enabled: true,
-          },
-          currency: 'usd',
-          consent_collection: {
-            payment_method_reuse_agreement: {
-              position: 'auto',
+          if (!customer) {
+            customer = await stripe.customers.create({ name: name, email: email })
+
+            await db
+              .update(user)
+              .set({
+                stripeId: customer.id,
+              })
+              .where(eq(user.id, id))
+          } else {
+            await db.update(user).set({ stripeId: customer.id }).where(eq(user.id, id))
+          }
+
+          const checkout = await stripe.checkout.sessions.create({
+            mode: 'subscription',
+            billing_address_collection: 'auto',
+            line_items: [{ price: STRIPE_SUBSCRIPTION_DATA.priceId!, quantity: 1 }],
+            customer: customer.id,
+            success_url: `${url}/studio/settings?s=processing`,
+            cancel_url: `${url}/studio/settings?s=cancelled`,
+            payment_method_types: ['card', 'link', 'paypal'],
+            adaptive_pricing: {
+              enabled: true,
             },
-            //   terms_of_service: 'required',
-          },
-        })
-        return c.json({ url: checkout.url ?? null })
-      } catch (error: unknown) {
-        console.error('Error creating checkout session:', error)
-        const message = error instanceof Error ? error.message : 'Unknown error occurred'
-        return c.json({ error: message })
+            currency: 'usd',
+            consent_collection: {
+              payment_method_reuse_agreement: {
+                position: 'auto',
+              },
+            },
+            payment_method_collection: 'if_required',
+            // only include trial settings if the user requests a trial and hasn't had one before
+            ...(trial &&
+              !hadTrial && {
+                subscription_data: {
+                  trial_period_days: 7,
+                  trial_settings: {
+                    end_behavior: {
+                      missing_payment_method: 'pause',
+                    },
+                  },
+                },
+              }),
+          })
+          return c.json({ url: checkout.url ?? null })
+        } catch (error: unknown) {
+          console.error('Error creating checkout session:', error)
+          const message =
+            error instanceof Error ? error.message : 'Unknown error occurred'
+          return c.json({ error: message })
+        }
       }
-    }
-  ),
+    ),
 
   /**
    * Create a Stripe Billing Portal session to allow the user to manage their subscription.
@@ -117,6 +140,8 @@ export const stripeRouter = j.router({
               stripeId: customer.id,
             })
             .where(eq(user.id, id))
+        } else {
+          await db.update(user).set({ stripeId: customer.id }).where(eq(user.id, id))
         }
 
         const portal = await stripe.billingPortal.sessions.create({
@@ -126,6 +151,41 @@ export const stripeRouter = j.router({
         return c.json({ url: portal.url ?? null })
       } catch (error: unknown) {
         console.error('Error creating billing portal session:', error)
+        const message = error instanceof Error ? error.message : 'Unknown error occurred'
+        return c.json({ error: message })
+      }
+    }
+  ),
+
+  subscription_product: privateProcedure.query(
+    async ({
+      c,
+      ctx: {
+        user: { hadTrial },
+      },
+    }) => {
+      try {
+        const product = await stripe.products.retrieve(STRIPE_SUBSCRIPTION_DATA.id!, {
+          expand: ['default_price'],
+        })
+        if (!product || !product.active) {
+          return c.json({ error: 'No subscription available' })
+        }
+
+        const offerTrial = true
+        const enableTrial: boolean = offerTrial && !hadTrial
+
+        return c.json({
+          subscription: {
+            name: product.name,
+            description: product.description,
+            features: product.marketing_features,
+            price: product.default_price as Stripe.Price,
+            enableTrial,
+          },
+        })
+      } catch (error) {
+        console.error('Error fetching subscription product:', error)
         const message = error instanceof Error ? error.message : 'Unknown error occurred'
         return c.json({ error: message })
       }
