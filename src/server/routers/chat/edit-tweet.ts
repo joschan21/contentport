@@ -1,4 +1,3 @@
-import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
 import { diff_wordMode } from '@/lib/diff-utils'
 import { editToolStyleMessage, editToolSystemPrompt } from '@/lib/prompt-utils'
 import { redis } from '@/lib/redis'
@@ -12,6 +11,12 @@ import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { Style } from '../style-router'
 import { PromptBuilder } from './utils'
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { Account } from '../settings-router'
+
+const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
+})
 
 interface CreateEditTweetArgs {
   chatId: string
@@ -42,7 +47,7 @@ export const create_edit_tweet = ({
         [
           redis.json.get<{ messages: TestUIMessage[] }>(redisKeys.chat),
           redis.json.get<Style>(redisKeys.style),
-          redis.json.get<ConnectedAccount>(redisKeys.account),
+          redis.json.get<Account>(redisKeys.account),
           redis.lrange<(FilePart | TextPart | ImagePart)[]>(
             `unseen-attachments:${chatId}`,
             0,
@@ -95,9 +100,19 @@ export const create_edit_tweet = ({
         },
       ]
 
+      const chatModel = openrouter.chat('google/gemini-2.5-pro', {
+        reasoning: { effort: 'low' },
+        models: [
+          'google/gemini-2.5-pro',
+          'anthropic/claude-3.5-sonnet',
+          'openai/o4-mini',
+        ],
+      })
+
       const result = await generateText({
+        model: chatModel,
         // model: xai("grok-3-latest"),
-        model: anthropic('claude-4-opus-20250514'),
+        // model: anthropic('claude-4-opus-20250514'),
         system: editToolSystemPrompt,
         messages: messages as CoreMessage[],
       })

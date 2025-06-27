@@ -50,6 +50,18 @@ export class MentionNode extends TextNode {
   canInsertTextAfter(): boolean {
     return false
   }
+
+  exportJSON(): SerializedTextNode {
+    return {
+      ...super.exportJSON(),
+      type: "mention",
+    }
+  }
+
+  static importJSON(serializedNode: SerializedTextNode): MentionNode {
+    const { text } = serializedNode
+    return new MentionNode(text)
+  }
 }
 
 export function $createMentionNode(text: string): MentionNode {
@@ -274,6 +286,10 @@ export class ElNode extends ElementNode {
 //   }
 // }
 
+interface SerializedAdditionNode extends SerializedTextNode {
+  id?: string
+}
+
 export class AdditionNode extends TextNode {
   __id?: string
 
@@ -308,6 +324,19 @@ export class AdditionNode extends TextNode {
     writable.__id = id
     return writable
   }
+
+  exportJSON(): SerializedAdditionNode {
+    return {
+      ...super.exportJSON(),
+      id: this.__id,
+      type: "addition",
+    }
+  }
+
+  static importJSON(serializedNode: SerializedAdditionNode): AdditionNode {
+    const { text, id } = serializedNode
+    return new AdditionNode(text, id)
+  }
 }
 
 export class UnchangedNode extends TextNode {
@@ -324,6 +353,18 @@ export class UnchangedNode extends TextNode {
     dom.classList.add("unchanged-node")
     return dom
   }
+
+  exportJSON(): SerializedTextNode {
+    return {
+      ...super.exportJSON(),
+      type: "unchanged",
+    }
+  }
+
+  static importJSON(serializedNode: SerializedTextNode): UnchangedNode {
+    const { text } = serializedNode
+    return new UnchangedNode(text)
+  }
 }
 
 export class DeletionNode extends TextNode {
@@ -339,6 +380,18 @@ export class DeletionNode extends TextNode {
     const dom = super.createDOM(config)
     dom.classList.add("deletion-node")
     return dom
+  }
+
+  exportJSON(): SerializedTextNode {
+    return {
+      ...super.exportJSON(),
+      type: "deletion",
+    }
+  }
+
+  static importJSON(serializedNode: SerializedTextNode): DeletionNode {
+    const { text } = serializedNode
+    return new DeletionNode(text)
   }
 }
 
@@ -379,6 +432,18 @@ export class UnprocessedNode extends TextNode {
     dom.classList.add("unprocessed-node")
     return dom
   }
+
+  exportJSON(): SerializedTextNode {
+    return {
+      ...super.exportJSON(),
+      type: "unprocessed",
+    }
+  }
+
+  static importJSON(serializedNode: SerializedTextNode): UnprocessedNode {
+    const { text } = serializedNode
+    return new UnprocessedNode(text)
+  }
 }
 
 export class AIEditNode extends TextNode {
@@ -394,6 +459,18 @@ export class AIEditNode extends TextNode {
     const dom = super.createDOM(config)
     dom.classList.add("ai-edit-node")
     return dom
+  }
+
+  exportJSON(): SerializedTextNode {
+    return {
+      ...super.exportJSON(),
+      type: "ai-edit",
+    }
+  }
+
+  static importJSON(serializedNode: SerializedTextNode): AIEditNode {
+    const { text } = serializedNode
+    return new AIEditNode(text)
   }
 }
 
@@ -467,6 +544,18 @@ export class ReplacementNode extends TextNode {
     const dom = super.createDOM(config)
     dom.classList.add("replacement-node")
     return dom
+  }
+
+  exportJSON(): SerializedTextNode {
+    return {
+      ...super.exportJSON(),
+      type: "replacement",
+    }
+  }
+
+  static importJSON(serializedNode: SerializedTextNode): ReplacementNode {
+    const { text } = serializedNode
+    return new ReplacementNode(text)
   }
 }
 

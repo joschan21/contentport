@@ -1,6 +1,7 @@
-"use client"
+'use client'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import DuolingoBadge from '@/components/ui/duolingo-badge'
 import { Progress } from '@/components/ui/progress'
 import { authClient } from '@/lib/auth-client'
@@ -30,6 +31,21 @@ const Page = () => {
       return `Resets tomorrow at ${timeStr}`
     }
     return `Resets ${format(date, 'MMM d')} at ${timeStr}`
+  }
+
+  const handleUpgrade = async () => {
+    // try {
+    //   const res = await client.stripe.createCheckout.$get()
+    //   const data = await res.json()
+    //   if ('error' in data) {
+    //     console.error(data.error)
+    //     return
+    //   }
+    //   // redirect to checkout
+    //   window.location.assign(data.url!)
+    // } catch (err) {
+    //   console.error('Upgrade error:', err)
+    // }
   }
 
   return (
@@ -80,6 +96,9 @@ const Page = () => {
               {typeof limit?.remaining === 'number'
                 ? `${limit.remaining}/20 messages remaining`
                 : '- messages remaining'}
+            </div>
+            <div className="flex items-center justify-center mt-2">
+              <Button onClick={handleUpgrade}>Upgrade</Button>
             </div>
           </div>
         </div>

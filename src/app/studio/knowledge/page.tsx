@@ -144,7 +144,7 @@ const Page = () => {
                   <ChevronDown className="size-4 ml-2" />
                 </DuolingoButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-96 p-3 border-2 shadow-xl">
+              <DropdownMenuContent align="end" className="p-3 border-2 shadow-xl">
                 <div className="space-y-2">
                   <DropdownMenuItem asChild>
                     <Link
@@ -152,19 +152,16 @@ const Page = () => {
                         pathname: '/studio/knowledge/new',
                         search: '?type=upload',
                       }}
-                      className="flex items-center gap-4 p-5 rounded-2xl hover:bg-indigo-50 transition-all cursor-pointer border-0 w-full group hover:shadow-sm"
+                      className="flex items-center gap-4 p-4 rounded-xl hover:bg-blue-50 transition-all cursor-pointer border-0 w-full group hover:shadow-sm"
                     >
-                      <div className="flex-shrink-0 w-14 h-14 bg-gray-50 group-hover:bg-indigo-100 rounded-2xl flex items-center justify-center transition-all group-hover:scale-105">
-                        <FolderOpen className="size-7 text-gray-500 group-hover:text-indigo-600 transition-colors" />
+                      <div className="flex-shrink-0 size-10 bg-gray-100 border border-gray-900 border-opacity-10 bg-clip-padding shadow-sm rounded-md flex items-center justify-center transition-all">
+                        <FolderOpen className="size-5 text-gray-600 transition-colors" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">📁</span>
-                          <h4 className="font-bold text-gray-900 group-hover:text-indigo-900 transition-colors">
-                            Upload Document
-                          </h4>
-                        </div>
-                        <p className="text-sm text-gray-500 leading-relaxed">
+                      <div className="flex-1 min-w-0 text-left">
+                        <h4 className="font-semibold text-gray-900 group-hover:text-blue-900 transition-colors">
+                          Upload Document
+                        </h4>
+                        <p className="text-sm opacity-60 leading-relaxed">
                           Upload pdf, docx, text or images
                         </p>
                       </div>
@@ -177,19 +174,16 @@ const Page = () => {
                         pathname: '/studio/knowledge/new',
                         search: '?type=url',
                       }}
-                      className="flex items-center gap-4 p-5 rounded-2xl hover:bg-indigo-50 transition-all cursor-pointer border-0 w-full group hover:shadow-sm"
+                      className="flex items-center gap-4 p-4 rounded-xl hover:bg-blue-50 transition-all cursor-pointer border-0 w-full group hover:shadow-sm"
                     >
-                      <div className="flex-shrink-0 w-14 h-14 bg-gray-50 group-hover:bg-indigo-100 rounded-2xl flex items-center justify-center transition-all group-hover:scale-105">
-                        <Globe className="size-7 text-gray-500 group-hover:text-indigo-600 transition-colors" />
+                      <div className="flex-shrink-0 size-10 bg-gray-100 border border-gray-900 border-opacity-10 bg-clip-padding shadow-sm rounded-md flex items-center justify-center transition-all">
+                        <Globe className="size-5 text-gray-600 transition-colors" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">🌐</span>
-                          <h4 className="font-bold text-gray-900 group-hover:text-indigo-900 transition-colors">
-                            Add from Website
-                          </h4>
-                        </div>
-                        <p className="text-sm text-gray-500 leading-relaxed">
+                      <div className="flex-1 min-w-0 text-left">
+                        <h4 className="font-semibold text-gray-900 group-hover:text-blue-900 transition-colors">
+                          Add from Website
+                        </h4>
+                        <p className="text-sm opacity-60 leading-relaxed">
                           Extract knowledge from articles and blog posts
                         </p>
                       </div>

@@ -53,3 +53,13 @@ PRIORITY
 FEATURE IDEAS
 
 - [ ] Show related documents to user query in chat (e.g. typed in ...about contentport) -> suggest docs related to contentport above certain threshold (0.9)
+
+NEW MIGRATION TODO:
+
+- put all "connected-account:${user.email}" also as "active-account:${user.email}"
+
+TODO:
+- add confirm modal to not DIRECTLY post (X)
+- queue improvements to allow nav during edits (X)
+- some kinda persistence to not delete current tweet (X)
+- add v2 verification badge check to adding account

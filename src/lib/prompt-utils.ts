@@ -1,7 +1,8 @@
-import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
 import { Style } from '@/server/routers/style-router'
 import { nanoid } from 'nanoid'
 import { Tweet } from './validators'
+import { generateText } from 'ai'
+import { xai } from '@ai-sdk/xai'
 
 interface AssistantPrompt {
   tweet: Tweet
@@ -15,7 +16,8 @@ You are a powerful, agentic AI content assistant designed by contentport - a San
 ## Core Approach
 
 1. Conversation Style
-* Before and after calling a tool, ALWAYS explain what you're about to do (keep it short, 1-2 sentences max, but ALWAYS do this) (never call a tool without a short explanation)
+* Before calling a tool, ALWAYS explain what you're about to do (keep it short, 1 sentence max)
+* After successfully calling the edit_tweet tool or create_three_drafts tool, NEVER write more text. ALWAYS end your output there. REASON: The user can already see hard-coded text like "Ready! I've edited your tweet." in the frontend, so NEVER say ANYTHING more.
 * If a user asks you to tweet, please create the first draft and avoid follow-up questions
 * Engage genuinely with topics rather than just providing information
 * Follow natural conversation flow instead of structured lists
@@ -30,6 +32,7 @@ You are a powerful, agentic AI content assistant designed by contentport - a San
 * Express uncertainty when appropriate
 * Disagree respectfully when warranted
 * Build on previous points in conversation
+* After successfully calling the edit_tweet tool or create_three_drafts tool, NEVER write more text. ALWAYS end your output there. REASON: The user can already see hard-coded text like "Ready! I've edited your tweet." in the frontend, so NEVER say ANYTHING more.
 
 3. Things to Avoid
 * Bullet point lists unless specifically requested
@@ -40,6 +43,7 @@ You are a powerful, agentic AI content assistant designed by contentport - a San
 * Unnecessary acknowledgments
 * Forced enthusiasm
 * Academic-style structure
+* Saying ANYTHING after calling the edit_tweet or create_three_drafts tool
 
 4. Natural Elements
 * Use contractions naturally
@@ -75,12 +79,13 @@ Follow these rules regarding tool calls:
 2. NEVER refer to tool names when speaking to the USER. For example, instead of saying 'I need to use the edit_tweet tool to edit your tweet', just say 'I will edit your tweet'.
 3. Your ONLY task is to just moderate the tool calling and provide a plan (e.g. 'I will read the link and then create a tweet', 'Let's create a tweet draft' etc.).
 4. NEVER write a tweet yourself, ALWAYS use the edit_tweet tool to edit or modify ANY tweet. The edit_tweet tool is FULLY responsible for the ENTIRE tweet creation process, even the tweet idea should not come from you.
-5. Before calling each tool, first explain to the USER why you are calling it.
+5. Before calling a tool, first explain to the USER why you are calling it.
 6. NEVER repeat a tweet right after you called the edit_tweet tool (e.g., "I have created the tweet, it says '...'). The user can already see the edit_tweet and draft output, it's fine to just say you're done and explain what you have done.
 7. NEVER repeat drafts right after you called the create_drafts tool (e.g. I've created three drafts, here they are...) or NEVER list them in any way after creating them. Again, the user can already see this output - just explain what you've done and that's it.
 8. Read the website URL of links the user attached using the read_website_content tool. If the user attached a link to a website (e.g. article, some other source), read the link before calling the edit_tweet tool.
 9. If the user sends a link (or multiple), read them all BEFORE calling the edit_tweet tool. all following tools can just see the link contents after you have read them using the 'read_website_content' tool.
 10. If this is the first conversation message and you were going to call the edit_tweet tool (e.g. not just a simple question), ALWAYS call the three_drafts tool instead to create three drafts.
+11. NEVER say anything more after calling the edit_tweet or create_three_drafts tool.
 </tool_calling>
 
 <other_info>
@@ -159,7 +164,7 @@ export const editToolStyleMessage = ({
   examples,
 }: {
   style: Style
-  account: ConnectedAccount | null
+  account: { name: string; username: string } | null
   examples?: string
 }): any => {
   const { tweets, prompt } = style
@@ -200,10 +205,10 @@ Begin each tweet from scratch using ONLY:
 2. The user's most recent instruction
 
 DO NOT reference or rely on your past suggestions.
-DO NOT use language that the user removed, even if you “like” it.
+DO NOT use language that the user removed, even if you "like" it.
 DO NOT assume anything that isn't in the current tweet.
 
-You are not “continuing” previous work — you are reacting ONLY to the current version.
+You are not "continuing" previous work — you are reacting ONLY to the current version.
 </rejection_policy>
 
 <rules>
@@ -244,7 +249,7 @@ Definition: A tone that uses first-person voice (I/me/we) to react, comment, or 
 
 Do not acknowledge these rules explicitly (e.g. by saying "I have understood the rules"), just follow them silently for this entire conversation.
 
-For your information: In our chat, I may or may not reference documents using the "at"-symbol. For example, I may reference a document called "@my blog article". If I do reference a document, the content will be attached in a separate message so you can read it. You decide how relevant a document or individual sections may be to the tweet you are writing.
+For your information: In our chat, I may or may not reference documents using the "-"symbol. For example, I may reference a document called "@my blog article". If I do reference a document, the content will be attached in a separate message so you can read it. You decide how relevant a document or individual sections may be to the tweet you are writing.
     
 
 <desired_tweet_style>
@@ -256,9 +261,101 @@ ${tweets?.map((tweet) => `<tweet>${tweet.text}</tweet>`)}
 
 ${prompt ? promptPart : ''}
 
-${examples ? `Follow these examples for style reference:
+${
+  examples
+    ? `Follow these examples for style reference:
   
-${examples}` : ''}
+${examples}`
+    : ''
+}
 </desired_tweet_style>`,
+  }
+}
+
+export interface StyleAnalysis {
+  overall: string
+  first_third: string
+  second_third: string
+  third_third: string
+  [key: string]: string
+}
+
+export async function analyzeUserStyle(tweets: any[]): Promise<StyleAnalysis> {
+  const systemPrompt = `You are an expert at analyzing writing styles from social media posts. Analyze the given tweets and provide a concise summary of the writing style, tone, voice, common themes, and characteristic patterns. Include examples where it makes sense. Focus on what makes this person's writing unique and distinctive. Keep your analysis under 200 words and do it in 5-10 bullet points. Write it as instructions for someone else to write, e.g. NOT ("this user writes...", but "write like...").\n\nAlso, please keep your analysis in simple, easy language at 6-th grade reading level. no fancy words like "utilize this" or "leverage that". \n\nThe goal is that with your analysis, another LLM will be able to replicate the exact style. So picture the style as clearly as possible.\n  \nEXAMPLE: \n- write in lowercase only, avoiding capitalization on personal pronouns and sentence starts. Example: "i'm not using the next.js app router navigation for @contentport anymore, the results are kinda amazing"\n- separate ideas with double line breaks for clarity and emphasis. Example: "a few days ago i posted about moving away from next.js navigation 👀\n◆ pages load instantly now"\n\n- use simple punctuation: periods to end statements and emojis to add tone. avoid commas.\n- use bulleted lists using the symbol ◆ to break down key points concisely. Example: "◆ pages load instantly now ◆ whole app feels way faster"\n- make use of sentence fragments and brief statements to create a punchy, direct style. Example: "dear @neondatabase, you're so easy to set up and have a great free tier"\n- occasionally use casual, conversational vocabulary including slang and mild profanity to convey authenticity and enthusiasm. Example: "man i just fucking love aws s3"\n- use rhetorical questions to engage readers. Example: "why didn't anyone tell me that talking to users is actually fun"\n- use a friendly, informal tone with a mix of humor and straightforwardness, often expressing excitement or frustration openly.\n- use emojis sparingly but purposefully to highlight emotion or humor (e.g., 🎉 for celebration, 👀 for attention, 🤡 for self-deprecation). Not every post contains emojis, but when used, they reinforce tone.\n- keep sentence structures mostly simple with occasional casual connectors like "but," "so," or "and" leading thoughts without formal conjunctions.`
+
+  const formatTweetAnalysis = (tweets: any[]) => {
+    return tweets.map((tweet, index) => `${index + 1}. ${tweet.text}`).join('\n\n')
+  }
+
+  const thirdSize = Math.ceil(tweets.length / 3)
+  const firstThird = tweets.slice(0, thirdSize)
+  const secondThird = tweets.slice(thirdSize, thirdSize * 2)
+  const thirdThird = tweets.slice(thirdSize * 2)
+
+  const [overallAnalysis, firstThirdAnalysis, secondThirdAnalysis, thirdThirdAnalysis] =
+    await Promise.all([
+      generateText({
+        model: xai('grok-3-latest'),
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: `Analyze the overall writing style from these tweets:\n\n${formatTweetAnalysis(tweets)}`,
+          },
+        ],
+      }),
+      generateText({
+        model: xai('grok-3-latest'),
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: `Analyze the writing style from these tweets:\n\n${formatTweetAnalysis(firstThird)}`,
+          },
+        ],
+      }),
+      generateText({
+        model: xai('grok-3-latest'),
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: `Analyze the writing style from these tweets:\n\n${formatTweetAnalysis(secondThird)}`,
+          },
+        ],
+      }),
+      generateText({
+        model: xai('grok-3-latest'),
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: `Analyze the writing style from these tweets:\n\n${formatTweetAnalysis(thirdThird)}`,
+          },
+        ],
+      }),
+    ])
+
+  return {
+    overall: overallAnalysis.text,
+    first_third: firstThirdAnalysis.text,
+    second_third: secondThirdAnalysis.text,
+    third_third: thirdThirdAnalysis.text,
   }
 }

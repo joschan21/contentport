@@ -2,12 +2,15 @@ import { db } from '@/db'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { createAuthMiddleware } from 'better-auth/api'
-import { client } from '@/lib/client'
-import { redis } from './redis'
 
 const database = drizzleAdapter(db, { provider: 'pg' })
 
 export const auth = betterAuth({
+  account: {
+    accountLinking: {
+      enabled: true,
+    },
+  },
   user: {
     additionalFields: {
       plan: { type: 'string', defaultValue: 'free' },
@@ -18,6 +21,19 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    },
+    twitter: {
+      clientId: process.env.TWITTER_CLIENT_ID as string,
+      clientSecret: process.env.TWITTER_CLIENT_SECRET as string,
+      scope: [
+        'tweet.read',
+        'tweet.write',
+        'users.read',
+        'offline.access',
+        'block.read',
+        'follows.read',
+        'media.write',
+      ],
     },
   },
   hooks: {

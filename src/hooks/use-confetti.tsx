@@ -20,7 +20,7 @@ export const ConfettiProvider = ({ children }: PropsWithChildren) => {
   return (
     <ConfettiContext.Provider value={{ fire }}>
       {children}
-      <Confetti ref={confettiRef} />
+      {/* <Confetti ref={confettiRef} /> */}
     </ConfettiContext.Provider>
   )
 }
