@@ -303,7 +303,7 @@ export const POST = async (req: Request) => {
           `Unrecognized price ID "${firstItem.pricing?.price_details?.price}"`,
           {
             status: 200,
-          }
+          },
         )
       }
 

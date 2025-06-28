@@ -24,6 +24,8 @@ const Page = () => {
     if (status) {
       if (status === 'cancelled') {
         toast.error('Checkout cancelled.')
+        router.push('/studio/settings')
+        return
       }
 
       if (status === 'processing') {
