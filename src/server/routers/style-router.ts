@@ -116,6 +116,12 @@ export const styleRouter = j.router({
       const { user, account } = ctx
       const { link, prompt } = input
 
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
+      }
+
       // Extract tweet ID from Twitter link
       const tweetIdMatch =
         link.match(/twitter\.com\/\w+\/status\/(\d+)/i) ||
@@ -229,6 +235,12 @@ export const styleRouter = j.router({
     .post(async ({ c, ctx, input }) => {
       const { user, account } = ctx
       const { prompt } = input
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
+      }
 
       const styleKey = `style:${user.email}:${account?.id}`
 

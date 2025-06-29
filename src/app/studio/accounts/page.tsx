@@ -228,8 +228,6 @@ export default function AccountsPage() {
 
   const { mutate: savePrompt, isPending: isSaving } = useMutation({
     mutationFn: async () => {
-      if (!account?.id) return
-
       await client.style.save.$post({ prompt })
     },
     onSuccess: () => {
@@ -247,9 +245,9 @@ export default function AccountsPage() {
       const res = await client.style.get.$get()
       const style = await res.json()
 
-      console.log('STYLE PROMPT', style.prompt);
+      console.log('STYLE PROMPT', style.prompt)
 
-      if (typeof style.prompt === "string") setPrompt(style.prompt)
+      if (typeof style.prompt === 'string') setPrompt(style.prompt)
 
       return style
     },
