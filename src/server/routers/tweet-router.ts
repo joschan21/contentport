@@ -1,16 +1,15 @@
 import { db } from '@/db'
-import { account as accountSchema, tweets, user } from '@/db/schema'
+import { account as accountSchema, tweets } from '@/db/schema'
 import { qstash } from '@/lib/qstash'
 import { BUCKET_NAME, s3Client } from '@/lib/s3'
 import { HeadObjectCommand } from '@aws-sdk/client-s3'
 import { Receiver } from '@upstash/qstash'
-import { and, desc, eq, or } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { SendTweetV2Params, TwitterApi } from 'twitter-api-v2'
 import { z } from 'zod'
 import { j, privateProcedure, publicProcedure } from '../jstack'
-import { redis } from '@/lib/redis'
-import { Account } from './settings-router'
+import { getBaseUrl } from '@/constants/base-url'
 
 const receiver = new Receiver({
   currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY as string,
@@ -335,15 +334,10 @@ export const tweetRouter = j.router({
         })
       }
 
-      const baseUrl =
-        process.env.NODE_ENV === 'development'
-          ? 'https://sponge-relaxing-separately.ngrok-free.app'
-          : 'https://contentport.io'
-
       const tweetId = crypto.randomUUID()
 
       const { messageId } = await qstash.publishJSON({
-        url: baseUrl + '/api/tweet/post',
+        url: getBaseUrl() + '/api/tweet/post',
         body: { tweetId, userId: user.id, accountId: dbAccount.id },
         notBefore: scheduledUnix,
       })
