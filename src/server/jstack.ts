@@ -176,6 +176,16 @@ const allowlist = [
   'jayan110105@gmail.com',
 ]
 
+const redirectMiddleware = j.middleware(async ({ c, next }) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers })
+
+  if (!session) {
+    return c.redirect('/login')
+  }
+
+  return await next()
+})
+
 const authMiddleware = j.middleware(async ({ c, next }) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
 
@@ -184,14 +194,10 @@ const authMiddleware = j.middleware(async ({ c, next }) => {
   }
 
   if (!allowlist.includes(session.user.email)) {
-    throw new HTTPException(418, { message: 'Unauthorized' })
+    throw new HTTPException(403, { message: 'Access denied' })
   }
 
   const account = await redis.json.get<Account>(`active-account:${session.user.email}`)
-
-  // if (!account) {
-  //   throw new HTTPException(404, { message: 'No connected account' })
-  // }
 
   return await next({ user: session.user, account })
 })
@@ -202,4 +208,4 @@ const authMiddleware = j.middleware(async ({ c, next }) => {
  * This is the base piece you use to build new queries and mutations on your API.
  */
 export const publicProcedure = j.procedure
-export const privateProcedure = publicProcedure.use(authMiddleware)
+export const privateProcedure = publicProcedure.use(redirectMiddleware).use(authMiddleware)

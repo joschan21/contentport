@@ -314,7 +314,7 @@ function ChatInputInner({
               </div>
             </form>
           </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
+          <TooltipContent side="top" className="max-w-xs z-10">
             <p className="text-center text-base">👇 Type your tweet idea here👇</p>
           </TooltipContent>
         </Tooltip>
