@@ -377,6 +377,12 @@ export const settingsRouter = j.router({
       const { user } = ctx
       const { accountId } = input
 
+      const activeAccount = await redis.json.get<Account>(`active-account:${user.email}`)
+
+      if (activeAccount?.id === accountId) {
+        await redis.del(`active-account:${user.email}`)
+      }
+
       const [dbAccount] = await db
         .select()
         .from(accountSchema)
@@ -449,14 +455,14 @@ export const settingsRouter = j.router({
 
     account = await redis.json.get<Account>(`active-account:${user.email}`)
 
-    if (!account) {
-      // legacy compat
-      account = await redis.json.get<Account>(`connected-account:${user.email}`)
+    // if (!account) {
+    //   // legacy compat
+    //   account = await redis.json.get<Account>(`connected-account:${user.email}`)
 
-      if (account) {
-        await redis.json.set(`active-account:${user.email}`, '$', account)
-      }
-    }
+    //   if (account) {
+    //     await redis.json.set(`active-account:${user.email}`, '$', account)
+    //   }
+    // }
 
     return c.json({ account })
   }),

@@ -256,12 +256,19 @@ export function TweetProvider({ children }: PropsWithChildren) {
 
         diffs.forEach((diff) => {
           if (diff.id === acceptedDiff.id) {
-            const text = $createTextNode(
-              diff.type === -1 ? '' : (diff.replacement ?? diff.text),
-            )
-            p.append(text)
+            let text = ''
+            if (diff.type === -1) {
+              text = ''
+            } else if (diff.type === 0) {
+              text = diff.text
+            } else if (diff.type === 1) {
+              text = diff.text
+            } else if (diff.type === 2) {
+              text = diff.replacement ?? ''
+            }
 
-            return
+            const textNode = $createTextNode(text)
+            p.append(textNode)
           } else {
             // preserve all other diffs
             if (diff.type === 2) {
@@ -297,6 +304,8 @@ export function TweetProvider({ children }: PropsWithChildren) {
     rejectedDiff: DiffWithReplacement,
     diffs: DiffWithReplacement[],
   ) => {
+    console.log('diffing', { rejectedDiff, diffs })
+
     shadowEditor.update(
       () => {
         const root = $getRoot()
@@ -304,26 +313,44 @@ export function TweetProvider({ children }: PropsWithChildren) {
 
         diffs.forEach((diff) => {
           if (diff.id === rejectedDiff.id) {
-            return
-          }
+            let text = ''
+            if (diff.type === -1) {
+              text = diff.text
+            } else if (diff.type === 0) {
+              text = diff.text
+            } else if (diff.type === 1) {
+              text = ''
+            } else if (diff.type === 2) {
+              text = diff.text
+            }
 
-          // preserve all other diffs
-          if (diff.type === 2) {
-            const node = new ReplacementNode(diff.replacement)
-
-            p.append(node)
-          } else if (diff.type === 1) {
-            const node = new AdditionNode(diff.text)
-
-            p.append(node)
-          } else if (diff.type === 0) {
-            const node = new UnchangedNode(diff.text)
-
-            p.append(node)
+            if (text) {
+              const textNode = $createTextNode(text)
+              p.append(textNode)
+            }
           } else {
-            const node = new DeletionNode(diff.text)
+            // preserve all other diffs
+            if(diff.rejected) {
+              const node = $createTextNode(diff.text)
 
-            p.append(node)
+              p.append(node)
+            } else if (diff.type === 2) {
+              const node = new ReplacementNode(diff.replacement)
+
+              p.append(node)
+            } else if (diff.type === 1) {
+              const node = new AdditionNode(diff.text)
+
+              p.append(node)
+            } else if (diff.type === 0) {
+              const node = new UnchangedNode(diff.text)
+
+              p.append(node)
+            } else {
+              const node = new DeletionNode(diff.text)
+
+              p.append(node)
+            }
           }
         })
 
@@ -333,7 +360,16 @@ export function TweetProvider({ children }: PropsWithChildren) {
       { tag: 'force-sync' },
     )
 
-    setImprovements((prev) => prev.filter((d) => d.id !== rejectedDiff.id))
+    setImprovements((prev) =>
+      prev.map((improvement) => {
+        if (improvement.id === rejectedDiff.id) {
+          return { ...improvement, rejected: true }
+        } else {
+          return improvement
+        }
+      }),
+    )
+    // setImprovements((prev) => prev.filter((d) => d.id !== rejectedDiff.id))
   }
 
   /**

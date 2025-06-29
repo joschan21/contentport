@@ -18,6 +18,7 @@ export type DiffWithReplacement = {
   lexicalKey?: string
   contextBefore?: string
   contextAfter?: string
+  rejected?: boolean
 }
 
 export function diff_lineMode(text1: string, text2: string) {
@@ -88,21 +89,21 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
     }
 
     const getContextAfter = (diffs: Diff[], index: number): string => {
-      let context = ""
+      let context = ''
       let wordCount = 0
 
       for (let j = 1; j <= 3; j++) {
         const diff = diffs[index + j]
         if (diff && diff[0] === 0) {
           const text = diff[1]
-          const lines = text.split("\n")
+          const lines = text.split('\n')
           const firstLine = lines[0]
 
           if (firstLine?.trim()) {
             const words = firstLine.trim().split(/\s+/)
             for (let i = 0; i < words.length; i++) {
               if (wordCount < 2) {
-                context += (context ? " " : "") + words[i]
+                context += (context ? ' ' : '') + words[i]
                 wordCount++
               }
             }
@@ -110,7 +111,7 @@ export const processDiffs = (diffs: Diff[]): DiffWithReplacement[] => {
         }
       }
 
-      return wordCount === 2 ? context + "..." : context
+      return wordCount === 2 ? context + '...' : context
     }
 
     // Check if we have a sequence of diffs that should be combined
@@ -229,11 +230,7 @@ export function diff_wordMode(text1: string, text2: string) {
   return diffs
 }
 
-export function chunkDiffs(
-  diffs: Diff[],
-  index = 0,
-  result: Diff[] = []
-): Diff[] {
+export function chunkDiffs(diffs: Diff[], index = 0, result: Diff[] = []): Diff[] {
   const current = diffs[index]
   const next = diffs[index + 1]
 
@@ -251,13 +248,7 @@ export function chunkDiffs(
       const d1 = diffs[cursor + 1]
       const d2 = diffs[cursor + 2]
 
-      if (
-        ws &&
-        ws[0] === 0 &&
-        !ws[1].trim() &&
-        d1?.[0] === -1 &&
-        d2?.[0] === 1
-      ) {
+      if (ws && ws[0] === 0 && !ws[1].trim() && d1?.[0] === -1 && d2?.[0] === 1) {
         group.push(ws, d1, d2)
         cursor += 3
       } else {
@@ -269,11 +260,11 @@ export function chunkDiffs(
     const removal = group
       .filter((d) => d[0] === -1 || d[0] === 0)
       .map((d) => d[1])
-      .join("")
+      .join('')
     const addition = group
       .filter((d) => d[0] === 1 || d[0] === 0)
       .map((d) => d[1])
-      .join("")
+      .join('')
 
     result.push([-1, removal], [1, addition])
 

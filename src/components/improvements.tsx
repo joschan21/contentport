@@ -316,16 +316,10 @@ function DraftsSelector({ drafts }: { drafts: Draft[] }) {
 }
 
 export const Improvements = ({ empty }: { empty?: boolean }) => {
-  const {
-    tweetId,
-    improvements,
-    acceptImprovement,
-    rejectImprovement,
-    showImprovementsInEditor,
-    drafts,
-  } = useTweets()
+  const { tweetId, improvements, acceptImprovement, rejectImprovement, drafts } =
+    useTweets()
 
-  const visibleImprovements = empty ? [] : improvements.filter((i) => i.type !== 0)
+  const visibleImprovements = empty ? [] : improvements.filter((i) => i.type !== 0 && !Boolean(i.rejected))
 
   const handleAcceptImprovement = async (diff: DiffWithReplacement) => {
     acceptImprovement(diff, improvements)
@@ -349,7 +343,7 @@ export const Improvements = ({ empty }: { empty?: boolean }) => {
       )}
 
       {showImprovements && (
-        <div className="h-full w-full">
+        <div className="h-full w-full max-h-80 overflow-y-scroll">
           <div className="space-y-1">
             <p className="text-sm/7 font-medium text-black">Improvements</p>
             {visibleImprovements.map((diff, index) => {

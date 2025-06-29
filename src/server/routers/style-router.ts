@@ -87,14 +87,14 @@ export const styleRouter = j.router({
 
     style = await redis.json.get<Style>(`style:${user.email}:${account?.id}`)
 
-    if (!style) {
-      // legacy
-      style = await redis.json.get<Style>(`style:${user.email}`)
+    // if (!style) {
+    //   // legacy
+    //   style = await redis.json.get<Style>(`style:${user.email}`)
 
-      if (style && account) {
-        await redis.json.set(`style:${user.email}:${account.id}`, '$', style)
-      }
-    }
+    //   if (style && account) {
+    //     await redis.json.set(`style:${user.email}:${account.id}`, '$', style)
+    //   }
+    // }
 
     if (!style) {
       return c.json({
@@ -246,26 +246,3 @@ export const styleRouter = j.router({
       })
     }),
 })
-
-async function getUserData(username: string) {
-  const { data } = await client.v2.userByUsername(username, {
-    'user.fields': [
-      'profile_image_url',
-      'name',
-      'username',
-      'id',
-      'verified',
-      'verified_type',
-    ],
-  })
-
-  if (!data) {
-    throw new HTTPException(404, {
-      message: `User "${username}" not found`,
-    })
-  }
-
-  await redis.hset(`twitter-user-data`, { [username]: data })
-
-  return data
-}
