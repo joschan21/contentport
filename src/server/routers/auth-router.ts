@@ -30,17 +30,22 @@ export const authRouter = j.router({
   createTwitterLink: privateProcedure
     .input(z.object({ action: z.enum(['onboarding', 'add-account']) }))
     .query(async ({ c, input, ctx }) => {
-      const { url, oauth_token, oauth_token_secret } = await client.generateAuthLink(
-        `${getBaseUrl()}/api/auth_router/callback`,
-      )
+      try {
+        const { url, oauth_token, oauth_token_secret } = await client.generateAuthLink(
+          `${getBaseUrl()}/api/auth_router/callback`,
+        )
 
-      await Promise.all([
-        redis.set(`twitter_oauth_secret:${oauth_token}`, oauth_token_secret),
-        redis.set(`twitter_oauth_user_id:${oauth_token}`, ctx.user.id),
-        redis.set(`auth_action:${oauth_token}`, input.action),
-      ])
+        await Promise.all([
+          redis.set(`twitter_oauth_secret:${oauth_token}`, oauth_token_secret),
+          redis.set(`twitter_oauth_user_id:${oauth_token}`, ctx.user.id),
+          redis.set(`auth_action:${oauth_token}`, input.action),
+        ])
 
-      return c.json({ url })
+        return c.json({ url })
+      } catch (err) {
+        console.error(JSON.stringify(err, null, 2))
+        throw new HTTPException(400, { message: 'Failed to create Twitter link' })
+      }
     }),
 
   createInviteLink: privateProcedure.query(async ({ c, input, ctx }) => {
