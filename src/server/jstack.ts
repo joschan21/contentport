@@ -180,22 +180,15 @@ const authMiddleware = j.middleware(async ({ c, next }) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
 
   if (!session) {
-    c.redirect('/login')
-
-    throw new HTTPException(401, { message: 'Unauthorized' })
+    return c.redirect('/login')
   }
 
   if (!allowlist.includes(session.user.email)) {
-    c.redirect('/login')
-
-    throw new HTTPException(401, { message: 'Unauthorized' })
+    return c.redirect('/login')
   }
 
   const account = await redis.json.get<Account>(`active-account:${session.user.email}`)
 
-  // if (!account) {
-  //   throw new HTTPException(404, { message: 'No connected account' })
-  // }
 
   return await next({ user: session.user, account })
 })
