@@ -340,6 +340,7 @@ export const tweetRouter = j.router({
         url: getBaseUrl() + '/api/tweet/post',
         body: { tweetId, userId: user.id, accountId: dbAccount.id },
         notBefore: scheduledUnix,
+        
       })
 
       const [tweet] = await db
