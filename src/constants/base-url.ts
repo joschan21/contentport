@@ -1,8 +1,5 @@
-export const BASE_URL = "http://localhost:3000"
-
-// export const BASE_URL =
-//   process.env.NODE_ENV === 'development'
-//     ? 'http://localhost:3000'
-//     : process.env.VERCEL_URL
-//       ? `https://${process.env.VERCEL_URL}`
-//       : 'https://contentport.io'
+export const getBaseUrl = () => {
+  if (typeof window !== 'undefined') return window.location.origin
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+  return `http://localhost:3000`
+}

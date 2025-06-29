@@ -10,7 +10,7 @@ import { TwitterApi } from 'twitter-api-v2'
 import { j, privateProcedure, publicProcedure } from '../jstack'
 import { z } from 'zod'
 import { Account } from './settings-router'
-import { BASE_URL } from '@/constants/base-url'
+import { getBaseUrl } from '@/constants/base-url'
 
 const nanoid = customAlphabet(
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
@@ -31,7 +31,7 @@ export const authRouter = j.router({
     .input(z.object({ action: z.enum(['onboarding', 'add-account']) }))
     .query(async ({ c, input, ctx }) => {
       const { url, oauth_token, oauth_token_secret } = await client.generateAuthLink(
-        `${BASE_URL}/api/auth_router/callback`,
+        `${getBaseUrl()}/api/auth_router/callback`,
       )
 
       await Promise.all([
@@ -50,7 +50,7 @@ export const authRouter = j.router({
     await redis.set(`invite:${inviteId}`, ctx.user.id, { ex: 60 * 60 * 24 })
     await redis.set(`invite:name:${inviteId}`, ctx.user.name, { ex: 60 * 60 * 24 })
 
-    const url = `${BASE_URL}/invite?id=${inviteId}`
+    const url = `${getBaseUrl()}/invite?id=${inviteId}`
 
     return c.json({ url })
   }),
@@ -65,7 +65,7 @@ export const authRouter = j.router({
       }
 
       const { url, oauth_token, oauth_token_secret } = await client.generateAuthLink(
-        `${BASE_URL}/api/auth_router/callback`,
+        `${getBaseUrl()}/api/auth_router/callback`,
       )
 
       await Promise.all([
@@ -144,14 +144,14 @@ export const authRouter = j.router({
       console.log('existingAccount', existingAccount)
       if (existingAccount?.username === userProfile.screen_name) {
         if (authAction === 'invite') {
-          return c.redirect(`${BASE_URL}/invite/success?id=${inviteId}`)
+          return c.redirect(`${getBaseUrl()}/invite/success?id=${inviteId}`)
         }
 
         if (authAction === 'add-account') {
-          return c.redirect(`${BASE_URL}/studio/accounts`)
+          return c.redirect(`${getBaseUrl()}/studio/accounts`)
         }
 
-        return c.redirect(`${BASE_URL}/studio?account_connected=true`)
+        return c.redirect(`${getBaseUrl()}/studio?account_connected=true`)
       }
     }
 
@@ -299,13 +299,13 @@ export const authRouter = j.router({
     }
 
     if (authAction === 'invite') {
-      return c.redirect(`${BASE_URL}/invite/success?id=${inviteId}`)
+      return c.redirect(`${getBaseUrl()}/invite/success?id=${inviteId}`)
     }
 
     if (authAction === 'add-account') {
-      return c.redirect(`${BASE_URL}/studio/accounts`)
+      return c.redirect(`${getBaseUrl()}/studio/accounts`)
     }
 
-    return c.redirect(`${BASE_URL}/studio?account_connected=true`)
+    return c.redirect(`${getBaseUrl()}/studio?account_connected=true`)
   }),
 })
