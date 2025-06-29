@@ -24,6 +24,12 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { HTTPException } from 'hono/http-exception'
 import { create_three_drafts } from './create-three-drafts'
 
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+
+const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
+})
+
 // ==================== Types ====================
 
 export interface EditTweetToolResult {
@@ -82,24 +88,12 @@ const chatMessageSchema = z.object({
 
 // ==================== Constants ====================
 
-const REDIS_KEYS = {
-  chat: (email: string, chatId: string) => `chat:${email}:${chatId}`,
-  toolChat: (email: string, chatId: string) => `chat:${email}:tool:${chatId}`,
-  lastSuggestion: (chatId: string) => `last-suggestion:${chatId}`,
-  style: (email: string) => `style:${email}`,
-  connectedAccount: (email: string) => `connected-account:${email}`,
-  chatCount: (email: string) => `chat:count:${email}`,
-}
-
 const MESSAGE_ID_PREFIXES = {
   document: 'doc:',
   meta: 'meta:',
   style: 'style:',
   system: 'system-prompt',
 }
-
-const MAX_TWEET_LENGTH = 240
-const MAX_TWEET_LINES = 5
 
 function filterVisibleMessages(messages: UIMessage[]): UIMessage[] {
   return messages.filter(
@@ -152,10 +146,15 @@ export const chatRouter = j.router({
       }),
     )
     .post(async ({ input, ctx }) => {
-      const { user } = ctx
+      const { user, account } = ctx
+
       const chatId = input.message.chatId
       const attachments = input.message.metadata?.attachments
       const { tweet } = input
+
+      if (!account) {
+        throw new HTTPException(412, { message: 'No connected account' })
+      }
 
       if (process.env.NODE_ENV === 'production') {
         const { success } = await chatLimiter.limit(user.email)
@@ -245,8 +244,8 @@ export const chatRouter = j.router({
         isDraftMode: isConversationEmpty,
         redisKeys: {
           chat: `chat:tool:${user.email}:${chatId}`,
-          account: `connected-account:${user.email}`,
-          style: `style:${user.email}`,
+          account: `active-account:${user.email}`,
+          style: `style:${user.email}:${account.id}`,
         },
       })
 
@@ -257,8 +256,8 @@ export const chatRouter = j.router({
         userEmail: user.email,
         redisKeys: {
           chat: `chat:tool:${user.email}:${chatId}`,
-          account: `connected-account:${user.email}`,
-          style: `style:${user.email}`,
+          account: `active-account:${user.email}`,
+          style: `style:${user.email}:${account.id}`,
         },
         chatId,
         userMessage,
@@ -267,15 +266,20 @@ export const chatRouter = j.router({
 
       const read_website_content = create_read_website_content({ chatId: chatId })
 
+      const chatModel = openrouter.chat('openai/gpt-4o', {
+        reasoning: { effort: 'low' },
+        models: ['anthropic/claude-3.5-sonnet', 'google/gemini-2.5-pro'],
+      })
+
       return createDataStreamResponse({
         execute: (stream) => {
           const result = streamText({
+            model: chatModel,
             system: assistantPrompt({ tweet }),
             tools: { read_website_content, edit_tweet, three_drafts },
             toolChoice: 'auto',
             maxSteps: 6,
             experimental_transform: smoothStream({ delayInMs: 20 }),
-            model: openai('gpt-4o'),
             messages: messages as CoreMessage[],
             onError: ({ error }) => {
               console.error(error)
@@ -287,51 +291,14 @@ export const chatRouter = j.router({
             onStepFinish: ({ toolResults }) => {
               toolResults.forEach((result) => {
                 if (result.toolName === 'edit_tweet') {
-                  if ('error' in result && result.error) {
-                    const errorMessage = typeof result.error === 'object' && result.error !== null && 'message' in result.error 
-                      ? (result.error as { message: string }).message 
-                      : 'Failed to edit tweet'
-                    stream.writeData({ 
-                      hook: 'onTweetError', 
-                      data: { 
-                        toolName: 'edit_tweet',
-                        error: errorMessage
-                      } 
-                    })
-                  } else if ('result' in result && result.result) {
+                  if ('result' in result && result.result) {
                     stream.writeData({ hook: 'onTweetResult', data: result.result })
                   }
                 }
 
                 if (result.toolName === 'three_drafts') {
-                  if ('error' in result && result.error) {
-                    const errorMessage = typeof result.error === 'object' && result.error !== null && 'message' in result.error 
-                      ? (result.error as { message: string }).message 
-                      : 'Failed to create drafts'
-                    stream.writeData({ 
-                      hook: 'onDraftsError', 
-                      data: { 
-                        toolName: 'three_drafts',
-                        error: errorMessage
-                      } 
-                    })
-                  } else if ('result' in result && result.result) {
+                  if ('result' in result && result.result) {
                     stream.writeData({ hook: 'onThreeDrafts', data: result.result })
-                  }
-                }
-
-                if (result.toolName === 'read_website_content') {
-                  if ('error' in result && result.error) {
-                    const errorMessage = typeof result.error === 'object' && result.error !== null && 'message' in result.error 
-                      ? (result.error as { message: string }).message 
-                      : 'Failed to read website'
-                    stream.writeData({ 
-                      hook: 'onWebsiteError', 
-                      data: { 
-                        toolName: 'read_website_content',
-                        error: errorMessage
-                      } 
-                    })
                   }
                 }
               })

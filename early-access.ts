@@ -1,35 +1,47 @@
-import { redis } from "./src/lib/redis"
-import "dotenv/config"
+import { redis } from './src/lib/redis'
+import 'dotenv/config'
 
-import { Resend } from "resend"
+import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function getEarlyAccessEmails() {
-  // Get all waitlist emails
-  const waitlistEmails = await redis.smembers("waitlist") as string[]
-  
-  // Get first batch emails
-  const firstBatchEmails = await redis.smembers("onboarding-batch") as string[]
-  const firstBatchSet = new Set(firstBatchEmails)
-  
-  // Filter out emails that are already in first batch
-  const newEmails = waitlistEmails.filter(email => !firstBatchSet.has(email))
-  
-  // Take the first 20 new emails
-  const selectedEmails = newEmails.slice(0, 20)
-  
-  // Add selected emails to second batch
-  for (const email of selectedEmails) {
-    await redis.sadd("onboarding-batch-2", email)
+  const audienceId = '6d6c5fc8-ceeb-43f8-a484-3c9bbfe840ed'
+
+  // console.log('Fetching existing contacts...')
+  // const existingContacts = await resend.contacts.list({ audienceId })
+
+  // console.log(`Removing ${existingContacts.data?.data?.length || 0} existing contacts...`)
+  // if (existingContacts.data?.data) {
+  //   for (const contact of existingContacts.data.data) {
+  //     await resend.contacts.remove({
+  //       email: contact.email,
+  //       audienceId,
+  //     })
+  //   }
+  // }
+
+  // console.log('Getting waitlist emails...')
+  // const waitlistEmails = (await redis.smembers('waitlist')) as string[]
+
+  // console.log('Filtering for @gmail.com addresses...')
+  // const gmailEmails = waitlistEmails.filter((email) => email.endsWith('@gmail.com'))
+
+  // console.log(`Found ${gmailEmails.length} @gmail.com addresses`)
+  // const selectedEmails = gmailEmails.slice(0, 100)
+
+  // await redis.set('onboarding-batch-3', selectedEmails)
+
+  // console.log(`Adding ${selectedEmails.length} contacts to audience...`)
+  for (const email of ["neske.joscha@gmail.com", "onlineplattformjjs@gmail.com"]) {
     await resend.contacts.create({
       email,
       unsubscribed: false,
-      audienceId: "6d6c5fc8-ceeb-43f8-a484-3c9bbfe840ed",
+      audienceId,
     })
   }
-  
-  return selectedEmails
+
+  // return selectedEmails
 }
 
 getEarlyAccessEmails()

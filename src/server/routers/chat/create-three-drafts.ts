@@ -1,15 +1,15 @@
-import { ConnectedAccount } from '@/components/tweet-editor/tweet-editor'
 import { diff_wordMode } from '@/lib/diff-utils'
 import { editToolStyleMessage, editToolSystemPrompt } from '@/lib/prompt-utils'
 import { redis } from '@/lib/redis'
 import { chunkDiffs, DiffWithReplacement, processDiffs } from '@/lib/utils'
 import { TestUIMessage } from '@/types/message'
-import { anthropic } from '@ai-sdk/anthropic'
-import { CoreMessage, FilePart, generateText, ImagePart, TextPart, tool, Tool } from 'ai'
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { FilePart, generateText, ImagePart, TextPart, tool, Tool } from 'ai'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { Style } from '../style-router'
 import { buildEditorStateMessage } from './edit-tweet'
+import { Account } from '../settings-router'
 
 interface StyleAnalysis {
   overall: string
@@ -31,6 +31,10 @@ interface CreateThreeDraftsProps {
   userEmail: string
 }
 
+const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
+})
+
 export const create_three_drafts = ({
   redisKeys,
   chatId,
@@ -45,7 +49,7 @@ export const create_three_drafts = ({
       const [style, account, unseenAttachments, websiteContent, draftStyle] =
         await Promise.all([
           redis.json.get<Style>(redisKeys.style),
-          redis.json.get<ConnectedAccount>(redisKeys.account),
+          redis.json.get<Account>(redisKeys.account),
           redis.lrange<(FilePart | TextPart | ImagePart)[]>(
             `unseen-attachments:${chatId}`,
             0,
@@ -139,23 +143,29 @@ export const create_three_drafts = ({
         },
       ]
 
+      // const chatModel = openrouter.chat('google/gemini-2.5-pro', {
+      const chatModel = openrouter.chat('x-ai/grok-3', {
+        reasoning: { effort: 'low' },
+        // models: ['anthropic/claude-3.5-sonnet', 'google/gemini-2.5-pro'],
+      })
+
       const [draft1, draft2, draft3] = await Promise.all([
         generateText({
-          model: anthropic('claude-4-opus-20250514'),
+          model: chatModel,
           temperature: 0.25,
           system: editToolSystemPrompt,
           // @ts-ignore
           messages: firstDraftMessages,
         }),
         generateText({
-          model: anthropic('claude-4-opus-20250514'),
+          model: chatModel,
           temperature: 0.25,
           system: editToolSystemPrompt,
           // @ts-ignore
           messages: secondDraftMessages,
         }),
         generateText({
-          model: anthropic('claude-4-opus-20250514'),
+          model: chatModel,
           temperature: 0.25,
           system: editToolSystemPrompt,
           // @ts-ignore

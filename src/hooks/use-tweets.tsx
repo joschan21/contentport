@@ -1,22 +1,24 @@
-import { client } from '@/lib/client'
 import { AdditionNode, DeletionNode, ReplacementNode, UnchangedNode } from '@/lib/nodes'
 import { DiffWithReplacement } from '@/lib/utils'
-import { InferInput, InferOutput } from '@/server'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { $createParagraphNode, $createTextNode, $getNodeByKey, $getRoot } from 'lexical'
-import debounce from 'lodash.debounce'
+import { InferOutput } from '@/server'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getNodeByKey,
+  $getRoot,
+  createEditor,
+} from 'lexical'
 import { nanoid } from 'nanoid'
 import { useParams, usePathname, useSearchParams } from 'next/navigation'
 import React, {
   createContext,
   PropsWithChildren,
-  useCallback,
   useContext,
   useEffect,
   useRef,
   useState,
 } from 'react'
-import { useEditor } from './use-editors'
 
 interface TweetImage {
   src: string
@@ -69,25 +71,43 @@ interface Draft {
   diffs: any[]
 }
 
+export const initialConfig = {
+  namespace: `tweet-editor`,
+  theme: {
+    text: {
+      bold: 'font-bold',
+      italic: 'italic',
+      underline: 'underline',
+    },
+  },
+  onError: (error: Error) => {
+    console.error('[Tweet Editor Error]', error)
+  },
+  nodes: [DeletionNode, AdditionNode, UnchangedNode, ReplacementNode],
+}
+
 interface TweetContextType {
   // tweets: Tweet[]
-  currentTweet: { id: string; content: string; image?: TweetImage }
+  currentTweet: { id: string; content: string; image?: TweetImage; mediaIds: string[] }
   tweetId: string | null
   improvements: DiffWithReplacement[]
   drafts: Draft[]
   toolErrors: Record<string, string>
+  shadowEditor: ReturnType<typeof createEditor>
   // setTweetId: (id: string) => void
   setTweetContent: (content: string) => void
   setTweetImage: (image: TweetImage) => void
   removeTweetImage: () => void
   listImprovements: (diffs: DiffWithReplacement[]) => void
   showImprovementsInEditor: (diffs: DiffWithReplacement[]) => void
-  acceptImprovement: (diff: DiffWithReplacement, opts?: { isInitial: boolean }) => void
-  rejectImprovement: (diff: DiffWithReplacement) => void
-  queuedImprovements: Record<string, DiffWithReplacement[]>
-  setQueuedImprovements: React.Dispatch<
-    React.SetStateAction<Record<string, DiffWithReplacement[]>>
-  >
+  acceptImprovement: (
+    acceptedDiff: DiffWithReplacement,
+    diffs: DiffWithReplacement[],
+  ) => void
+  rejectImprovement: (
+    rejectedDiff: DiffWithReplacement,
+    diffs: DiffWithReplacement[],
+  ) => void
   resetImprovements: () => void
   setCurrentTweet: React.Dispatch<React.SetStateAction<CurrentTweet>>
   setDrafts: (drafts: Draft[]) => void
@@ -95,6 +115,8 @@ interface TweetContextType {
   setToolError: (toolName: string, error: string) => void
   clearToolError: (toolName: string) => void
   draftCheckpoint: React.RefObject<string | null>
+  selectedDraftIndex: number
+  setSelectedDraftIndex: React.Dispatch<React.SetStateAction<number>>
 }
 
 const TweetContext = createContext<TweetContextType | undefined>(undefined)
@@ -103,6 +125,7 @@ export type CurrentTweet = {
   id: string
   content: string
   image?: TweetImage
+  mediaIds: string[]
 }
 
 export function TweetProvider({ children }: PropsWithChildren) {
@@ -116,17 +139,18 @@ export function TweetProvider({ children }: PropsWithChildren) {
   const [currentTweet, setCurrentTweet] = useState<CurrentTweet>({
     id: nanoid(),
     content: '',
+    mediaIds: [],
   })
 
-  console.log('current tweet', currentTweet)
+  const shadowEditorRef = useRef(createEditor({ ...initialConfig }))
+  const shadowEditor = shadowEditorRef.current
 
-  const editor = useEditor('tweet-editor')
   const [improvements, setImprovements] = useState<DiffWithReplacement[]>([])
+
   const [drafts, setDrafts] = useState<Draft[]>([])
+  const [selectedDraftIndex, setSelectedDraftIndex] = useState(0)
+
   const [toolErrors, setToolErrors] = useState<Record<string, string>>({})
-  const [queuedImprovements, setQueuedImprovements] = useState<
-    Record<string, DiffWithReplacement[]>
-  >({})
 
   const resetImprovements = () => {
     setImprovements([])
@@ -137,7 +161,7 @@ export function TweetProvider({ children }: PropsWithChildren) {
   }
 
   const setToolError = (toolName: string, error: string) => {
-    setToolErrors(prev => ({ ...prev, [toolName]: error }))
+    setToolErrors((prev) => ({ ...prev, [toolName]: error }))
     // Clear drafts if the three_drafts tool failed
     if (toolName === 'three_drafts') {
       setDrafts([])
@@ -145,14 +169,12 @@ export function TweetProvider({ children }: PropsWithChildren) {
   }
 
   const clearToolError = (toolName: string) => {
-    setToolErrors(prev => {
+    setToolErrors((prev) => {
       const newErrors = { ...prev }
       delete newErrors[toolName]
       return newErrors
     })
   }
-
-  const improvementKeys = useRef(new Map<string, string>())
 
   const setTweetContent = (content: string) => {
     setCurrentTweet((prev) => ({ ...prev, content }))
@@ -169,7 +191,7 @@ export function TweetProvider({ children }: PropsWithChildren) {
   // initial load
   useEffect(() => {
     if (!hasLoaded.current && currentTweet) {
-      editor?.update(
+      shadowEditor.update(
         () => {
           const root = $getRoot()
           const p = $createParagraphNode()
@@ -182,7 +204,7 @@ export function TweetProvider({ children }: PropsWithChildren) {
       )
       hasLoaded.current = true
     }
-  }, [currentTweet, editor])
+  }, [currentTweet, shadowEditor])
 
   // show list of improvements in chat
   const listImprovements = async (diffs: DiffWithReplacement[]) => {
@@ -190,22 +212,16 @@ export function TweetProvider({ children }: PropsWithChildren) {
   }
 
   const showImprovementsInEditor = async (diffs: DiffWithReplacement[]) => {
-    editor?.update(
+    shadowEditor.update(
       () => {
         const p = $createParagraphNode()
         diffs.forEach((diff) => {
           if (diff.type === 2) {
             const node = new ReplacementNode(diff.replacement)
-            const key = node.getKey()
-
-            improvementKeys.current.set(diff.id, key)
 
             p.append(node)
           } else if (diff.type === 1) {
             const node = new AdditionNode(diff.text)
-            const key = node.getKey()
-
-            improvementKeys.current.set(diff.id, key)
 
             p.append(node)
           } else if (diff.type === 0) {
@@ -214,9 +230,6 @@ export function TweetProvider({ children }: PropsWithChildren) {
             p.append(node)
           } else {
             const node = new DeletionNode(diff.text)
-            const key = node.getKey()
-
-            improvementKeys.current.set(diff.id, key)
 
             p.append(node)
           }
@@ -228,85 +241,135 @@ export function TweetProvider({ children }: PropsWithChildren) {
         root.append(p)
       },
       // prevent save
-      { tag: 'system-update' },
+      { tag: 'force-sync' },
     )
   }
 
   const acceptImprovement = (
-    diff: DiffWithReplacement,
-    opts?: { isInitial: boolean },
+    acceptedDiff: DiffWithReplacement,
+    diffs: DiffWithReplacement[],
   ) => {
-    // apply initial suggestion directly
-    if (opts?.isInitial) {
-      if (!editor) console.warn('no editor')
-      console.log('editor', editor)
-
-      editor?.update(() => {
+    shadowEditor.update(
+      () => {
         const root = $getRoot()
         const p = $createParagraphNode()
-        const text = $createTextNode(diff.text)
 
-        p.append(text)
+        diffs.forEach((diff) => {
+          if (diff.id === acceptedDiff.id) {
+            let text = ''
+            if (diff.type === -1) {
+              text = ''
+            } else if (diff.type === 0) {
+              text = diff.text
+            } else if (diff.type === 1) {
+              text = diff.text
+            } else if (diff.type === 2) {
+              text = diff.replacement ?? ''
+            }
 
-        root.append(p)
-      })
-    } else {
-      const improvement = improvements?.find((d) => d.id === diff.id)
-      if (!improvement) return console.warn('no improvement')
+            const textNode = $createTextNode(text)
+            p.append(textNode)
+          } else {
+            // preserve all other diffs
+            if (diff.type === 2) {
+              const node = new ReplacementNode(diff.replacement)
 
-      const key = improvementKeys.current.get(diff.id)
-      if (!key) return console.warn('no key')
+              p.append(node)
+            } else if (diff.type === 1) {
+              const node = new AdditionNode(diff.text)
 
-      editor?.update(
-        () => {
-          const node = $getNodeByKey(key)
+              p.append(node)
+            } else if (diff.type === 0) {
+              const node = new UnchangedNode(diff.text)
 
-          if (node instanceof DeletionNode) {
-            node.remove()
-          } else if (node instanceof AdditionNode) {
-            const textNode = $createTextNode(node.getTextContent())
-            node.replace(textNode)
-          } else if (node instanceof ReplacementNode) {
-            const textNode = $createTextNode(diff.replacement)
-            node.replace(textNode)
+              p.append(node)
+            } else {
+              const node = new DeletionNode(diff.text)
+
+              p.append(node)
+            }
           }
-        },
-        { tag: 'accept-improvement' },
-      )
-    }
+        })
 
-    const content = editor?.read(() => $getRoot().getTextContent())
+        root.clear()
+        root.append(p)
+      },
+      { tag: 'force-sync' },
+    )
 
-    // save improvement
-    // if (typeof content === 'string') {
-    //   queueSave({ tweetId: diff.tweetId, content })
-    // }
-
-    // cleanup
-    improvementKeys.current.delete(diff.id)
-    setImprovements((prev) => prev.filter((d) => d.id !== diff.id))
+    setImprovements((prev) => prev.filter((d) => d.id !== acceptedDiff.id))
   }
 
-  const rejectImprovement = (diff: DiffWithReplacement) => {
-    const key = improvementKeys.current.get(diff.id)
-    if (!key) return
+  const rejectImprovement = (
+    rejectedDiff: DiffWithReplacement,
+    diffs: DiffWithReplacement[],
+  ) => {
+    console.log('diffing', { rejectedDiff, diffs })
 
-    editor?.update(() => {
-      const node = $getNodeByKey(key)
+    shadowEditor.update(
+      () => {
+        const root = $getRoot()
+        const p = $createParagraphNode()
 
-      if (node instanceof DeletionNode) {
-        const textNode = $createTextNode(node.getTextContent())
-        node.replace(textNode)
-      } else if (node instanceof AdditionNode) {
-        node.remove()
-      } else if (node instanceof ReplacementNode) {
-        const textNode = $createTextNode(diff.text)
-        node.replace(textNode)
-      }
-    })
+        diffs.forEach((diff) => {
+          if (diff.id === rejectedDiff.id) {
+            let text = ''
+            if (diff.type === -1) {
+              text = diff.text
+            } else if (diff.type === 0) {
+              text = diff.text
+            } else if (diff.type === 1) {
+              text = ''
+            } else if (diff.type === 2) {
+              text = diff.text
+            }
 
-    improvementKeys.current.delete(diff.id)
-    setImprovements((prev) => prev.filter((i) => i.id !== diff.id))
+            if (text) {
+              const textNode = $createTextNode(text)
+              p.append(textNode)
+            }
+          } else {
+            // preserve all other diffs
+            if(diff.rejected) {
+              const node = $createTextNode(diff.text)
+
+              p.append(node)
+            } else if (diff.type === 2) {
+              const node = new ReplacementNode(diff.replacement)
+
+              p.append(node)
+            } else if (diff.type === 1) {
+              const node = new AdditionNode(diff.text)
+
+              p.append(node)
+            } else if (diff.type === 0) {
+              const node = new UnchangedNode(diff.text)
+
+              p.append(node)
+            } else {
+              const node = new DeletionNode(diff.text)
+
+              p.append(node)
+            }
+          }
+        })
+
+        root.clear()
+        root.append(p)
+      },
+      { tag: 'force-sync' },
+    )
+
+    setImprovements((prev) =>
+      prev.map((improvement) => {
+        if (improvement.id === rejectedDiff.id) {
+          return { ...improvement, rejected: true }
+        } else {
+          return improvement
+        }
+      }),
+    )
+    // setImprovements((prev) => prev.filter((d) => d.id !== rejectedDiff.id))
   }
 
   /**
@@ -320,74 +383,74 @@ export function TweetProvider({ children }: PropsWithChildren) {
   const searchParams = useSearchParams()
   const pathname = usePathname()
 
-  type SaveInput = InferInput['tweet']['save']
-  const { mutate } = useMutation({
-    mutationFn: async ({ tweetId, content }: SaveInput) => {
-      // prevent multiple saves at once
-      saveInFlight.current = true
+  // type SaveInput = InferInput['tweet']['save']
+  // const { mutate } = useMutation({
+  //   mutationFn: async ({ tweetId, content }: SaveInput) => {
+  //     // prevent multiple saves at once
+  //     saveInFlight.current = true
 
-      console.log(
-        '%c🔄 SAVING TWEET',
-        'color: #3b82f6; font-weight: bold; font-size: 14px;',
-        {
-          tweetId,
-          content,
-          timestamp: new Date().toISOString(),
-        },
-      )
+  //     console.log(
+  //       '%c🔄 SAVING TWEET',
+  //       'color: #3b82f6; font-weight: bold; font-size: 14px;',
+  //       {
+  //         tweetId,
+  //         content,
+  //         timestamp: new Date().toISOString(),
+  //       },
+  //     )
 
-      const res = await client.tweet.save.$post({
-        tweetId,
-        content,
-      })
+  //     const res = await client.tweet.save.$post({
+  //       tweetId,
+  //       content,
+  //     })
 
-      saveInFlight.current = false
+  //     saveInFlight.current = false
 
-      return await res.json()
-    },
-    onSuccess: ({ assignedId, tweet }) => {
-      queryClient.setQueryData(['get-current-tweet', tweetId], tweet)
-      // queryClient.refetchQueries({ queryKey: ['get-recent-tweets'] })
+  //     return await res.json()
+  //   },
+  //   onSuccess: ({ assignedId, tweet }) => {
+  //     queryClient.setQueryData(['get-current-tweet', tweetId], tweet)
+  //     // queryClient.refetchQueries({ queryKey: ['get-recent-tweets'] })
 
-      if (tweet) prevSave.current = tweet.content
-      processPendingSaves({ assignedId })
+  //     if (tweet) prevSave.current = tweet.content
+  //     processPendingSaves({ assignedId })
 
-      // if (pathname === '/studio') {
-      //   const chatId = searchParams.get('chatId')
-      //   let push = `/studio/t/${assignedId}`
-      //   if (chatId) push += `?chatId=${chatId}`
+  //     // if (pathname === '/studio') {
+  //     //   const chatId = searchParams.get('chatId')
+  //     //   let push = `/studio/t/${assignedId}`
+  //     //   if (chatId) push += `?chatId=${chatId}`
 
-      //   router.push(push)
-      // }
-      // setDraft({ isVisible: false, content: '' })
+  //     //   router.push(push)
+  //     // }
+  //     // setDraft({ isVisible: false, content: '' })
 
-      // if (tweetId === 'draft' || !tweetId) {
-      //   setTweetId(assignedId)
-      // }
-    },
-  })
+  //     // if (tweetId === 'draft' || !tweetId) {
+  //     //   setTweetId(assignedId)
+  //     // }
+  //   },
+  // })
 
-  const debouncedSave = useCallback(
-    debounce(({ tweetId, content }: SaveInput) => {
-      hasPendingChanges.current = false
-      if (saveInFlight.current === true) {
-        pendingSaves.current.push(({ assignedId }) =>
-          mutate({ tweetId: assignedId, content }),
-        )
-      } else {
-        mutate({ tweetId, content })
-      }
-    }, 750),
-    [mutate],
-  )
+  // const debouncedSave = useCallback(
+  //   debounce(({ tweetId, content }: SaveInput) => {
+  //     hasPendingChanges.current = false
+  //     if (saveInFlight.current === true) {
+  //       pendingSaves.current.push(({ assignedId }) =>
+  //         mutate({ tweetId: assignedId, content }),
+  //       )
+  //     } else {
+  //       mutate({ tweetId, content })
+  //     }
+  //   }, 750),
+  //   [mutate],
+  // )
 
-  const queueSave = useCallback(
-    ({ tweetId, content }: SaveInput) => {
-      hasPendingChanges.current = true
-      debouncedSave({ tweetId, content })
-    },
-    [debouncedSave],
-  )
+  // const queueSave = useCallback(
+  //   ({ tweetId, content }: SaveInput) => {
+  //     hasPendingChanges.current = true
+  //     debouncedSave({ tweetId, content })
+  //   },
+  //   [debouncedSave],
+  // )
 
   // const queueSave = useCallback(
   //   debounce(({ tweetId, content }: SaveInput) => {
@@ -433,6 +496,7 @@ export function TweetProvider({ children }: PropsWithChildren) {
         currentTweet,
         setCurrentTweet,
         tweetId,
+        shadowEditor,
         // setTweetId,
         setTweetContent,
         setTweetImage,
@@ -441,8 +505,6 @@ export function TweetProvider({ children }: PropsWithChildren) {
         showImprovementsInEditor,
         acceptImprovement,
         rejectImprovement,
-        queuedImprovements,
-        setQueuedImprovements,
         resetImprovements,
         setDrafts,
         clearDrafts,
@@ -450,6 +512,8 @@ export function TweetProvider({ children }: PropsWithChildren) {
         toolErrors,
         setToolError,
         clearToolError,
+        selectedDraftIndex,
+        setSelectedDraftIndex,
       }}
     >
       {children}

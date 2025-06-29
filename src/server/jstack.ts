@@ -1,6 +1,8 @@
 import { auth } from '@/lib/auth'
+import { redis } from '@/lib/redis'
 import { HTTPException } from 'hono/http-exception'
 import { jstack } from 'jstack'
+import { Account } from './routers/settings-router'
 
 interface Env {
   Bindings: {}
@@ -178,14 +180,20 @@ const authMiddleware = j.middleware(async ({ c, next }) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
 
   if (!session) {
-    throw new HTTPException(401, { message: 'Unauthorized' })
+    throw new HTTPException(418, { message: 'Unauthorized' })
   }
 
   if (!allowlist.includes(session.user.email)) {
-    throw new HTTPException(401, { message: 'Unauthorized' })
+    throw new HTTPException(418, { message: 'Unauthorized' })
   }
 
-  return await next({ user: session.user })
+  const account = await redis.json.get<Account>(`active-account:${session.user.email}`)
+
+  // if (!account) {
+  //   throw new HTTPException(404, { message: 'No connected account' })
+  // }
+
+  return await next({ user: session.user, account })
 })
 
 /**

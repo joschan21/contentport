@@ -295,7 +295,6 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
         clientX = e.clientX
         clientY = e.clientY
       }
-      console.log('calculating')
       const newWidth = Math.max(100, resizeStart.w + (clientX - resizeStart.x))
       const newHeight = Math.max(100, resizeStart.h + (clientY - resizeStart.y))
       setCanvasWidth(newWidth)

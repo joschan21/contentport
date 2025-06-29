@@ -27,7 +27,16 @@ const ChatContext = createContext<TChatContext | null>(null)
 
 export const ChatProvider = ({ children }: PropsWithChildren) => {
   const [chatId, setChatId] = useQueryState('chatId')
-  const { currentTweet, draftCheckpoint,tweetId, listImprovements, showImprovementsInEditor, setDrafts, setToolError, clearToolError } = useTweets()
+  const {
+    currentTweet,
+    draftCheckpoint,
+    tweetId,
+    listImprovements,
+    showImprovementsInEditor,
+    setDrafts,
+    setToolError,
+    clearToolError,
+  } = useTweets()
 
   const tweetIdRef = useRef(tweetId)
 
@@ -63,7 +72,7 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
       const response = res.clone()
       registerStreamHooks(response, {
         onThreeDrafts: async (data: ThreeDrafts) => {
-          console.log('drafts are here', data);
+          console.log('drafts are here', data)
           draftCheckpoint.current = currentTweet.content
           setDrafts(data)
           clearToolError('three_drafts')
@@ -79,28 +88,6 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
         }) => {
           listImprovements(diffs)
           showImprovementsInEditor(diffs)
-          clearToolError('edit_tweet')
-        },
-        onDraftsError: async ({ error, toolName }: { error: string; toolName: string }) => {
-          console.error(`Tool ${toolName} failed:`, error)
-          const friendlyError = error.includes('Overloaded') 
-            ? 'AI service is overloaded. Please try again in a moment.' 
-            : error
-          setToolError(toolName, friendlyError)
-          toast.error(`Failed to create drafts: ${friendlyError}`)
-        },
-        onTweetError: async ({ error, toolName }: { error: string; toolName: string }) => {
-          console.error(`Tool ${toolName} failed:`, error)
-          const friendlyError = error.includes('Overloaded') 
-            ? 'AI service is overloaded. Please try again in a moment.' 
-            : error
-          setToolError(toolName, friendlyError)
-          toast.error(`Failed to edit tweet: ${friendlyError}`)
-        },
-        onWebsiteError: async ({ error, toolName }: { error: string; toolName: string }) => {
-          console.error(`Tool ${toolName} failed:`, error)
-          setToolError(toolName, error)
-          toast.error(`Failed to read website: ${error}`)
         },
       })
     },

@@ -5,11 +5,12 @@ import { useEffect, useState } from 'react'
 import DuolingoButton from './ui/duolingo-button'
 import { useEditor } from '@/hooks/use-editors'
 import { useLocalStorage } from '@/hooks/use-local-storage'
-import { ConnectedAccount, DEFAULT_CONNECTED_ACCOUNT } from './tweet-editor/tweet-editor'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Icons } from './icons'
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
 import toast from 'react-hot-toast'
+import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
+import { usePathname } from 'next/navigation'
 
 const CATEGORY_LABELS: Record<string, string> = {
   'write-initial-content': 'Initial Content',
@@ -136,33 +137,46 @@ function ContextAfter({ diff, text }: { diff: DiffWithReplacement; text: string 
 interface Draft {
   id: string
   improvedText: string
-  diffs: any[]
+  diffs: DiffWithReplacement[]
 }
 
 function DraftsSelector({ drafts }: { drafts: Draft[] }) {
-  const [selectedDraftIndex, setSelectedDraftIndex] = useState(0)
+  const pathname = usePathname()
+  const { shadowEditor } = useTweets()
+
   const [draftDecisionMade, setDraftDecisionMade] = useState<
     'applied' | 'rejected' | null
   >(null)
-  const [connectedAccount] = useLocalStorage(
-    'connected-account',
-    DEFAULT_CONNECTED_ACCOUNT,
-  )
-  const { showImprovementsInEditor, resetImprovements, clearDrafts, draftCheckpoint } =
-    useTweets()
-  const editor = useEditor('tweet-editor')
+  const {
+    showImprovementsInEditor,
+    resetImprovements,
+    clearDrafts,
+    draftCheckpoint,
+    selectedDraftIndex,
+    setSelectedDraftIndex,
+  } = useTweets()
 
   const currentDraft = drafts[selectedDraftIndex]
 
+  useEffect(() => {
+    if (!currentDraft) return
+
+    console.log('diffs', currentDraft.diffs)
+    showImprovementsInEditor(currentDraft.diffs)
+  }, [pathname, currentDraft])
+
   const applyDraft = (content: string, index: number) => {
-    editor?.update(() => {
-      const root = $getRoot()
-      const p = $createParagraphNode()
-      const text = $createTextNode(content)
-      p.append(text)
-      root.clear()
-      root.append(p)
-    })
+    shadowEditor.update(
+      () => {
+        const root = $getRoot()
+        const p = $createParagraphNode()
+        const text = $createTextNode(content)
+        p.append(text)
+        root.clear()
+        root.append(p)
+      },
+      { tag: 'force-sync' },
+    )
 
     setSelectedDraftIndex(index)
     setDraftDecisionMade('applied')
@@ -178,14 +192,17 @@ function DraftsSelector({ drafts }: { drafts: Draft[] }) {
   const handleRejectAllDrafts = () => {
     resetImprovements()
 
-    editor?.update(() => {
-      const root = $getRoot()
-      const p = $createParagraphNode()
-      const text = $createTextNode(draftCheckpoint.current ?? '')
-      p.append(text)
-      root.clear()
-      root.append(p)
-    })
+    shadowEditor.update(
+      () => {
+        const root = $getRoot()
+        const p = $createParagraphNode()
+        const text = $createTextNode(draftCheckpoint.current ?? '')
+        p.append(text)
+        root.clear()
+        root.append(p)
+      },
+      { tag: 'force-sync' },
+    )
 
     draftCheckpoint.current = null
 
@@ -193,21 +210,13 @@ function DraftsSelector({ drafts }: { drafts: Draft[] }) {
     clearDrafts()
   }
 
-  useEffect(() => {
-    if (drafts.length > 0 && editor && drafts[0]) {
-      showImprovementsInEditor(drafts[0].diffs)
-    }
-  }, [drafts, editor])
-
   const cycleDraft = (direction: 'next' | 'prev') => {
     const newIndex =
       direction === 'next'
         ? (selectedDraftIndex + 1) % drafts.length
         : (selectedDraftIndex - 1 + drafts.length) % drafts.length
-    if (editor && drafts[newIndex]) {
-      showImprovementsInEditor(drafts[newIndex].diffs)
-      setSelectedDraftIndex(newIndex)
-    }
+
+    setSelectedDraftIndex(newIndex)
   }
 
   if (!currentDraft) return null
@@ -217,26 +226,11 @@ function DraftsSelector({ drafts }: { drafts: Draft[] }) {
       <div className="relative rounded-lg w-full">
         <div className="relative text-left rounded-md bg-white border border-gray-200 shadow-md bg-clip-padding overflow-hidden">
           <div className="flex items-start gap-3 p-6">
-            <Avatar className="h-10 w-10 rounded-full border border-border/30">
-              <AvatarImage
-                src={connectedAccount.profile_image_url}
-                alt={`@${connectedAccount.username}`}
-              />
-              <AvatarFallback className="bg-primary/10 text-primary text-sm/6">
-                {connectedAccount.name.slice(0, 1).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <AccountAvatar />
             <div className="flex flex-col flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-base leading-relaxed font-semibold">
-                  {connectedAccount.name}
-                </span>
-                <span className="text-sm/6 text-muted-foreground">
-                  @{connectedAccount.username}
-                </span>
-                {connectedAccount.verified && (
-                  <Icons.verificationBadge className="h-4 w-4" />
-                )}
+                <AccountName />
+                <AccountHandle />
               </div>
               <div className="mt-1 text-base leading-relaxed whitespace-pre-line">
                 {currentDraft.improvedText}
@@ -325,14 +319,14 @@ export const Improvements = ({ empty }: { empty?: boolean }) => {
   const { tweetId, improvements, acceptImprovement, rejectImprovement, drafts } =
     useTweets()
 
-  const visibleImprovements = empty ? [] : improvements.filter((i) => i.type !== 0)
+  const visibleImprovements = empty ? [] : improvements.filter((i) => i.type !== 0 && !Boolean(i.rejected))
 
   const handleAcceptImprovement = async (diff: DiffWithReplacement) => {
-    acceptImprovement(diff)
+    acceptImprovement(diff, improvements)
   }
 
   const handleRejectImprovement = (diff: DiffWithReplacement) => {
-    rejectImprovement(diff)
+    rejectImprovement(diff, improvements)
   }
 
   const showDrafts = drafts.length > 0
@@ -349,7 +343,7 @@ export const Improvements = ({ empty }: { empty?: boolean }) => {
       )}
 
       {showImprovements && (
-        <div className="h-full w-full">
+        <div className="h-full w-full max-h-80 overflow-y-scroll">
           <div className="space-y-1">
             <p className="text-sm/7 font-medium text-black">Improvements</p>
             {visibleImprovements.map((diff, index) => {

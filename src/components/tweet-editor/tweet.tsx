@@ -1,75 +1,438 @@
 'use client'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import DuolingoButton from '@/components/ui/duolingo-button'
+import DuolingoCheckbox from '@/components/ui/duolingo-checkbox'
 import { useConfetti } from '@/hooks/use-confetti'
-import { useEditor } from '@/hooks/use-editors'
-import { useTweets } from '@/hooks/use-tweets'
-import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
+import { initialConfig, useTweets } from '@/hooks/use-tweets'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
 import { cn } from '@/lib/utils'
-import { InitialConfigType, LexicalComposer } from '@lexical/react/LexicalComposer'
+import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 
-import { AdditionNode, DeletionNode, ReplacementNode, UnchangedNode } from '@/lib/nodes'
+import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
+import { client } from '@/lib/client'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  BLUR_COMMAND,
+  COMMAND_PRIORITY_LOW,
   EditorState,
+  FOCUS_COMMAND,
   LexicalEditor,
 } from 'lexical'
-import { Bold, Copy, ImagePlus, Italic, Pencil, Smile, Trash2, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { AlertCircle, Calendar, Copy, ImagePlus, Pencil, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { Icons } from '../icons'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '../ui/dialog'
 import {
   Drawer,
   DrawerClose,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from '../ui/drawer'
 import { ImageTool } from './image-tool'
+import { ShadowEditorSyncPlugin } from '@/lib/lexical-plugins/sync-plugin'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { $createAdditionNode, AdditionNode } from '@/lib/nodes'
 
 interface TweetProps {
   id: string | undefined
   initialContent?: string
-  account: {
-    name: string
-    handle: string
-    avatarFallback: string
-    avatar?: string
-    verified?: boolean
-  }
   onDelete?: () => void
   onAdd?: () => void
   selectionMode?: boolean
 }
 
-export default function Tweet({
-  id,
-  account,
-  initialContent,
-  selectionMode = false,
-}: TweetProps) {
-  const { setTweetContent, currentTweet, setTweetImage, removeTweetImage } = useTweets()
+interface MediaFile {
+  file: File
+  url: string
+  type: 'image' | 'gif' | 'video'
+  uploading: boolean
+  uploaded: boolean
+  error?: string
+  media_id?: string
+  media_key?: string
+  s3Key?: string
+}
+
+// Twitter media type validation
+const TWITTER_MEDIA_TYPES = {
+  image: ['image/jpeg', 'image/png', 'image/webp'],
+  gif: ['image/gif'],
+  video: ['video/mp4', 'video/quicktime', 'video/x-msvideo'],
+} as const
+
+const TWITTER_SIZE_LIMITS = {
+  image: 5 * 1024 * 1024, // 5MB
+  gif: 15 * 1024 * 1024, // 15MB
+  video: 512 * 1024 * 1024, // 512MB
+} as const
+
+const MAX_MEDIA_COUNT = 4
+
+export default function Tweet({ id, initialContent, selectionMode = false }: TweetProps) {
+  const { setTweetContent, currentTweet, setTweetImage, removeTweetImage, shadowEditor } =
+    useTweets()
   const { fire } = useConfetti()
-  const editor = useEditor(id ? `tweet-editor-${id}` : 'tweet-editor')
   const [charCount, setCharCount] = useState(0)
   const [open, setOpen] = useState(false)
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false)
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false)
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const [showPostConfirmModal, setShowPostConfirmModal] = useState(false)
+  const [dontShowAgain, setDontShowAgain] = useState(false)
+
+  const renderMediaOverlays = (mediaFile: MediaFile, index: number) => (
+    <>
+      {(mediaFile.uploading || mediaFile.error) && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          {mediaFile.uploading && (
+            <div className="text-white text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+              <p className="text-sm">Uploading...</p>
+            </div>
+          )}
+          {mediaFile.error && (
+            <div className="text-white text-center">
+              <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+              <p className="text-sm">{mediaFile.error}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!selectionMode && (
+        <DuolingoButton
+          size="icon"
+          variant="secondary"
+          onClick={() => removeMediaFile(mediaFile.url)}
+          className="absolute top-2 right-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <X className="h-4 w-4" />
+        </DuolingoButton>
+      )}
+    </>
+  )
+
+  const getDefaultScheduleDateTime = (): { date: string; time: string } => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() + 1)
+
+    const date = now.toISOString().split('T')[0] || ''
+    const time = now.toTimeString().slice(0, 5) || ''
+
+    return { date, time }
+  }
+
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduleTime, setScheduleTime] = useState('')
+
+  // Media upload mutations
+  const uploadToS3Mutation = useMutation({
+    mutationFn: async ({
+      file,
+      mediaType,
+    }: {
+      file: File
+      mediaType: 'image' | 'gif' | 'video'
+    }) => {
+      const res = await client.file.uploadTweetMedia.$post({
+        fileName: file.name,
+        fileType: file.type,
+      })
+
+      const { url, fields, fileKey } = await res.json()
+
+      const formData = new FormData()
+      Object.entries(fields).forEach(([key, value]) => {
+        formData.append(key, value as string)
+      })
+      formData.append('file', file)
+
+      const uploadResponse = await fetch(url, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload to S3')
+      }
+
+      return { fileKey, mediaType, file }
+    },
+  })
+
+  const { setCurrentTweet } = useTweets()
+
+  const uploadToTwitterMutation = useMutation({
+    mutationFn: async ({
+      s3Key,
+      mediaType,
+    }: {
+      s3Key: string
+      mediaType: 'image' | 'gif' | 'video'
+    }) => {
+      const res = await client.tweet.uploadMediaToTwitter.$post({
+        s3Key,
+        mediaType,
+      })
+
+      return await res.json()
+    },
+    onSuccess: ({ media_id }) => {
+      setCurrentTweet((prev) => ({
+        ...prev,
+        mediaIds: [...prev.mediaIds, media_id],
+      }))
+    },
+  })
+
+  const postTweetMutation = useMutation({
+    mutationFn: async ({
+      content,
+      mediaIds = [],
+      s3Keys = [],
+    }: {
+      content: string
+      mediaIds?: string[]
+      s3Keys?: string[]
+    }) => {
+      const res = await client.tweet.postImmediate.$post({
+        content,
+        mediaIds,
+        s3Keys,
+      })
+
+      return await res.json()
+    },
+    onSuccess: () => {
+      toast.success('Tweet posted successfully!')
+      fire({
+        particleCount: 100,
+        spread: 110,
+        origin: { y: 0.6 },
+      })
+      // Clear tweet content and media
+      shadowEditor?.update(() => {
+        const root = $getRoot()
+        root.clear()
+        root.append($createParagraphNode())
+      })
+      setMediaFiles([])
+      localStorage.removeItem('tweet')
+    },
+    onError: (error) => {
+      console.error('Failed to post tweet:', error)
+      toast.error('Failed to post tweet')
+    },
+  })
+
+  const queryClient = useQueryClient()
+
+  const scheduleTweetMutation = useMutation({
+    mutationFn: async ({
+      content,
+      scheduledUnix,
+      mediaIds = [],
+      s3Keys = [],
+    }: {
+      content: string
+      scheduledUnix: number
+      mediaIds?: string[]
+      s3Keys?: string[]
+    }) => {
+      await client.tweet.schedule.$post({
+        content,
+        scheduledUnix,
+        mediaIds,
+        s3Keys,
+      })
+    },
+    onSuccess: () => {
+      toast.success('Tweet scheduled successfully!')
+      setScheduleDialogOpen(false)
+      setScheduleDate('')
+      setScheduleTime('')
+
+      queryClient.invalidateQueries({ queryKey: ['scheduled-and-published-tweets'] })
+    },
+    onError: () => {
+      toast.error('Failed to schedule tweet')
+    },
+  })
+
+  const validateFile = (
+    file: File,
+  ): { valid: boolean; type?: 'image' | 'gif' | 'video'; error?: string } => {
+    // Check file type
+    let mediaType: 'image' | 'gif' | 'video'
+    if (TWITTER_MEDIA_TYPES.image.includes(file.type as any)) {
+      mediaType = 'image'
+    } else if (TWITTER_MEDIA_TYPES.gif.includes(file.type as any)) {
+      mediaType = 'gif'
+    } else if (TWITTER_MEDIA_TYPES.video.includes(file.type as any)) {
+      mediaType = 'video'
+    } else {
+      return {
+        valid: false,
+        error: 'File type not supported. Use JPG, PNG, WEBP, GIF, or MP4.',
+      }
+    }
+
+    // Check file size
+    const sizeLimit = TWITTER_SIZE_LIMITS[mediaType]
+    if (file.size > sizeLimit) {
+      const sizeMB = Math.round(sizeLimit / (1024 * 1024))
+      return {
+        valid: false,
+        error: `File too large. ${mediaType.toUpperCase()} files must be under ${sizeMB}MB.`,
+      }
+    }
+
+    // Check media count limits
+    const hasVideo = mediaFiles.some((m) => m.type === 'video')
+    const hasGif = mediaFiles.some((m) => m.type === 'gif')
+
+    if (mediaType === 'video' && (mediaFiles.length > 0 || hasGif)) {
+      return { valid: false, error: 'Videos must be posted alone.' }
+    }
+
+    if (mediaType === 'gif' && (mediaFiles.length > 0 || hasVideo)) {
+      return { valid: false, error: 'GIFs must be posted alone.' }
+    }
+
+    if (mediaType === 'image' && (hasVideo || hasGif)) {
+      return { valid: false, error: 'Cannot mix images with videos or GIFs.' }
+    }
+
+    if (mediaFiles.length >= MAX_MEDIA_COUNT) {
+      return { valid: false, error: 'Maximum 4 images per tweet.' }
+    }
+
+    return { valid: true, type: mediaType }
+  }
+
+  const handleFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files)
+
+    for (const file of fileArray) {
+      const validation = validateFile(file)
+
+      if (!validation.valid) {
+        toast.error(validation.error!)
+        continue
+      }
+
+      const url = URL.createObjectURL(file)
+      const mediaFile: MediaFile = {
+        file,
+        url,
+        type: validation.type!,
+        uploading: true,
+        uploaded: false,
+      }
+
+      setMediaFiles((prev) => [...prev, mediaFile])
+
+      try {
+        // Upload to S3
+        const s3Result = await uploadToS3Mutation.mutateAsync({
+          file,
+          mediaType: validation.type!,
+        })
+
+        // Upload to Twitter
+        const twitterResult = await uploadToTwitterMutation.mutateAsync({
+          s3Key: s3Result.fileKey,
+          mediaType: s3Result.mediaType,
+        })
+
+        setMediaFiles((prev) =>
+          prev.map((mf) =>
+            mf.url === url
+              ? {
+                  ...mf,
+                  uploading: false,
+                  uploaded: true,
+                  media_id: twitterResult.media_id,
+                  media_key: twitterResult.media_key,
+                  s3Key: s3Result.fileKey,
+                }
+              : mf,
+          ),
+        )
+
+        // toast.success('Upload done!')
+      } catch (error) {
+        console.error('Failed to upload media:', error)
+        setMediaFiles((prev) =>
+          prev.map((mf) =>
+            mf.url === url ? { ...mf, uploading: false, error: 'Upload failed' } : mf,
+          ),
+        )
+        toast.error('Failed to upload media')
+      }
+    }
+  }
+
+  const removeMediaFile = (url: string) => {
+    setMediaFiles((prev) => {
+      const file = prev.find((f) => f.url === url)
+      if (file) {
+        URL.revokeObjectURL(file.url)
+      }
+      return prev.filter((f) => f.url !== url)
+    })
+  }
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragging(false)
+
+      if (selectionMode) return
+
+      const files = e.dataTransfer.files
+      if (files.length > 0) {
+        handleFiles(files)
+      }
+    },
+    [selectionMode],
+  )
 
   useEffect(() => {
     const tweet = localStorage.getItem('tweet')
 
     if (tweet) {
-      editor?.update(() => {
+      shadowEditor?.update(() => {
         const root = $getRoot()
         const p = $createParagraphNode()
         const text = $createTextNode(tweet)
@@ -79,35 +442,21 @@ export default function Tweet({
         root.append(p)
       })
     }
-  }, [editor])
+  }, [shadowEditor])
 
   useEffect(() => {
-    editor?.update(() => {
-      const root = $getRoot()
-      const p = $createParagraphNode()
-      const text = $createTextNode(initialContent)
+    if (initialContent) {
+      shadowEditor?.update(() => {
+        const root = $getRoot()
+        const p = $createParagraphNode()
+        const text = $createTextNode(initialContent)
 
-      p.append(text)
-      root.clear()
-      root.append(p)
-    })
-  }, [initialContent, editor])
-
-  const initialConfig: InitialConfigType = {
-    namespace: `tweet-editor-${id}`,
-    theme: {
-      text: {
-        bold: 'font-bold',
-        italic: 'italic',
-        underline: 'underline',
-      },
-    },
-    editable: !selectionMode,
-    onError: (error: Error) => {
-      console.error('[Tweet Editor Error]', error)
-    },
-    nodes: [DeletionNode, AdditionNode, UnchangedNode, ReplacementNode],
-  }
+        p.append(text)
+        root.clear()
+        root.append(p)
+      })
+    }
+  }, [initialContent, shadowEditor])
 
   const onEditorChange = (
     editorState: EditorState,
@@ -120,31 +469,90 @@ export default function Tweet({
     setTweetContent(content)
 
     localStorage.setItem('tweet', content)
-
-    // if (tags.has('system-clear')) {
-    //   prev.current = ''
-    //   return
-    // }
-
-    // if (tags.has('system-update')) {
-    //   prev.current = content
-    //   return
-    // }
-
-    // if (content === prev.current) return
-
-    // queueSave({ tweetId, content })
   }
 
-  const handlePostToTwitter = () => {
-    const tweetText = editor?.read(() => $getRoot().getTextContent())
-    const encodedText = encodeURIComponent(tweetText ?? '')
+  const handleScheduleTweet = () => {
+    if (!scheduleDate || !scheduleTime) {
+      toast.error('Please select both date and time')
+      return
+    }
 
-    const sanitizedText = encodedText.endsWith('%0A')
-      ? encodedText.slice(0, -3)
-      : encodedText
+    const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`)
+    const now = new Date()
 
-    window.open(`https://x.com/intent/tweet?text=${sanitizedText}`, '_blank')
+    if (scheduledDateTime <= now) {
+      toast.error('Scheduled time must be in the future')
+      return
+    }
+
+    const scheduledUnix = Math.floor(scheduledDateTime.getTime() / 1000)
+    const uploadedMedia = mediaFiles.filter((f) => f.uploaded && f.media_id)
+    const mediaIds = uploadedMedia.map((f) => f.media_id!)
+
+    const s3Keys = mediaFiles
+      .filter((f) => Boolean(f.s3Key))
+      .map((f) => f.s3Key)
+      .filter(Boolean)
+
+    scheduleTweetMutation.mutate({
+      content: currentTweet.content,
+      scheduledUnix,
+      mediaIds: currentTweet.mediaIds,
+      s3Keys,
+    })
+  }
+
+  const handlePostTweet = () => {
+    const content = shadowEditor?.read(() => $getRoot().getTextContent()) || ''
+
+    if (!content.trim() && mediaFiles.length === 0) {
+      toast.error('Tweet cannot be empty')
+      return
+    }
+
+    const uploadedMedia = mediaFiles.filter((f) => f.uploaded && f.media_id)
+    if (mediaFiles.some((f) => f.uploading)) {
+      toast.error('Please wait for media uploads to complete')
+      return
+    }
+
+    if (mediaFiles.some((f) => f.error)) {
+      toast.error('Please remove failed media uploads')
+      return
+    }
+
+    const skipConfirmation = localStorage.getItem('skipPostConfirmation') === 'true'
+
+    if (skipConfirmation) {
+      performPostTweet()
+    } else {
+      setShowPostConfirmModal(true)
+    }
+  }
+
+  const performPostTweet = () => {
+    const content = shadowEditor?.read(() => $getRoot().getTextContent()) || ''
+    const uploadedMedia = mediaFiles.filter((f) => f.uploaded && f.media_id)
+    const mediaIds = uploadedMedia.map((f) => f.media_id!)
+
+    const s3Keys = mediaFiles
+      .filter((f) => Boolean(f.s3Key))
+      .map((f) => f.s3Key)
+      .filter(Boolean)
+
+    postTweetMutation.mutate({
+      content,
+      mediaIds: mediaIds.length > 0 ? mediaIds : undefined,
+      s3Keys,
+    })
+  }
+
+  const handleConfirmPost = () => {
+    if (dontShowAgain) {
+      localStorage.setItem('skipPostConfirmation', 'true')
+    }
+    setShowPostConfirmModal(false)
+    performPostTweet()
   }
 
   const copyTweetImageToClipboard = async () => {
@@ -177,95 +585,198 @@ export default function Tweet({
   const circumference = 2 * Math.PI * 10
   const strokeDashoffset = circumference - (progress / 100) * circumference
 
-  // if (isLoadingTweet && tweetId !== 'new') {
-  //   return (
-  //     <div className="relative bg-white p-6 rounded-2xl w-full border border-stone-200 bg-clip-padding shadow-sm">
-  //       <div className="flex gap-3">
-  //         <Skeleton className="h-12 w-12 rounded-full" />
+  const [editor] = useLexicalComposerContext()
+  // const [focus, setFocus] = useState(false)
 
-  //         <div className="flex-1">
-  //           <div className="flex items-center gap-2 mb-3">
-  //             <Skeleton className="h-4 w-24" />
-  //             <Skeleton className="h-4 w-20" />
-  //           </div>
+  // useEffect(
+  //   () =>
+  //     editor.registerCommand(
+  //       BLUR_COMMAND,
+  //       () => {
+  //         setFocus(false)
+  //         return false
+  //       },
+  //       COMMAND_PRIORITY_LOW,
+  //     ),
+  //   [],
+  // )
 
-  //           <div className="space-y-2">
-  //             <Skeleton className="h-4 w-full" />
-  //             <Skeleton className="h-4 w-3/4" />
-  //             <Skeleton className="h-4 w-5/6" />
-  //           </div>
-
-  //           <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
-  //             <div className="flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg">
-  //               <Skeleton className="h-8 w-8 rounded-md" />
-  //               <div className="w-px h-4 bg-stone-300 mx-2"></div>
-  //               <Skeleton className="h-8 w-8 rounded-md" />
-  //               <Skeleton className="h-8 w-8 rounded-md" />
-  //               <Skeleton className="h-8 w-8 rounded-md" />
-  //               <div className="w-px h-4 bg-stone-300 mx-2"></div>
-  //               <Skeleton className="h-8 w-8 rounded-full" />
-  //             </div>
-
-  //             <Skeleton className="h-11 w-28 rounded-lg" />
-  //           </div>
-  //         </div>
-  //       </div>
-  //     </div>
-  //   )
-  // }
+  // useEffect(
+  //   () =>
+  //     editor.registerCommand(
+  //       FOCUS_COMMAND,
+  //       () => {
+  //         setFocus(true)
+  //         return false
+  //       },
+  //       COMMAND_PRIORITY_LOW,
+  //     ),
+  //   [],
+  // )
 
   return (
     <>
       <Drawer modal={false} open={open && !selectionMode} onOpenChange={setOpen}>
-        <div className="relative bg-white p-6 rounded-2xl w-full border border-stone-200 bg-clip-padding shadow-sm">
-          {/* {showConnector && (
-        <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-gray-200 dark:bg-stone-700 z-0"></div>
-      )} */}
-
+        <div
+          className={cn(
+            'relative bg-white p-6 rounded-2xl w-full border border-stone-200 border-transparent bg-clip-padding shadow-sm transition-colors',
+            isDragging && !selectionMode && 'border-indigo-600 border-dashed border-2',
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <div className="flex gap-3 relative z-10">
-            <Avatar className="h-12 w-12 rounded-full border-2 border-white bg-white">
-              <AvatarImage src={account.avatar} alt={account.handle} />
-              <AvatarFallback>{account.avatarFallback}</AvatarFallback>
-            </Avatar>
+            <AccountAvatar className="size-12" />
 
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1">
-                  <span className="font-semibold text-text-gray text-base">
-                    {account.name}
-                  </span>
-                  {account.verified && <Icons.verificationBadge className="h-4 w-4" />}
-                  <span className="text-stone-400 text-base">@{account.handle}</span>
+                  <AccountName />
+                  <AccountHandle />
                 </div>
               </div>
 
               <div className="mt-1 text-stone-800 leading-relaxed">
-                <LexicalComposer
-                  initialConfig={{
-                    ...initialConfig,
-                  }}
-                >
-                  <PlainTextPlugin
-                    contentEditable={
-                      <ContentEditable
-                        autoFocus={!selectionMode}
-                        spellCheck={false}
-                        className={cn(
-                          'w-full !min-h-16 resize-none text-base/7 leading-relaxed text-stone-800 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
-                          selectionMode && 'pointer-events-none',
-                        )}
-                      />
-                    }
-                    ErrorBoundary={LexicalErrorBoundary}
-                  />
-                  <PlaceholderPlugin placeholder="What's happening?" />
-                  <OnChangePlugin onChange={onEditorChange} />
-                  <HistoryPlugin />
-                  <MultipleEditorStorePlugin
-                    id={id ? `tweet-editor-${id}` : 'tweet-editor'}
-                  />
-                </LexicalComposer>
+                <PlainTextPlugin
+                  contentEditable={
+                    <ContentEditable
+                      autoFocus={!selectionMode}
+                      spellCheck={false}
+                      className={cn(
+                        'w-full !min-h-16 resize-none text-base/7 leading-relaxed text-stone-800 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+                        selectionMode && 'pointer-events-none',
+                      )}
+                    />
+                  }
+                  ErrorBoundary={LexicalErrorBoundary}
+                />
+                <PlaceholderPlugin placeholder="What's happening?" />
+                <OnChangePlugin onChange={onEditorChange} />
+                <HistoryPlugin />
+                <ShadowEditorSyncPlugin />
               </div>
+
+              {/* Media Files Display */}
+              {mediaFiles.length > 0 && (
+                <div className="mt-3">
+                  {mediaFiles.length === 1 && mediaFiles[0] && (
+                    <div className="relative group">
+                      <div className="relative overflow-hidden rounded-2xl border border-stone-200">
+                        {mediaFiles[0].type === 'video' ? (
+                          <video
+                            src={mediaFiles[0].url}
+                            className="w-full max-h-[510px] object-cover"
+                            controls={false}
+                          />
+                        ) : (
+                          <img
+                            src={mediaFiles[0].url}
+                            alt="Upload preview"
+                            className="w-full max-h-[510px] object-cover"
+                          />
+                        )}
+                        {renderMediaOverlays(mediaFiles[0], 0)}
+                      </div>
+                    </div>
+                  )}
+
+                  {mediaFiles.length === 2 && (
+                    <div className="grid grid-cols-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200">
+                      {mediaFiles.map((mediaFile, index) => (
+                        <div key={mediaFile.url} className="relative group">
+                          <div className="relative overflow-hidden h-[254px]">
+                            {mediaFile.type === 'video' ? (
+                              <video
+                                src={mediaFile.url}
+                                className="w-full h-full object-cover"
+                                controls={false}
+                              />
+                            ) : (
+                              <img
+                                src={mediaFile.url}
+                                alt="Upload preview"
+                                className="w-full h-full object-cover"
+                              />
+                            )}
+                            {renderMediaOverlays(mediaFile, index)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {mediaFiles.length === 3 && mediaFiles[0] && (
+                    <div className="grid grid-cols-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200 h-[254px]">
+                      <div className="relative group">
+                        <div className="relative overflow-hidden h-full">
+                          {mediaFiles[0].type === 'video' ? (
+                            <video
+                              src={mediaFiles[0].url}
+                              className="w-full h-full object-cover"
+                              controls={false}
+                            />
+                          ) : (
+                            <img
+                              src={mediaFiles[0].url}
+                              alt="Upload preview"
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                          {renderMediaOverlays(mediaFiles[0], 0)}
+                        </div>
+                      </div>
+                      <div className="grid grid-rows-2 gap-0.5">
+                        {mediaFiles.slice(1).map((mediaFile, index) => (
+                          <div key={mediaFile.url} className="relative group">
+                            <div className="relative overflow-hidden h-full">
+                              {mediaFile.type === 'video' ? (
+                                <video
+                                  src={mediaFile.url}
+                                  className="w-full h-full object-cover"
+                                  controls={false}
+                                />
+                              ) : (
+                                <img
+                                  src={mediaFile.url}
+                                  alt="Upload preview"
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                              {renderMediaOverlays(mediaFile, index + 1)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {mediaFiles.length === 4 && (
+                    <div className="grid grid-cols-2 grid-rows-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200 h-[254px]">
+                      {mediaFiles.map((mediaFile, index) => (
+                        <div key={mediaFile.url} className="relative group">
+                          <div className="relative overflow-hidden h-full">
+                            {mediaFile.type === 'video' ? (
+                              <video
+                                src={mediaFile.url}
+                                className="w-full h-full object-cover"
+                                controls={false}
+                              />
+                            ) : (
+                              <img
+                                src={mediaFile.url}
+                                alt="Upload preview"
+                                className="w-full h-full object-cover"
+                              />
+                            )}
+                            {renderMediaOverlays(mediaFile, index)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {currentTweet?.image && (
                 <>
@@ -281,39 +792,38 @@ export default function Tweet({
                         alt="Tweet media"
                         className="absolute inset-0 w-full h-full object-cover rounded-md"
                       />
-                      {!selectionMode && (
-                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <DuolingoButton
-                            size="icon"
-                            variant="secondary"
-                            onClick={() => {
-                              setImageDrawerOpen(true)
-                            }}
-                            className="rounded-full"
-                          >
-                            <Pencil className="h-4 w-4" />
-                            <span className="sr-only">Edit image</span>
-                          </DuolingoButton>
-                          <DuolingoButton
-                            size="icon"
-                            variant="secondary"
-                            onClick={copyTweetImageToClipboard}
-                            className="rounded-full"
-                          >
-                            <Copy className="h-4 w-4" />
-                            <span className="sr-only">Copy image to clipboard</span>
-                          </DuolingoButton>
-                          <DuolingoButton
-                            size="icon"
-                            variant="secondary"
-                            onClick={removeTweetImage}
-                            className="rounded-full"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                            <span className="sr-only">Remove image</span>
-                          </DuolingoButton>
-                        </div>
-                      )}
+
+                      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <DuolingoButton
+                          size="icon"
+                          variant="secondary"
+                          onClick={() => {
+                            setImageDrawerOpen(true)
+                          }}
+                          className="rounded-full"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          <span className="sr-only">Edit image</span>
+                        </DuolingoButton>
+                        <DuolingoButton
+                          size="icon"
+                          variant="secondary"
+                          onClick={copyTweetImageToClipboard}
+                          className="rounded-full"
+                        >
+                          <Copy className="h-4 w-4" />
+                          <span className="sr-only">Copy image to clipboard</span>
+                        </DuolingoButton>
+                        <DuolingoButton
+                          size="icon"
+                          variant="secondary"
+                          onClick={removeTweetImage}
+                          className="rounded-full"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                          <span className="sr-only">Remove image</span>
+                        </DuolingoButton>
+                      </div>
                     </div>
                   </div>
                 </>
@@ -326,111 +836,31 @@ export default function Tweet({
                     selectionMode && 'pointer-events-none opacity-50',
                   )}
                 >
-                  <DrawerTrigger asChild>
+                  <label htmlFor="media-upload" className="cursor-pointer">
                     <DuolingoButton
                       variant="secondary"
                       size="icon"
                       className="rounded-md"
+                      onClick={() => setImageDrawerOpen(true)}
                       disabled={selectionMode}
                     >
                       <ImagePlus className="size-4" />
-                      <span className="sr-only">Add image</span>
+                      <span className="sr-only">Add media</span>
                     </DuolingoButton>
-                  </DrawerTrigger>
-                  <DrawerContent className="h-full">
-                    <div className="max-w-6xl mx-auto w-full">
-                      <DrawerHeader className="px-0">
-                        <DrawerTitle className="font-medium">Add image</DrawerTitle>
-                      </DrawerHeader>
-                      <DrawerClose asChild>
-                        <DuolingoButton
-                          variant="secondary"
-                          size="icon"
-                          className="absolute bg-stone-100 right-4 top-4"
-                        >
-                          <X className="h-4 w-4 text-stone-500" />
-                        </DuolingoButton>
-                      </DrawerClose>
-                    </div>
-
-                    <div className="w-full drawer-body h-full overflow-y-auto">
-                      <div className="max-w-6xl mx-auto w-full mb-12">
-                        <ImageTool
-                          onClose={() => setOpen(false)}
-                          onSave={async (image) => {
-                            setTweetImage({
-                              src: image.src,
-                              originalSrc: image.editorState.blob.src,
-                              width: image.width,
-                              height: image.height,
-                              editorState: image.editorState,
-                            })
-
-                            try {
-                              const response = await fetch(image.src)
-                              const blob = await response.blob()
-
-                              await navigator.clipboard.write([
-                                new ClipboardItem({
-                                  [blob.type]: blob,
-                                }),
-                              ])
-                            } catch (error) {
-                              console.error('Failed to copy image to clipboard:', error)
-                            }
-
-                            fire({
-                              particleCount: 100,
-                              spread: 110,
-                              origin: { y: 0.6 },
-                            })
-                            fire({
-                              particleCount: 100,
-                              spread: 90,
-                              origin: { y: 0.6 },
-                            })
-                            fire({
-                              particleCount: 100,
-                              spread: 70,
-                              origin: { y: 0.6 },
-                            })
-
-                            setOpen(false)
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </DrawerContent>
-
-                  <div className="w-px h-4 bg-stone-300 mx-2"></div>
-
-                  <DuolingoButton
-                    variant="secondary"
-                    size="icon"
-                    className="rounded-md"
-                    disabled={selectionMode}
-                  >
-                    <Bold className="size-4" />
-                    <span className="sr-only">Bold</span>
-                  </DuolingoButton>
-                  <DuolingoButton
-                    variant="secondary"
-                    size="icon"
-                    className="rounded-md"
-                    disabled={selectionMode}
-                  >
-                    <Italic className="size-4" />
-                    <span className="sr-only">Italic</span>
-                  </DuolingoButton>
-                  <DuolingoButton
-                    variant="secondary"
-                    size="icon"
-                    className="rounded-md"
-                    disabled={selectionMode}
-                  >
-                    <Smile className="size-4" />
-                    <span className="sr-only">Emoji</span>
-                  </DuolingoButton>
+                  </label>
+                  <input
+                    id="media-upload"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/x-msvideo"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        handleFiles(e.target.files)
+                      }
+                      e.target.value = ''
+                    }}
+                  />
 
                   <div className="w-px h-4 bg-stone-300 mx-2"></div>
 
@@ -470,14 +900,88 @@ export default function Tweet({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+                    <DialogTrigger asChild>
+                      <DuolingoButton
+                        variant="secondary"
+                        size="icon"
+                        className="aspect-square h-11 w-11"
+                        disabled={selectionMode}
+                        onClick={() => {
+                          const defaultDateTime = getDefaultScheduleDateTime()
+                          setScheduleDate(defaultDateTime.date)
+                          setScheduleTime(defaultDateTime.time)
+                        }}
+                      >
+                        <Calendar className="size-4" />
+                        <span className="sr-only">Schedule tweet</span>
+                      </DuolingoButton>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Schedule Tweet</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <label
+                            htmlFor="date"
+                            className="text-right text-sm font-medium"
+                          >
+                            Date
+                          </label>
+                          <input
+                            id="date"
+                            type="date"
+                            value={scheduleDate}
+                            onChange={(e) => setScheduleDate(e.target.value)}
+                            className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <label
+                            htmlFor="time"
+                            className="text-right text-sm font-medium"
+                          >
+                            Time
+                          </label>
+                          <input
+                            id="time"
+                            type="time"
+                            value={scheduleTime}
+                            onChange={(e) => setScheduleTime(e.target.value)}
+                            className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <DuolingoButton
+                            variant="secondary"
+                            onClick={() => setScheduleDialogOpen(false)}
+                          >
+                            Cancel
+                          </DuolingoButton>
+                          <DuolingoButton
+                            onClick={handleScheduleTweet}
+                            disabled={scheduleTweetMutation.isPending}
+                          >
+                            {scheduleTweetMutation.isPending
+                              ? 'Scheduling...'
+                              : 'Schedule Tweet'}
+                          </DuolingoButton>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
                   <DuolingoButton
                     className="h-11"
-                    onClick={handlePostToTwitter}
-                    disabled={selectionMode}
+                    onClick={handlePostTweet}
+                    disabled={selectionMode || postTweetMutation.isPending}
                   >
                     <Icons.twitter className="size-4 mr-2" />
-                    <span className="text-sm">Preview</span>
-                    <span className="sr-only">Preview on Twitter</span>
+                    <span className="text-sm">
+                      {postTweetMutation.isPending ? 'Posting...' : 'Post'}
+                    </span>
+                    <span className="sr-only">Post to Twitter</span>
                   </DuolingoButton>
                 </div>
               </div>
@@ -540,6 +1044,45 @@ export default function Tweet({
           </DrawerContent>
         </Drawer>
       </Drawer>
+
+      <Dialog open={showPostConfirmModal} onOpenChange={setShowPostConfirmModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">Post to Twitter</DialogTitle>
+          </DialogHeader>
+          <div className="">
+            <p className="text-sm text-muted-foreground mb-4">
+              This will post your tweet to Twitter. Continue?
+            </p>
+            <DuolingoCheckbox
+              id="dont-show-again"
+              label="Don't show this again"
+              checked={dontShowAgain}
+              onChange={(e) => setDontShowAgain(e.target.checked)}
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <DuolingoButton
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setShowPostConfirmModal(false)
+                setDontShowAgain(false)
+              }}
+            >
+              Cancel
+            </DuolingoButton>
+            <DuolingoButton
+              size="sm"
+              onClick={handleConfirmPost}
+              disabled={postTweetMutation.isPending}
+            >
+              <Icons.twitter className="size-4 mr-2" />
+              {postTweetMutation.isPending ? 'Posting...' : 'Post Now'}
+            </DuolingoButton>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

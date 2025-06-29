@@ -8,7 +8,14 @@ import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
 import { $getRoot } from 'lexical'
-import { ArrowLeftFromLine, ArrowRightFromLine, PanelLeft, Plus } from 'lucide-react'
+import {
+  ArrowLeftFromLine,
+  ArrowRightFromLine,
+  PanelLeft,
+  Plus,
+  User,
+  Users,
+} from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createSerializer, parseAsString } from 'nuqs'
@@ -19,9 +26,12 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   useSidebar,
 } from './ui/sidebar'
+import { Separator } from './ui/separator'
 import { nanoid } from 'nanoid'
 
 const searchParams = {
@@ -35,7 +45,8 @@ export const LeftSidebar = () => {
   const { state } = useSidebar()
   const queryClient = useQueryClient()
   const { data } = authClient.useSession()
-  const { resetImprovements, setCurrentTweet } = useTweets()
+  const { resetImprovements, setCurrentTweet, setDrafts } = useTweets()
+
   const router = useRouter()
   const editor = useEditor('tweet-editor')
 
@@ -76,19 +87,26 @@ export const LeftSidebar = () => {
       </SidebarHeader>
 
       <SidebarContent>
+        {/* Create Group */}
         <SidebarGroup>
-          <div className="flex flex-col gap-2">
+          <SidebarGroupLabel
+            className={cn(
+              'transition-all duration-200 ease-out px-3',
+              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+            )}
+          >
+            Create
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
             <DuolingoButton
               size="sm"
               className="w-full flex gap-1.5 justify-start items-center h-10"
               onClick={() => {
-                router.push('/studio')
-                resetImprovements()
-                setCurrentTweet({ id: nanoid(), content: '', image: undefined })
-                editor?.update(() => {
-                  const root = $getRoot()
-                  root.clear()
-                })
+                if (chatId) {
+                  router.push(`/studio?chatId=${chatId}`)
+                } else {
+                  router.push('/studio')
+                }
               }}
             >
               <Plus className="size-4 shrink-0" />
@@ -98,26 +116,108 @@ export const LeftSidebar = () => {
                   isCollapsed ? 'opacity-0 w-0 overflow-hidden hidden' : 'opacity-100',
                 )}
               >
-                My Tweet
+                Tweet
               </span>
             </DuolingoButton>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
+        {/* Content Group */}
+        <SidebarGroup>
+          <SidebarGroupLabel
+            className={cn(
+              'transition-all duration-200 ease-out px-3',
+              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+            )}
+          >
+            Content
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <div className="flex flex-col gap-1">
+              <Link
+                href={{
+                  pathname: '/studio/knowledge',
+                  search: serialize({ chatId }),
+                }}
+                className={cn(
+                  buttonVariants({
+                    variant: 'ghost',
+                    className: 'justify-start gap-2 px-3 py-2',
+                  }),
+                  pathname.includes('/studio/knowledge') &&
+                    'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
+                )}
+              >
+                <div className="size-6 flex items-center justify-center flex-shrink-0">
+                  🧠
+                </div>
+                <span
+                  className={cn(
+                    'transition-all duration-200 ease-out',
+                    isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+                  )}
+                >
+                  Knowledge Base
+                </span>
+              </Link>
+
+              <Link
+                href={{
+                  pathname: '/studio/scheduled',
+                  search: serialize({ chatId }),
+                }}
+                className={cn(
+                  buttonVariants({
+                    variant: 'ghost',
+                    className: 'justify-start gap-2 px-3 py-2',
+                  }),
+                  pathname.includes('/studio/scheduled') &&
+                    'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
+                )}
+              >
+                <div className="size-6 flex items-center justify-center flex-shrink-0">
+                  📅
+                </div>
+                <span
+                  className={cn(
+                    'transition-all duration-200 ease-out',
+                    isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+                  )}
+                >
+                  Schedule
+                </span>
+              </Link>
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Account Group */}
+        <SidebarGroup>
+          <SidebarGroupLabel
+            className={cn(
+              'transition-all duration-200 ease-out px-3',
+              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+            )}
+          >
+            Account
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
             <Link
               href={{
-                pathname: '/studio/knowledge',
+                pathname: '/studio/accounts',
                 search: serialize({ chatId }),
               }}
               className={cn(
                 buttonVariants({
                   variant: 'ghost',
-                  className: 'justify-start gap-2 px-3 py-2',
+                  className: 'w-full justify-start gap-2 px-3 py-2',
                 }),
-                pathname.includes('/studio/knowledge') &&
+                pathname.includes('/studio/accounts') &&
                   'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
               )}
             >
               <div className="size-6 flex items-center justify-center flex-shrink-0">
-                🧠
+                <Users className="size-4" />
               </div>
               <span
                 className={cn(
@@ -125,10 +225,10 @@ export const LeftSidebar = () => {
                   isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
                 )}
               >
-                Knowledge Base
+                Accounts
               </span>
             </Link>
-          </div>
+          </SidebarGroupContent>
         </SidebarGroup>
 
         {/* <div
@@ -292,14 +392,14 @@ export const LeftSidebar = () => {
                 </div>
               </Link>
             )}
-            <a
+            {/* <a
               href="https://docs.google.com/forms/d/e/1FAIpQLSdCtO75IY051uoGcxBQ_vK3uNnNnokb_Z8VTrp5JZJnzUI02g/viewform?usp=dialog"
               className={buttonVariants({ variant: 'outline' })}
               target="_blank"
               rel="noopener noreferrer"
             >
               Feedback 🫶
-            </a>
+            </a> */}
           </div>
         </div>
       </SidebarFooter>
