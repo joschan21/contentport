@@ -97,9 +97,9 @@ export default function ScheduledTweetsPage() {
       const { tweets } = await res.json()
       return tweets.map((tweet: any) => ({
         ...tweet,
-        mediaFiles: tweet.mediaUrls.map((url: string) => ({
-          url,
-          type: 'image', // Assuming all mediaUrls are images for simplicity
+        mediaFiles: tweet.mediaData.map((media: { url: string; type: 'image' | 'gif' | 'video' }) => ({
+          url: media.url,
+          type: media.type,
           uploading: false,
           uploaded: true,
         })),
@@ -194,7 +194,7 @@ export default function ScheduledTweetsPage() {
 
   if (isLoading) {
     return (
-      <div className="container max-w-4xl mx-auto p-6">
+      <div className="container max-w-xl mx-auto p-6">
         <div className="space-y-6">
           <div className="flex items-center gap-3">
             <AccountAvatar className="size-12" />
@@ -215,7 +215,7 @@ export default function ScheduledTweetsPage() {
 
   return (
     <div className="relative z-10 container max-w-4xl mx-auto p-6">
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-xl">
         <div className="flex items-center gap-3">
           <AccountAvatar className="size-12" />
           <div>

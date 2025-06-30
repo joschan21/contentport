@@ -328,7 +328,7 @@ export default function AccountsPage() {
 
         {isLoadingAccounts ? (
           <div className="bg-white">
-            {[1, 2].map((index) => (
+            {[1].map((index) => (
               <div key={index}>
                 <div className="rounded-lg p-4">
                   <div className="w-full flex items-center justify-between">

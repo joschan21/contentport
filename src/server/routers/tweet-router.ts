@@ -10,6 +10,7 @@ import { SendTweetV2Params, TwitterApi } from 'twitter-api-v2'
 import { z } from 'zod'
 import { j, privateProcedure, publicProcedure } from '../jstack'
 import { getBaseUrl } from '@/constants/base-url'
+import { getAccount } from './utils/get-account'
 
 const receiver = new Receiver({
   currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY as string,
@@ -17,24 +18,39 @@ const receiver = new Receiver({
 })
 
 // Function to fetch media URLs from S3 keys using S3Client
-async function fetchMediaFromS3(s3Keys: string[]): Promise<string[]> {
-  const mediaUrls = await Promise.all(
+async function fetchMediaFromS3(s3Keys: string[]): Promise<Array<{ url: string; type: 'image' | 'gif' | 'video' }>> {
+  const mediaData = await Promise.all(
     s3Keys.map(async (s3Key) => {
       try {
-        await s3Client.send(
+        const headResponse = await s3Client.send(
           new HeadObjectCommand({
             Bucket: BUCKET_NAME,
             Key: s3Key,
           }),
         )
-        return `https://contentport-dev.s3.amazonaws.com/${s3Key}`
+        
+        const url = `https://contentport-dev.s3.amazonaws.com/${s3Key}`
+        const contentType = headResponse.ContentType || ''
+        
+        // Determine media type from content-type or file extension
+        let type: 'image' | 'gif' | 'video' = 'image'
+        
+        if (contentType.startsWith('video/') || s3Key.toLowerCase().includes('.mp4') || s3Key.toLowerCase().includes('.mov')) {
+          type = 'video'
+        } else if (contentType === 'image/gif' || s3Key.toLowerCase().endsWith('.gif')) {
+          type = 'gif'
+        } else if (contentType.startsWith('image/')) {
+          type = 'image'
+        }
+        
+        return { url, type }
       } catch (error) {
         console.error('Failed to fetch media from S3:', error)
         throw new Error('Failed to fetch media from S3')
       }
     }),
   )
-  return mediaUrls
+  return mediaData
 }
 
 export const tweetRouter = j.router({
@@ -74,10 +90,16 @@ export const tweetRouter = j.router({
     }),
 
   create: privateProcedure.post(async ({ c, ctx }) => {
-    const { user, account } = ctx
+    const { user } = ctx
 
-    if (!account) {
-      throw new HTTPException(412, { message: 'No account connected' })
+    const account = await getAccount({
+      email: user.email,
+    })
+
+    if (!account?.id) {
+      throw new HTTPException(400, {
+        message: 'Please connect your Twitter account',
+      })
     }
 
     const id = crypto.randomUUID()
@@ -161,11 +183,22 @@ export const tweetRouter = j.router({
       const { user } = ctx
       const { s3Key, mediaType } = input
 
-      const connectedAccount = await db.query.account.findFirst({
-        where: and(eq(accountSchema.userId, user.id), eq(accountSchema.id, 'twitter')),
+      const activeAccount = await getAccount({ email: user.email })
+
+      if (!activeAccount) {
+        throw new HTTPException(400, {
+          message: 'No active account found',
+        })
+      }
+
+      const account = await db.query.account.findFirst({
+        where: and(
+          eq(accountSchema.userId, user.id),
+          eq(accountSchema.id, activeAccount.id),
+        ),
       })
 
-      if (!connectedAccount || !connectedAccount.accessToken) {
+      if (!account) {
         throw new HTTPException(400, {
           message: 'Twitter account not connected or access token missing',
         })
@@ -177,8 +210,8 @@ export const tweetRouter = j.router({
       const client = new TwitterApi({
         appKey: consumerKey as string,
         appSecret: consumerSecret as string,
-        accessToken: connectedAccount.accessToken as string,
-        accessSecret: connectedAccount.accessSecret as string,
+        accessToken: account.accessToken as string,
+        accessSecret: account.accessSecret as string,
       })
 
       const mediaUrl = `https://contentport-dev.s3.amazonaws.com/${s3Key}`
@@ -209,61 +242,8 @@ export const tweetRouter = j.router({
           break
       }
 
-      console.log('Using tokens:', {
-        accessToken: connectedAccount.accessToken?.slice(0, 10) + '...',
-        accessSecret: connectedAccount.accessSecret?.slice(0, 10) + '...',
-        mimeType,
-        bufferSize: buffer.byteLength,
-      })
-
       const mediaBuffer = Buffer.from(buffer)
       const mediaId = await client.v1.uploadMedia(mediaBuffer, { mimeType })
-
-      // // Step 4: STATUS - Check processing if needed
-      // if (finalizeData.data.processing_info) {
-      //   let processingComplete = false
-      //   let statusAttempts = 0
-      //   const maxStatusAttempts = 30
-
-      //   while (!processingComplete && statusAttempts < maxStatusAttempts) {
-      //     const checkAfterSecs = finalizeData.data.processing_info.check_after_secs || 1
-      //     await new Promise(resolve => setTimeout(resolve, checkAfterSecs * 1000))
-
-      //     const statusResponse = await fetch(
-      //       `https://api.x.com/2/media/upload?command=STATUS&media_id=${mediaId}`,
-      //       {
-      //         method: 'GET',
-      //         headers: {
-      //           'Authorization': `Bearer ${accessToken}`,
-      //         },
-      //       }
-      //     )
-
-      //     if (!statusResponse.ok) {
-      //       console.error('STATUS check failed')
-      //       break
-      //     }
-
-      //     const statusData = await statusResponse.json() as any
-      //     const state = statusData.data.processing_info?.state
-
-      //     if (state === 'succeeded') {
-      //       processingComplete = true
-      //     } else if (state === 'failed') {
-      //       throw new HTTPException(500, {
-      //         message: 'Media processing failed on Twitter servers',
-      //       })
-      //     }
-
-      //     statusAttempts++
-      //   }
-
-      //   if (!processingComplete) {
-      //     throw new HTTPException(500, {
-      //       message: 'Media processing timeout - please try again',
-      //     })
-      //   }
-      // }
 
       const mediaUpload = mediaId
 
@@ -317,11 +297,17 @@ export const tweetRouter = j.router({
       }),
     )
     .post(async ({ c, ctx, input }) => {
-      const { user, account } = ctx
+      const { user } = ctx
       const { content, scheduledUnix, mediaIds, s3Keys } = input
 
-      if (!account) {
-        throw new HTTPException(412, { message: 'No account connected' })
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
       }
 
       const dbAccount = await db.query.account.findFirst({
@@ -336,8 +322,13 @@ export const tweetRouter = j.router({
 
       const tweetId = crypto.randomUUID()
 
+      const baseUrl =
+        process.env.NODE_ENV === 'development'
+          ? 'https://sponge-relaxing-separately.ngrok-free.app'
+          : getBaseUrl()
+
       const { messageId } = await qstash.publishJSON({
-        url: getBaseUrl() + '/api/tweet/post',
+        url: baseUrl + '/api/tweet/post',
         body: { tweetId, userId: user.id, accountId: dbAccount.id },
         notBefore: scheduledUnix,
       })
@@ -376,7 +367,7 @@ export const tweetRouter = j.router({
         signature,
       })
     } catch (err) {
-      throw new HTTPException(401, { message: 'Invalid credentials' })
+      throw new HTTPException(403, { message: 'Invalid credentials' })
     }
 
     const { tweetId, userId, accountId } = JSON.parse(body) as {
@@ -461,11 +452,17 @@ export const tweetRouter = j.router({
       }),
     )
     .post(async ({ c, ctx, input }) => {
-      const { user, account } = ctx
+      const { user } = ctx
       const { content, mediaIds, s3Keys } = input
 
-      if (!account) {
-        throw new HTTPException(412, { message: 'No account connected' })
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
       }
 
       const dbAccount = await db.query.account.findFirst({
@@ -568,10 +565,16 @@ export const tweetRouter = j.router({
 
   // Modify the getScheduledAndPublished function to include media URLs
   getScheduledAndPublished: privateProcedure.get(async ({ c, ctx }) => {
-    const { account } = ctx
+    const { user } = ctx
 
-    if (!account) {
-      return c.json({ tweets: [] })
+    const account = await getAccount({
+      email: user.email,
+    })
+
+    if (!account?.id) {
+      throw new HTTPException(400, {
+        message: 'Please connect your Twitter account',
+      })
     }
 
     const allTweets = await db.query.tweets.findMany({
@@ -582,8 +585,8 @@ export const tweetRouter = j.router({
     // Fetch media URLs for each tweet
     const tweetsWithMedia = await Promise.all(
       allTweets.map(async (tweet) => {
-        const mediaUrls = await fetchMediaFromS3(tweet.s3Keys || [])
-        return { ...tweet, mediaUrls }
+        const mediaData = await fetchMediaFromS3(tweet.s3Keys || [])
+        return { ...tweet, mediaData }
       }),
     )
 

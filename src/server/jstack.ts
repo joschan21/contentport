@@ -1,8 +1,6 @@
 import { auth } from '@/lib/auth'
-import { redis } from '@/lib/redis'
 import { HTTPException } from 'hono/http-exception'
 import { jstack } from 'jstack'
-import { Account } from './routers/settings-router'
 
 interface Env {
   Bindings: {}
@@ -176,30 +174,18 @@ const allowlist = [
   'jayan110105@gmail.com',
 ]
 
-const redirectMiddleware = j.middleware(async ({ c, next }) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers })
-
-  if (!session) {
-    return c.redirect('/login')
-  }
-
-  return await next()
-})
-
 const authMiddleware = j.middleware(async ({ c, next }) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
 
   if (!session) {
-    throw new HTTPException(418, { message: 'Unauthorized' })
+    throw new HTTPException(401, { message: 'Unauthorized' })
   }
 
   if (!allowlist.includes(session.user.email)) {
     throw new HTTPException(403, { message: 'Access denied' })
   }
 
-  const account = await redis.json.get<Account>(`active-account:${session.user.email}`)
-
-  return await next({ user: session.user, account })
+  return await next({ user: session.user })
 })
 
 /**
@@ -208,4 +194,4 @@ const authMiddleware = j.middleware(async ({ c, next }) => {
  * This is the base piece you use to build new queries and mutations on your API.
  */
 export const publicProcedure = j.procedure
-export const privateProcedure = publicProcedure.use(redirectMiddleware).use(authMiddleware)
+export const privateProcedure = publicProcedure.use(authMiddleware)

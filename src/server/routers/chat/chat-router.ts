@@ -25,6 +25,7 @@ import { HTTPException } from 'hono/http-exception'
 import { create_three_drafts } from './create-three-drafts'
 
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { getAccount } from '../utils/get-account'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -146,11 +147,13 @@ export const chatRouter = j.router({
       }),
     )
     .post(async ({ input, ctx }) => {
-      const { user, account } = ctx
+      const { user } = ctx
 
       const chatId = input.message.chatId
       const attachments = input.message.metadata?.attachments
       const { tweet } = input
+
+      const account = await getAccount({ email: user.email })
 
       if (!account) {
         throw new HTTPException(412, { message: 'No connected account' })

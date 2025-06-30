@@ -3,7 +3,7 @@
 import DuolingoButton from '@/components/ui/duolingo-button'
 import DuolingoCheckbox from '@/components/ui/duolingo-checkbox'
 import { useConfetti } from '@/hooks/use-confetti'
-import { initialConfig, useTweets } from '@/hooks/use-tweets'
+import { initialConfig, MediaFile, useTweets } from '@/hooks/use-tweets'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
 import { cn } from '@/lib/utils'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
@@ -26,8 +26,17 @@ import {
   FOCUS_COMMAND,
   LexicalEditor,
 } from 'lexical'
-import { AlertCircle, Calendar, Copy, ImagePlus, Pencil, Trash2, X } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import {
+  AlertCircle,
+  Calendar,
+  Copy,
+  ImagePlus,
+  LinkIcon,
+  Pencil,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { Icons } from '../icons'
 import {
@@ -48,6 +57,8 @@ import { ImageTool } from './image-tool'
 import { ShadowEditorSyncPlugin } from '@/lib/lexical-plugins/sync-plugin'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $createAdditionNode, AdditionNode } from '@/lib/nodes'
+import { Loader } from '../ui/loader'
+import Link from 'next/link'
 
 interface TweetProps {
   id: string | undefined
@@ -55,18 +66,6 @@ interface TweetProps {
   onDelete?: () => void
   onAdd?: () => void
   selectionMode?: boolean
-}
-
-interface MediaFile {
-  file: File
-  url: string
-  type: 'image' | 'gif' | 'video'
-  uploading: boolean
-  uploaded: boolean
-  error?: string
-  media_id?: string
-  media_key?: string
-  s3Key?: string
 }
 
 // Twitter media type validation
@@ -85,14 +84,20 @@ const TWITTER_SIZE_LIMITS = {
 const MAX_MEDIA_COUNT = 4
 
 export default function Tweet({ id, initialContent, selectionMode = false }: TweetProps) {
-  const { setTweetContent, currentTweet, setTweetImage, removeTweetImage, shadowEditor } =
-    useTweets()
+  const {
+    setTweetContent,
+    currentTweet,
+    shadowEditor,
+    mediaFiles,
+    setMediaFiles,
+    setCurrentTweet,
+  } = useTweets()
+
   const { fire } = useConfetti()
   const [charCount, setCharCount] = useState(0)
   const [open, setOpen] = useState(false)
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false)
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false)
-  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [showPostConfirmModal, setShowPostConfirmModal] = useState(false)
   const [dontShowAgain, setDontShowAgain] = useState(false)
@@ -100,11 +105,11 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
   const renderMediaOverlays = (mediaFile: MediaFile, index: number) => (
     <>
       {(mediaFile.uploading || mediaFile.error) && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
           {mediaFile.uploading && (
-            <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-              <p className="text-sm">Uploading...</p>
+            <div className="text-white flex flex-col items-center gap-1.5 text-center">
+              <Loader variant="classic" />
+              <p className="text-sm/6 font-medium">Uploading</p>
             </div>
           )}
           {mediaFile.error && (
@@ -119,9 +124,9 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
       {!selectionMode && (
         <DuolingoButton
           size="icon"
-          variant="secondary"
+          variant="destructive"
           onClick={() => removeMediaFile(mediaFile.url)}
-          className="absolute top-2 right-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
         >
           <X className="h-4 w-4" />
         </DuolingoButton>
@@ -142,6 +147,9 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleTime, setScheduleTime] = useState('')
 
+  const s3Controller = useRef<AbortController | null>(null)
+  const twitterController = useRef<AbortController | null>(null)
+
   // Media upload mutations
   const uploadToS3Mutation = useMutation({
     mutationFn: async ({
@@ -151,10 +159,15 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
       file: File
       mediaType: 'image' | 'gif' | 'video'
     }) => {
-      const res = await client.file.uploadTweetMedia.$post({
-        fileName: file.name,
-        fileType: file.type,
-      })
+      s3Controller.current = new AbortController()
+
+      const res = await client.file.uploadTweetMedia.$post(
+        {
+          fileName: file.name,
+          fileType: file.type,
+        },
+        { init: { signal: s3Controller.current.signal } },
+      )
 
       const { url, fields, fileKey } = await res.json()
 
@@ -175,9 +188,12 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
 
       return { fileKey, mediaType, file }
     },
+    onSettled: () => {
+      if (s3Controller.current) {
+        s3Controller.current = null
+      }
+    },
   })
-
-  const { setCurrentTweet } = useTweets()
 
   const uploadToTwitterMutation = useMutation({
     mutationFn: async ({
@@ -187,10 +203,15 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
       s3Key: string
       mediaType: 'image' | 'gif' | 'video'
     }) => {
-      const res = await client.tweet.uploadMediaToTwitter.$post({
-        s3Key,
-        mediaType,
-      })
+      twitterController.current = new AbortController()
+
+      const res = await client.tweet.uploadMediaToTwitter.$post(
+        {
+          s3Key,
+          mediaType,
+        },
+        { init: { signal: twitterController.current.signal } },
+      )
 
       return await res.json()
     },
@@ -199,6 +220,11 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
         ...prev,
         mediaIds: [...prev.mediaIds, media_id],
       }))
+    },
+    onSettled: () => {
+      if (s3Controller.current) {
+        s3Controller.current = null
+      }
     },
   })
 
@@ -227,13 +253,7 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
         spread: 110,
         origin: { y: 0.6 },
       })
-      // Clear tweet content and media
-      shadowEditor?.update(() => {
-        const root = $getRoot()
-        root.clear()
-        root.append($createParagraphNode())
-      })
-      setMediaFiles([])
+
       localStorage.removeItem('tweet')
     },
     onError: (error) => {
@@ -264,7 +284,29 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
       })
     },
     onSuccess: () => {
-      toast.success('Tweet scheduled successfully!')
+      toast.success(
+        <div className="flex gap-1.5 items-center">
+          <p>Tweet scheduled!</p>
+          <Link
+            href="/studio/scheduled"
+            className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
+          >
+            See schedule
+          </Link>
+        </div>,
+      )
+
+      setMediaFiles([])
+
+      shadowEditor.update(
+        () => {
+          const root = $getRoot()
+          root.clear()
+          root.append($createParagraphNode())
+        },
+        { tag: 'force-sync' },
+      )
+
       setScheduleDialogOpen(false)
       setScheduleDate('')
       setScheduleTime('')
@@ -379,18 +421,24 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
 
         // toast.success('Upload done!')
       } catch (error) {
-        console.error('Failed to upload media:', error)
         setMediaFiles((prev) =>
           prev.map((mf) =>
             mf.url === url ? { ...mf, uploading: false, error: 'Upload failed' } : mf,
           ),
         )
-        toast.error('Failed to upload media')
       }
     }
   }
 
   const removeMediaFile = (url: string) => {
+    if (s3Controller.current) {
+      s3Controller.current.abort('Media file removed')
+    }
+
+    if (twitterController.current) {
+      twitterController.current.abort('Media file removed')
+    }
+
     setMediaFiles((prev) => {
       const file = prev.find((f) => f.url === url)
       if (file) {
@@ -510,7 +558,6 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
       return
     }
 
-    const uploadedMedia = mediaFiles.filter((f) => f.uploaded && f.media_id)
     if (mediaFiles.some((f) => f.uploading)) {
       toast.error('Please wait for media uploads to complete')
       return
@@ -553,6 +600,29 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
     }
     setShowPostConfirmModal(false)
     performPostTweet()
+  }
+
+  const handleClearTweet = () => {
+    if (s3Controller.current) {
+      s3Controller.current.abort('Media file removed')
+    }
+    if (twitterController.current) {
+      twitterController.current.abort('Media file removed')
+    }
+
+    shadowEditor.update(
+      () => {
+        const root = $getRoot()
+        root.clear()
+        root.append($createParagraphNode())
+      },
+      { tag: 'force-sync' },
+    )
+
+    setMediaFiles([])
+    localStorage.removeItem('tweet')
+    setCharCount(0)
+    setTweetContent('')
   }
 
   const copyTweetImageToClipboard = async () => {
@@ -778,57 +848,6 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
                 </div>
               )}
 
-              {currentTweet?.image && (
-                <>
-                  <div className="overflow-hidden group relative">
-                    <div
-                      className="relative w-full"
-                      style={{
-                        paddingBottom: `${(currentTweet.image.height / currentTweet.image.width) * 100}%`,
-                      }}
-                    >
-                      <img
-                        src={currentTweet.image.src}
-                        alt="Tweet media"
-                        className="absolute inset-0 w-full h-full object-cover rounded-md"
-                      />
-
-                      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <DuolingoButton
-                          size="icon"
-                          variant="secondary"
-                          onClick={() => {
-                            setImageDrawerOpen(true)
-                          }}
-                          className="rounded-full"
-                        >
-                          <Pencil className="h-4 w-4" />
-                          <span className="sr-only">Edit image</span>
-                        </DuolingoButton>
-                        <DuolingoButton
-                          size="icon"
-                          variant="secondary"
-                          onClick={copyTweetImageToClipboard}
-                          className="rounded-full"
-                        >
-                          <Copy className="h-4 w-4" />
-                          <span className="sr-only">Copy image to clipboard</span>
-                        </DuolingoButton>
-                        <DuolingoButton
-                          size="icon"
-                          variant="secondary"
-                          onClick={removeTweetImage}
-                          className="rounded-full"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                          <span className="sr-only">Remove image</span>
-                        </DuolingoButton>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
               <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
                 <div
                   className={cn(
@@ -862,7 +881,20 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
                     }}
                   />
 
-                  <div className="w-px h-4 bg-stone-300 mx-2"></div>
+                  <div className="w-px h-4 bg-stone-300 mx-2" />
+
+                  <DuolingoButton
+                    variant="secondary"
+                    size="icon"
+                    className="rounded-md"
+                    onClick={handleClearTweet}
+                    disabled={selectionMode}
+                  >
+                    <Trash2 className="size-4" />
+                    <span className="sr-only">Clear tweet</span>
+                  </DuolingoButton>
+
+                  <div className="w-px h-4 bg-stone-300 mx-2" />
 
                   <div className="relative flex items-center justify-center">
                     <div className="h-8 w-8">
@@ -1014,29 +1046,9 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
               <div className="max-w-6xl mx-auto w-full mb-12">
                 <ImageTool
                   onClose={() => setImageDrawerOpen(false)}
-                  onSave={async (image) => {
-                    setTweetImage({
-                      src: image.src,
-                      originalSrc: image.editorState.blob.src,
-                      width: image.width,
-                      height: image.height,
-                      editorState: image.editorState,
-                    })
-
-                    try {
-                      const response = await fetch(image.src)
-                      const blob = await response.blob()
-
-                      await navigator.clipboard.write([
-                        new ClipboardItem({
-                          [blob.type]: blob,
-                        }),
-                      ])
-                    } catch (error) {
-                      console.error('Failed to copy image to clipboard:', error)
-                    }
-
+                  onUpload={async (file) => {
                     setImageDrawerOpen(false)
+                    await handleFiles([file])
                   }}
                 />
               </div>
@@ -1051,8 +1063,8 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
             <DialogTitle className="flex items-center gap-2">Post to Twitter</DialogTitle>
           </DialogHeader>
           <div className="">
-            <p className="text-sm text-muted-foreground mb-4">
-              This will post your tweet to Twitter. Continue?
+            <p className="text-base text-muted-foreground mb-4">
+              This will post to Twitter. Continue?
             </p>
             <DuolingoCheckbox
               id="dont-show-again"

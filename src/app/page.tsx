@@ -1,27 +1,23 @@
 'use client'
 
-import { Dialog } from '@/components/ui/dialog'
+import { buttonVariants } from '@/components/ui/button'
 import DuolingoButton from '@/components/ui/duolingo-button'
+import DuolingoInput from '@/components/ui/duolingo-input'
 import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
+import MuxPlayer from '@mux/mux-player-react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { HTTPException } from 'hono/http-exception'
-import { ArrowRight, Menu, X } from 'lucide-react'
+import { Menu } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { useState } from 'react'
 import { toast } from 'react-hot-toast'
-import MuxPlayer from '@mux/mux-player-react'
-import Script from 'next/script'
-import { Icons } from '@/components/icons'
-import { Marquee } from '@/components/magicui/marquee'
-import Link from 'next/link'
-import { buttonVariants } from '@/components/ui/button'
 
-const navigation = [
-  { name: 'Product', href: '#' },
-  { name: 'Features', href: '#' },
-  { name: 'Marketplace', href: '#' },
-  { name: 'Company', href: '#' },
-]
+const Testimonials = dynamic(
+  () => import('@/app/testimonials').then((mod) => ({ default: mod.Testimonials })),
+  { ssr: false },
+)
 
 const Page = () => {
   const [email, setEmail] = useState('')
@@ -58,12 +54,6 @@ const Page = () => {
     joinWaitlist()
   }
 
-  const handleAccess = async () => {
-    await authClient.signIn.social({ provider: 'google' })
-  }
-
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
   return (
     <>
       <section className="bg-gray-100">
@@ -82,20 +72,15 @@ const Page = () => {
               <div className="flex lg:hidden">
                 <button
                   type="button"
-                  onClick={() => setMobileMenuOpen(true)}
                   className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
                 >
                   <span className="sr-only">Open main menu</span>
                   <Menu aria-hidden="true" className="size-6" />
                 </button>
               </div>
-              <div className="hidden lg:flex gap-4 lg:flex-1 lg:justify-end">
-                <Link className="flex gap-1.5 items-center" href="/login">
-                  Login
-                </Link>
-                <Link className={buttonVariants({ size: 'lg' })} href="/login">
-                  Sign up for free
-                </Link>
+              <div className="hidden opacity-50 lg:flex gap-4 lg:flex-1 lg:justify-end">
+                <div className="flex gap-1.5 items-center">Login</div>
+                <div className={buttonVariants({ size: 'lg' })}>Sign up for free</div>
               </div>
             </nav>
           </header>
@@ -151,9 +136,26 @@ const Page = () => {
                         </p>
                       </div>
                     </div>
-                    <DuolingoButton size="lg" className="mt-6 w-full sm:w-auto sm:px-8">
-                      Start for free today
-                    </DuolingoButton>
+                    <form
+                      onSubmit={handleSubmit}
+                      className="flex mt-4 flex-col gap-2 max-w-sm w-full"
+                    >
+                      <DuolingoInput
+                        className="h-12"
+                        placeholder="your@email.com"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                      />
+                      <DuolingoButton
+                        type="submit"
+                        disabled={isPending}
+                        className="w-full h-12 sm:w-auto sm:px-8"
+                      >
+                        {isPending ? 'Joining...' : 'Join Waitlist →'}
+                      </DuolingoButton>
+                    </form>
 
                     <div className="mt-2 flex items-center justify-center gap-4">
                       <div className="flex -space-x-2">
@@ -248,17 +250,7 @@ const Page = () => {
               />
             </div>
 
-            <script
-              src="https://widget.senja.io/widget/3fae6f42-6a34-4da8-81f2-d3389606a704/platform.js"
-              type="text/javascript"
-              async
-            ></script>
-            <div
-              className="senja-embed block w-full mt-20"
-              data-id="3fae6f42-6a34-4da8-81f2-d3389606a704"
-              data-mode="shadow"
-              data-lazyload="false"
-            ></div>
+            <Testimonials />
           </div>
         </div>
       </section>

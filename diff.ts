@@ -1,8 +1,8 @@
 import { diff_wordMode } from '@/lib/diff-utils'
 import { chunkDiffs, DiffWithReplacement, processDiffs } from '@/lib/utils'
 
-const before = 'their cloud tools get better month over month'
-const after = 'their tools get better month over month'
+const before = 'their tools get better month over month'
+const after = 'their cloud tools get better month over month'
 
 const diffs = diff(before, after)
 

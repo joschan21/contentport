@@ -587,6 +587,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
               <DuolingoButton
                 onClick={toggleSidebar}
                 variant="secondary"
+                className='aspect-square'
                 size="icon"
                 title="Close Sidebar"
               >

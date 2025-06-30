@@ -1,5 +1,6 @@
 import { useTweets } from '@/hooks/use-tweets'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { $getRoot } from 'lexical'
 import { useEffect, useRef } from 'react'
 
 export function ShadowEditorSyncPlugin() {
@@ -31,7 +32,6 @@ export function ShadowEditorSyncPlugin() {
 
     const unregisterPersistent = shadowEditor.registerUpdateListener(
       ({ editorState, tags }) => {
-        console.log('SHADOW EDITOR UPDATE', editorState, tags);
         if (tags?.has('force-sync')) {
           const serializedState = editorState.toJSON()
           const parsedState = shadowEditor.parseEditorState(serializedState)

@@ -35,6 +35,7 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
     showImprovementsInEditor,
     setDrafts,
     setToolError,
+    improvementRef,
     clearToolError,
   } = useTweets()
 
@@ -86,6 +87,7 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
           diffs: DiffWithReplacement[]
           improvedText: string
         }) => {
+          improvementRef.current = diffs
           listImprovements(diffs)
           showImprovementsInEditor(diffs)
         },

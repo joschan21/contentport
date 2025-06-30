@@ -95,7 +95,7 @@ export function SuggestionCard({
           )}
         >
           {diff.contextBefore && (
-            <span className="text-stone-700">{diff.contextBefore}</span>
+            <span className="text-stone-700">{diff.contextBefore.trim()} </span>
           )}
           {diff.type === -1 ? (
             <span className="line-through font-medium text-stone-400">
@@ -131,7 +131,7 @@ export function SuggestionCard({
 
 function ContextAfter({ diff, text }: { diff: DiffWithReplacement; text: string }) {
   if (diff.type === 2 && diff.text.endsWith('\n')) return null
-  return <span className="text-stone-700">{text}</span>
+  return <span className="text-stone-700"> {text.trim()}</span>
 }
 
 interface Draft {
@@ -316,17 +316,21 @@ function DraftsSelector({ drafts }: { drafts: Draft[] }) {
 }
 
 export const Improvements = ({ empty }: { empty?: boolean }) => {
-  const { tweetId, improvements, acceptImprovement, rejectImprovement, drafts } =
-    useTweets()
+  const { improvements, acceptImprovement, rejectImprovement, drafts } = useTweets()
+  console.log('improvements', improvements);
 
-  const visibleImprovements = empty ? [] : improvements.filter((i) => i.type !== 0 && !Boolean(i.rejected))
+  const visibleImprovements = empty
+    ? []
+    : improvements.filter(
+        (i) => i.type !== 0 && !Boolean(i.accepted) && !Boolean(i.rejected),
+      )
 
   const handleAcceptImprovement = async (diff: DiffWithReplacement) => {
-    acceptImprovement(diff, improvements)
+    acceptImprovement(diff)
   }
 
   const handleRejectImprovement = (diff: DiffWithReplacement) => {
-    rejectImprovement(diff, improvements)
+    rejectImprovement(diff)
   }
 
   const showDrafts = drafts.length > 0

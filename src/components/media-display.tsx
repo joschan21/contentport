@@ -2,6 +2,13 @@ import { useState } from 'react'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { AlertCircle, CheckCircle, Loader2, X } from 'lucide-react'
 import { Loader } from './ui/loader'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from './ui/dialog'
 
 interface MediaFile {
   url: string
@@ -21,6 +28,8 @@ export default function MediaDisplay({
   selectionMode = false,
   removeMediaFile,
 }: MediaDisplayProps) {
+  const [openImageUrl, setOpenImageUrl] = useState<string | null>(null)
+
   const renderMediaOverlays = (mediaFile: MediaFile) => (
     <>
       {(mediaFile.uploading || mediaFile.error) && (
@@ -39,37 +48,56 @@ export default function MediaDisplay({
           )}
         </div>
       )}
-
-      {/* {!selectionMode && (
-        <DuolingoButton
-          size="icon"
-          variant="secondary"
-          onClick={() => removeMediaFile(mediaFile.url)}
-          className="absolute top-2 right-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <X className="h-4 w-4" />
-        </DuolingoButton>
-      )} */}
     </>
   )
 
+  const renderImage = (mediaFile: MediaFile, className: string) => (
+    <Dialog open={openImageUrl === mediaFile.url} onOpenChange={(open) => setOpenImageUrl(open ? mediaFile.url : null)}>
+      <DialogTrigger asChild>
+        <img
+          src={mediaFile.url}
+          alt="Upload preview"
+          className={`${className} cursor-pointer hover:opacity-90 transition-opacity`}
+        />
+      </DialogTrigger>
+      <DialogContent
+        className="max-w-4xl w-full h-fit max-h-[90vh] p-0 bg-transparent border-none shadow-none"
+        noClose
+      >
+        <DialogTitle className="sr-only">Image Zoom View</DialogTitle>
+        <div className="relative w-full h-full flex items-center justify-center">
+          <div className="relative">
+            <img
+              src={mediaFile.url}
+              className="max-w-full max-h-full object-contain rounded-lg"
+            />
+            <DialogClose className="absolute top-2 right-2" asChild>
+              <button
+                onClick={() => setOpenImageUrl(null)}
+                className="bg-black bg-opacity-50 hover:bg-opacity-75 text-white rounded-full p-2 transition-all"
+              >
+                <X className="size-5" />
+              </button>
+            </DialogClose>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+
   return (
-    <div className="mt-3 max-w-lg">
+    <div className="mt-3 max-w-full">
       {mediaFiles.length === 1 && mediaFiles[0] && (
         <div className="relative group">
-          <div className="relative overflow-hidden rounded-2xl border border-stone-200">
+          <div className="relative overflow-hidden border border-stone-200">
             {mediaFiles[0].type === 'video' ? (
               <video
                 src={mediaFiles[0].url}
                 className="w-full max-h-[510px] object-cover"
-                controls={false}
+                controls
               />
             ) : (
-              <img
-                src={mediaFiles[0].url}
-                alt="Upload preview"
-                className="w-full max-h-[510px] object-cover"
-              />
+              renderImage(mediaFiles[0], "w-full max-h-[510px] object-cover")
             )}
             {renderMediaOverlays(mediaFiles[0])}
           </div>
@@ -77,22 +105,18 @@ export default function MediaDisplay({
       )}
 
       {mediaFiles.length === 2 && (
-        <div className="grid grid-cols-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200">
+        <div className="grid grid-cols-2 gap-0.5 overflow-hidden border border-stone-200">
           {mediaFiles.map((mediaFile, index) => (
             <div key={mediaFile.url} className="relative group">
               <div className="relative overflow-hidden h-[254px]">
                 {mediaFile.type === 'video' ? (
-                  <video
-                    src={mediaFile.url}
+                  <video 
+                    src={mediaFile.url} 
                     className="w-full h-full object-cover"
-                    controls={false}
+                    controls
                   />
                 ) : (
-                  <img
-                    src={mediaFile.url}
-                    alt="Upload preview"
-                    className="w-full h-full object-cover"
-                  />
+                  renderImage(mediaFile, "w-full h-full object-cover")
                 )}
                 {renderMediaOverlays(mediaFile)}
               </div>
@@ -102,21 +126,17 @@ export default function MediaDisplay({
       )}
 
       {mediaFiles.length === 3 && mediaFiles[0] && (
-        <div className="grid grid-cols-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200 h-[254px]">
+        <div className="grid grid-cols-2 gap-0.5 overflow-hidden border border-stone-200 h-[254px]">
           <div className="relative group">
             <div className="relative overflow-hidden h-full">
               {mediaFiles[0].type === 'video' ? (
-                <video
-                  src={mediaFiles[0].url}
+                <video 
+                  src={mediaFiles[0].url} 
                   className="w-full h-full object-cover"
-                  controls={false}
+                  controls
                 />
               ) : (
-                <img
-                  src={mediaFiles[0].url}
-                  alt="Upload preview"
-                  className="w-full h-full object-cover"
-                />
+                renderImage(mediaFiles[0], "w-full h-full object-cover")
               )}
               {renderMediaOverlays(mediaFiles[0])}
             </div>
@@ -129,14 +149,10 @@ export default function MediaDisplay({
                     <video
                       src={mediaFile.url}
                       className="w-full h-full object-cover"
-                      controls={false}
+                      controls
                     />
                   ) : (
-                    <img
-                      src={mediaFile.url}
-                      alt="Upload preview"
-                      className="w-full h-full object-cover"
-                    />
+                    renderImage(mediaFile, "w-full h-full object-cover")
                   )}
                   {renderMediaOverlays(mediaFile)}
                 </div>
@@ -147,22 +163,18 @@ export default function MediaDisplay({
       )}
 
       {mediaFiles.length === 4 && (
-        <div className="grid grid-cols-2 grid-rows-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200 h-[254px]">
+        <div className="grid grid-cols-2 grid-rows-2 gap-0.5 overflow-hidden border border-stone-200 h-[254px]">
           {mediaFiles.map((mediaFile, index) => (
             <div key={mediaFile.url} className="relative group">
               <div className="relative overflow-hidden h-full">
                 {mediaFile.type === 'video' ? (
-                  <video
-                    src={mediaFile.url}
+                  <video 
+                    src={mediaFile.url} 
                     className="w-full h-full object-cover"
-                    controls={false}
+                    controls
                   />
                 ) : (
-                  <img
-                    src={mediaFile.url}
-                    alt="Upload preview"
-                    className="w-full h-full object-cover"
-                  />
+                  renderImage(mediaFile, "w-full h-full object-cover")
                 )}
                 {renderMediaOverlays(mediaFile)}
               </div>

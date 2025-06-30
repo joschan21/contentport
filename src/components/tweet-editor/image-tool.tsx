@@ -56,6 +56,7 @@ interface ImageBeautifierProps {
       }
     }
   }) => void
+  onUpload?: (file: File) => void
   initialEditorState?: {
     blob: {
       src: string
@@ -191,7 +192,7 @@ const Frame = ({ type, borderRadius, backgroundColor, children }: FrameProps) =>
   return children
 }
 
-export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifierProps) {
+export function ImageTool({ onClose, onSave, onUpload, initialEditorState }: ImageBeautifierProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [blob, setBlob] = useState<ScreenshotBlob>({
@@ -347,12 +348,24 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
     }
   }, [])
 
+  const dataURLtoFile = (dataurl: string, filename: string): File => {
+    const arr = dataurl.split(',')
+    const mime = arr[0]?.match(/:(.*?);/)?.[1] || 'image/png'
+    const bstr = atob(arr[1] || '')
+    let n = bstr.length
+    const u8arr = new Uint8Array(n)
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n)
+    }
+    return new File([u8arr], filename, { type: mime })
+  }
+
   const saveImage = async (scale = 1) => {
     try {
       const element = wrapperRef.current
       if (!element) return
 
-      const savingToast = toast.loading('Exporting image...')
+      const savingToast = toast.loading('Saving image...')
 
       const dragHandle = element.querySelector('[role="slider"]') as HTMLElement
       const originalDisplay = dragHandle?.style.display
@@ -375,27 +388,12 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
         dragHandle.style.display = originalDisplay || ''
       }
 
-      if (onSave) {
-        onSave({
-          src: data,
-          width: element.offsetWidth * scale,
-          height: element.offsetHeight * scale,
-          editorState: {
-            blob,
-            canvasWidth,
-            canvasHeight,
-            outlineSize,
-            outlineColor,
-            options: {
-              ...options,
-              outlineSize,
-              outlineColor,
-            },
-          },
-        })
+      if (onUpload) {
+        const file = dataURLtoFile(data, 'edited-image.png')
+        onUpload(file)
       }
 
-      toast.success('Image copied & ready to paste! 🎉', { id: savingToast })
+      toast.success('Image added! 🎉', { id: savingToast })
     } catch (error) {
       toast.error('something went wrong')
     }
@@ -1418,7 +1416,7 @@ export function ImageTool({ onClose, onSave, initialEditorState }: ImageBeautifi
               onClick={() => saveImage(3)}
               disabled={!blob?.src}
             >
-              Looks good! 🎉
+              Add to Tweet 🎉
             </Button>
           </div>
         </div>

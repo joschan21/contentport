@@ -97,9 +97,9 @@ const Page = () => {
                 ? `${limit.remaining}/20 messages remaining`
                 : '- messages remaining'}
             </div>
-            <div className="flex items-center justify-center mt-2">
+            {/* <div className="flex items-center justify-center mt-2">
               <Button onClick={handleUpgrade}>Upgrade</Button>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

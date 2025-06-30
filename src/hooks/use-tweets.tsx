@@ -100,14 +100,9 @@ interface TweetContextType {
   removeTweetImage: () => void
   listImprovements: (diffs: DiffWithReplacement[]) => void
   showImprovementsInEditor: (diffs: DiffWithReplacement[]) => void
-  acceptImprovement: (
-    acceptedDiff: DiffWithReplacement,
-    diffs: DiffWithReplacement[],
-  ) => void
-  rejectImprovement: (
-    rejectedDiff: DiffWithReplacement,
-    diffs: DiffWithReplacement[],
-  ) => void
+  acceptImprovement: (acceptedDiff: DiffWithReplacement) => void
+  rejectImprovement: (rejectedDiff: DiffWithReplacement) => void
+  improvementRef: React.RefObject<DiffWithReplacement[]>
   resetImprovements: () => void
   setCurrentTweet: React.Dispatch<React.SetStateAction<CurrentTweet>>
   setDrafts: (drafts: Draft[]) => void
@@ -117,6 +112,8 @@ interface TweetContextType {
   draftCheckpoint: React.RefObject<string | null>
   selectedDraftIndex: number
   setSelectedDraftIndex: React.Dispatch<React.SetStateAction<number>>
+  mediaFiles: MediaFile[]
+  setMediaFiles: React.Dispatch<React.SetStateAction<MediaFile[]>>
 }
 
 const TweetContext = createContext<TweetContextType | undefined>(undefined)
@@ -128,10 +125,23 @@ export type CurrentTweet = {
   mediaIds: string[]
 }
 
+export interface MediaFile {
+  file: File
+  url: string
+  type: 'image' | 'gif' | 'video'
+  uploading: boolean
+  uploaded: boolean
+  error?: string
+  media_id?: string
+  media_key?: string
+  s3Key?: string
+}
+
 export function TweetProvider({ children }: PropsWithChildren) {
   const { tweetId } = useParams() as { tweetId: string | null }
   const queryClient = useQueryClient()
   const hasLoaded = useRef(false)
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
 
   // fallback after rejecting all drafts
   const draftCheckpoint = useRef<string | null>(null)
@@ -145,6 +155,8 @@ export function TweetProvider({ children }: PropsWithChildren) {
   const shadowEditorRef = useRef(createEditor({ ...initialConfig }))
   const shadowEditor = shadowEditorRef.current
 
+  const improvementRef = useRef<DiffWithReplacement[]>([])
+  const improvementKeys = useRef(new Map<string, string>()) // diffId, key
   const [improvements, setImprovements] = useState<DiffWithReplacement[]>([])
 
   const [drafts, setDrafts] = useState<Draft[]>([])
@@ -218,6 +230,79 @@ export function TweetProvider({ children }: PropsWithChildren) {
         diffs.forEach((diff) => {
           if (diff.type === 2) {
             const node = new ReplacementNode(diff.replacement)
+            const key = node.getKey()
+
+            improvementKeys.current.set(diff.id, key)
+
+            p.append(node)
+          } else if (diff.type === 1) {
+            const node = new AdditionNode(diff.text)
+            const key = node.getKey()
+
+            improvementKeys.current.set(diff.id, key)
+
+            p.append(node)
+          } else if (diff.type === 0) {
+            const node = new UnchangedNode(diff.text)
+            const key = node.getKey()
+
+            improvementKeys.current.set(diff.id, key)
+
+            p.append(node)
+          } else {
+            const node = new DeletionNode(diff.text)
+            const key = node.getKey()
+
+            improvementKeys.current.set(diff.id, key)
+
+            p.append(node)
+          }
+        })
+
+        const root = $getRoot()
+        root.clear()
+
+        root.append(p)
+      },
+      // prevent save
+      { tag: 'force-sync' },
+    )
+  }
+
+  const acceptImprovement = (acceptedDiff: DiffWithReplacement) => {
+    shadowEditor.update(
+      () => {
+        const root = $getRoot()
+        const p = $createParagraphNode()
+
+        improvements.forEach((diff) => {
+          let text = ''
+
+          // handle accepted
+          if (diff.accepted || diff.id === acceptedDiff.id) {
+            if (diff.type === -1) text = ''
+            if (diff.type === 1) text = diff.text
+            if (diff.type === 2) text = diff.replacement!
+
+            const textNode = $createTextNode(text)
+            p.append(textNode)
+            return
+          }
+
+          // handle rejected
+          if (diff.rejected) {
+            if (diff.type === -1) text = diff.text
+            if (diff.type === 1) text = ''
+            if (diff.type === 2) text = diff.text
+
+            const textNode = $createTextNode(text)
+            p.append(textNode)
+            return
+          }
+
+          // all others remain the same
+          if (diff.type === 2) {
+            const node = new ReplacementNode(diff.replacement)
 
             p.append(node)
           } else if (diff.type === 1) {
@@ -235,122 +320,71 @@ export function TweetProvider({ children }: PropsWithChildren) {
           }
         })
 
-        const root = $getRoot()
         root.clear()
-
         root.append(p)
       },
-      // prevent save
       { tag: 'force-sync' },
+    )
+
+    setImprovements((prev) =>
+      prev.map((improvement) => {
+        if (improvement.id === acceptedDiff.id) {
+          return { ...improvement, accepted: true }
+        } else {
+          return improvement
+        }
+      }),
     )
   }
 
-  const acceptImprovement = (
-    acceptedDiff: DiffWithReplacement,
-    diffs: DiffWithReplacement[],
-  ) => {
+  const rejectImprovement = (rejectedDiff: DiffWithReplacement) => {
     shadowEditor.update(
       () => {
         const root = $getRoot()
         const p = $createParagraphNode()
 
-        diffs.forEach((diff) => {
-          if (diff.id === acceptedDiff.id) {
-            let text = ''
-            if (diff.type === -1) {
-              text = ''
-            } else if (diff.type === 0) {
-              text = diff.text
-            } else if (diff.type === 1) {
-              text = diff.text
-            } else if (diff.type === 2) {
-              text = diff.replacement ?? ''
-            }
+        improvements.forEach((diff) => {
+          let text = ''
+
+          // handle accepted
+          if (diff.accepted) {
+            if (diff.type === -1) text = ''
+            if (diff.type === 1) text = diff.text
+            if (diff.type === 2) text = diff.replacement!
 
             const textNode = $createTextNode(text)
             p.append(textNode)
-          } else {
-            // preserve all other diffs
-            if (diff.type === 2) {
-              const node = new ReplacementNode(diff.replacement)
-
-              p.append(node)
-            } else if (diff.type === 1) {
-              const node = new AdditionNode(diff.text)
-
-              p.append(node)
-            } else if (diff.type === 0) {
-              const node = new UnchangedNode(diff.text)
-
-              p.append(node)
-            } else {
-              const node = new DeletionNode(diff.text)
-
-              p.append(node)
-            }
+            return
           }
-        })
 
-        root.clear()
-        root.append(p)
-      },
-      { tag: 'force-sync' },
-    )
+          // handle rejected
+          if (diff.rejected || diff.id === rejectedDiff.id) {
+            if (diff.type === -1) text = diff.text
+            if (diff.type === 1) text = ''
+            if (diff.type === 2) text = diff.text
 
-    setImprovements((prev) => prev.filter((d) => d.id !== acceptedDiff.id))
-  }
+            const textNode = $createTextNode(text)
+            p.append(textNode)
+            return
+          }
 
-  const rejectImprovement = (
-    rejectedDiff: DiffWithReplacement,
-    diffs: DiffWithReplacement[],
-  ) => {
-    console.log('diffing', { rejectedDiff, diffs })
+          // all others remain the same
+          if (diff.type === 2) {
+            const node = new ReplacementNode(diff.replacement)
 
-    shadowEditor.update(
-      () => {
-        const root = $getRoot()
-        const p = $createParagraphNode()
+            p.append(node)
+          } else if (diff.type === 1) {
+            const node = new AdditionNode(diff.text)
 
-        diffs.forEach((diff) => {
-          if (diff.id === rejectedDiff.id) {
-            let text = ''
-            if (diff.type === -1) {
-              text = diff.text
-            } else if (diff.type === 0) {
-              text = diff.text
-            } else if (diff.type === 1) {
-              text = ''
-            } else if (diff.type === 2) {
-              text = diff.text
-            }
+            p.append(node)
+          } else if (diff.type === 0) {
+            const node = new UnchangedNode(diff.text)
 
-            if (text) {
-              const textNode = $createTextNode(text)
-              p.append(textNode)
-            }
+            p.append(node)
           } else {
-            // preserve all other diffs
-            if(diff.rejected) {
-              const node = $createTextNode(diff.text)
+            const node = new DeletionNode(diff.text)
 
-              p.append(node)
-            } else if (diff.type === 2) {
-              const node = new ReplacementNode(diff.replacement)
-
-              p.append(node)
-            } else if (diff.type === 1) {
-              const node = new AdditionNode(diff.text)
-
-              p.append(node)
-            } else if (diff.type === 0) {
-              const node = new UnchangedNode(diff.text)
-
-              p.append(node)
-            } else {
-              const node = new DeletionNode(diff.text)
-
-              p.append(node)
-            }
+            p.append(node)
           }
         })
 
@@ -369,7 +403,6 @@ export function TweetProvider({ children }: PropsWithChildren) {
         }
       }),
     )
-    // setImprovements((prev) => prev.filter((d) => d.id !== rejectedDiff.id))
   }
 
   /**
@@ -497,6 +530,8 @@ export function TweetProvider({ children }: PropsWithChildren) {
         setCurrentTweet,
         tweetId,
         shadowEditor,
+        mediaFiles,
+        setMediaFiles,
         // setTweetId,
         setTweetContent,
         setTweetImage,
@@ -505,6 +540,7 @@ export function TweetProvider({ children }: PropsWithChildren) {
         showImprovementsInEditor,
         acceptImprovement,
         rejectImprovement,
+        improvementRef,
         resetImprovements,
         setDrafts,
         clearDrafts,

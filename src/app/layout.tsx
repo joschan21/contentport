@@ -1,12 +1,10 @@
+import { Providers } from '@/components/providers/providers'
+import { Analytics } from '@vercel/analytics/next'
 import { Metadata, Viewport } from 'next'
 import { Instrument_Serif, JetBrains_Mono, Rubik } from 'next/font/google'
 import { Suspense } from 'react'
-import './globals.css'
-import { Providers } from '@/components/providers/providers'
-import ClientLayout from '@/frontend/studio/layout'
-import { cookies } from 'next/headers'
 import { Toaster } from 'react-hot-toast'
-import { Analytics } from '@vercel/analytics/next'
+import './globals.css'
 
 export const metadata: Metadata = {
   title: 'contentport',

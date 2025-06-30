@@ -19,6 +19,7 @@ export type DiffWithReplacement = {
   contextBefore?: string
   contextAfter?: string
   rejected?: boolean
+  accepted?: boolean
 }
 
 export function diff_lineMode(text1: string, text2: string) {

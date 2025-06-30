@@ -33,6 +33,7 @@ import {
 } from './ui/sidebar'
 import { Separator } from './ui/separator'
 import { nanoid } from 'nanoid'
+import { Icons } from './icons'
 
 const searchParams = {
   tweetId: parseAsString,
@@ -98,7 +99,33 @@ export const LeftSidebar = () => {
             Create
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <DuolingoButton
+            <Link
+              href={{
+                pathname: '/studio',
+                search: serialize({ chatId }),
+              }}
+              className={cn(
+                buttonVariants({
+                  variant: 'ghost',
+                  className: 'w-full justify-start gap-2 px-3 py-2',
+                }),
+                pathname === '/studio' &&
+                  'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
+              )}
+            >
+              <div className="size-6 flex items-center justify-center flex-shrink-0">
+                ✏️
+              </div>
+              <span
+                className={cn(
+                  'transition-all opacity-0 duration-200 ease-out delay-200',
+                  isCollapsed ? 'opacity-0 w-0 overflow-hidden hidden' : 'opacity-100',
+                )}
+              >
+                Studio
+              </span>
+            </Link>
+            {/* <DuolingoButton
               size="sm"
               className="w-full flex gap-1.5 justify-start items-center h-10"
               onClick={() => {
@@ -109,16 +136,16 @@ export const LeftSidebar = () => {
                 }
               }}
             >
-              <Plus className="size-4 shrink-0" />
+              <Icons.twitter className="size-4 shrink-0" />
               <span
                 className={cn(
                   'transition-all opacity-0 duration-200 ease-out delay-200',
                   isCollapsed ? 'opacity-0 w-0 overflow-hidden hidden' : 'opacity-100',
                 )}
               >
-                Tweet
+                Studio
               </span>
-            </DuolingoButton>
+            </DuolingoButton> */}
           </SidebarGroupContent>
         </SidebarGroup>
 
@@ -217,7 +244,7 @@ export const LeftSidebar = () => {
               )}
             >
               <div className="size-6 flex items-center justify-center flex-shrink-0">
-                <Users className="size-4" />
+                👤
               </div>
               <span
                 className={cn(

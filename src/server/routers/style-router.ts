@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
 import { redis } from '@/lib/redis'
 import { HTTPException } from 'hono/http-exception'
+import { getAccount } from './utils/get-account'
 
 type Author = {
   profile_image_url: string
@@ -81,7 +82,17 @@ export const styleRouter = j.router({
   //     }
   //   }),
   get: privateProcedure.query(async ({ c, input, ctx }) => {
-    const { user, account } = ctx
+    const { user } = ctx
+
+    const account = await getAccount({
+      email: user.email,
+    })
+
+    if (!account?.id) {
+      throw new HTTPException(400, {
+        message: 'Please connect your Twitter account',
+      })
+    }
 
     let style: Style | null = null
 
@@ -113,8 +124,12 @@ export const styleRouter = j.router({
       }),
     )
     .post(async ({ c, ctx, input }) => {
-      const { user, account } = ctx
+      const { user } = ctx
       const { link, prompt } = input
+
+      const account = await getAccount({
+        email: user.email,
+      })
 
       if (!account?.id) {
         throw new HTTPException(400, {
@@ -203,8 +218,18 @@ export const styleRouter = j.router({
       }),
     )
     .post(async ({ c, ctx, input }) => {
-      const { user, account } = ctx
+      const { user } = ctx
       const { tweetId } = input
+
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
+      }
 
       const styleKey = `style:${user.email}:${account?.id}`
       const styleExists = await redis.exists(styleKey)
@@ -233,16 +258,19 @@ export const styleRouter = j.router({
       }),
     )
     .post(async ({ c, ctx, input }) => {
-      const { user, account } = ctx
+      const { user } = ctx
       const { prompt } = input
+
+      const account = await getAccount({
+        email: user.email,
+      })
 
       if (!account?.id) {
         throw new HTTPException(400, {
           message: 'Please connect your Twitter account',
         })
       }
-
-      const styleKey = `style:${user.email}:${account?.id}`
+      const styleKey = `style:${user.email}:${account.id}`
 
       if (typeof prompt !== 'undefined') {
         const exists = await redis.exists(styleKey)

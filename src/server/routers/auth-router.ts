@@ -146,9 +146,7 @@ export const authRouter = j.router({
 
     const [, accountKeys] = accounts
     for (const accountKey of accountKeys) {
-      console.log('accountKey', accountKey)
       const existingAccount = await redis.json.get<Account>(accountKey)
-      console.log('existingAccount', existingAccount)
       if (existingAccount?.username === userProfile.screen_name) {
         if (authAction === 'invite') {
           return c.redirect(`${getBaseUrl()}/invite/success?id=${inviteId}`)
@@ -195,7 +193,7 @@ export const authRouter = j.router({
     }
 
     const userTweets = await loggedInClient.v2.userTimeline(userProfile.id_str, {
-      max_results: 10,
+      max_results: 30,
       'tweet.fields': [
         'public_metrics',
         'created_at',
