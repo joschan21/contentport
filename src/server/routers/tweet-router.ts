@@ -18,7 +18,9 @@ const receiver = new Receiver({
 })
 
 // Function to fetch media URLs from S3 keys using S3Client
-async function fetchMediaFromS3(s3Keys: string[]): Promise<Array<{ url: string; type: 'image' | 'gif' | 'video' }>> {
+async function fetchMediaFromS3(
+  s3Keys: string[],
+): Promise<Array<{ url: string; type: 'image' | 'gif' | 'video' }>> {
   const mediaData = await Promise.all(
     s3Keys.map(async (s3Key) => {
       try {
@@ -28,21 +30,25 @@ async function fetchMediaFromS3(s3Keys: string[]): Promise<Array<{ url: string; 
             Key: s3Key,
           }),
         )
-        
+
         const url = `https://contentport-dev.s3.amazonaws.com/${s3Key}`
         const contentType = headResponse.ContentType || ''
-        
+
         // Determine media type from content-type or file extension
         let type: 'image' | 'gif' | 'video' = 'image'
-        
-        if (contentType.startsWith('video/') || s3Key.toLowerCase().includes('.mp4') || s3Key.toLowerCase().includes('.mov')) {
+
+        if (
+          contentType.startsWith('video/') ||
+          s3Key.toLowerCase().includes('.mp4') ||
+          s3Key.toLowerCase().includes('.mov')
+        ) {
           type = 'video'
         } else if (contentType === 'image/gif' || s3Key.toLowerCase().endsWith('.gif')) {
           type = 'gif'
         } else if (contentType.startsWith('image/')) {
           type = 'image'
         }
-        
+
         return { url, type }
       } catch (error) {
         console.error('Failed to fetch media from S3:', error)
@@ -422,8 +428,15 @@ export const tweetRouter = j.router({
         }
       }
 
-      const response = await client.v2.tweet(tweetPayload)
-      console.log('Tweet posted successfully:', response.data)
+      try {
+        console.log("ℹ️ tweet payload", JSON.stringify(tweetPayload, null, 2))
+        const res = await client.v2.tweet(tweetPayload)
+        res.errors?.map((error) =>
+          console.error('⚠️ Twitter error:', JSON.stringify(error, null, 2)),
+        )
+      } catch (err) {
+        console.error('🔴 Twitter error:', JSON.stringify(err, null, 2))
+      }
 
       await db
         .update(tweets)
