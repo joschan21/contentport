@@ -429,23 +429,27 @@ export const tweetRouter = j.router({
       }
 
       try {
-        console.log("ℹ️ tweet payload", JSON.stringify(tweetPayload, null, 2))
+        console.log('ℹ️ tweet payload', JSON.stringify(tweetPayload, null, 2))
         const res = await client.v2.tweet(tweetPayload)
         res.errors?.map((error) =>
           console.error('⚠️ Twitter error:', JSON.stringify(error, null, 2)),
         )
+
+        await db
+          .update(tweets)
+          .set({
+            isScheduled: false,
+            isPublished: true,
+            updatedAt: new Date(),
+          })
+          .where(eq(tweets.id, tweetId))
       } catch (err) {
         console.error('🔴 Twitter error:', JSON.stringify(err, null, 2))
-      }
 
-      await db
-        .update(tweets)
-        .set({
-          isScheduled: false,
-          isPublished: true,
-          updatedAt: new Date(),
+        throw new HTTPException(500, {
+          message: 'Failed to post tweet to Twitter',
         })
-        .where(eq(tweets.id, tweetId))
+      }
     } catch (error) {
       console.error('Failed to post tweet:', error)
       throw new HTTPException(500, {

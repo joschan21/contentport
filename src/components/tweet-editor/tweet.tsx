@@ -545,7 +545,7 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
     scheduleTweetMutation.mutate({
       content: currentTweet.content,
       scheduledUnix,
-      mediaIds: currentTweet.mediaIds,
+      mediaIds,
       s3Keys,
     })
   }
