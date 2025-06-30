@@ -143,10 +143,9 @@ export const create_three_drafts = ({
         },
       ]
 
-      // const chatModel = openrouter.chat('google/gemini-2.5-pro', {
-      const chatModel = openrouter.chat('x-ai/grok-3', {
+      const chatModel = openrouter.chat('google/gemini-2.5-pro', {
         reasoning: { effort: 'low' },
-        // models: ['anthropic/claude-3.5-sonnet', 'google/gemini-2.5-pro'],
+        models: ['anthropic/claude-3.5-sonnet', 'google/gemini-2.5-pro'],
       })
 
       const [draft1, draft2, draft3] = await Promise.all([
