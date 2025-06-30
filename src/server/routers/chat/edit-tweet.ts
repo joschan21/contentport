@@ -84,7 +84,14 @@ export const create_edit_tweet = ({
         }
       })
 
+      const systemMessage: TestUIMessage = {
+        role: 'system',
+        id: `meta:system`,
+        content: editToolSystemPrompt,
+      }
+
       let messages: TestUIMessage[] = [
+        ...(isConversationEmpty ? [systemMessage] : []),
         ...(isConversationEmpty && style
           ? [editToolStyleMessage({ style, account })]
           : []),
@@ -100,13 +107,11 @@ export const create_edit_tweet = ({
         },
       ]
 
-      const chatModel = openrouter.chat('google/gemini-2.5-pro', {
+      // const chatModel = openrouter.chat('alpindale/goliath-120b', {
+      // const chatModel = openrouter.chat('anthropic/claude-3-haiku', {
+      const chatModel = openrouter.chat('meta-llama/llama-3.2-90b-vision-instruct', {
         reasoning: { effort: 'low' },
-        models: [
-          'google/gemini-2.5-pro',
-          'anthropic/claude-3.5-sonnet',
-          'openai/o4-mini',
-        ],
+        models: ['anthropic/claude-3.7-sonnet', 'openai/o4-mini'],
       })
 
       const result = await generateText({

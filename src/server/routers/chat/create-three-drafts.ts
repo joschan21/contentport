@@ -143,29 +143,33 @@ export const create_three_drafts = ({
         },
       ]
 
-      const chatModel = openrouter.chat('google/gemini-2.5-pro', {
+      // const chatModel = openrouter.chat('anthropic/claude-3-opus:beta', {
+      // const chatModel = openrouter.chat('anthropic/claude-2.1', {
+      // const chatModel = openrouter.chat('alpindale/magnum-72b', {
+      const chatModel = openrouter.chat('anthropic/claude-3.7-sonnet', {
+      // const chatModel = openrouter.chat('anthracite-org/magnum-v4-72b', {
         reasoning: { effort: 'low' },
-        models: ['anthropic/claude-3.5-sonnet', 'google/gemini-2.5-pro'],
+        models: ['anthropic/claude-opus-4', 'google/gemini-2.5-pro'],
       })
 
       const [draft1, draft2, draft3] = await Promise.all([
         generateText({
           model: chatModel,
-          temperature: 0.25,
+          temperature: 0.10,
           system: editToolSystemPrompt,
           // @ts-ignore
           messages: firstDraftMessages,
         }),
         generateText({
           model: chatModel,
-          temperature: 0.25,
+          temperature: 0.10,
           system: editToolSystemPrompt,
           // @ts-ignore
           messages: secondDraftMessages,
         }),
         generateText({
           model: chatModel,
-          temperature: 0.25,
+          temperature: 0.10,
           system: editToolSystemPrompt,
           // @ts-ignore
           messages: thirdDraftMessages,
