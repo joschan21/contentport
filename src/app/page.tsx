@@ -78,9 +78,10 @@ const Page = () => {
                   <Menu aria-hidden="true" className="size-6" />
                 </button>
               </div>
-              <div className="hidden opacity-50 lg:flex gap-4 lg:flex-1 lg:justify-end">
-                <div className="flex gap-1.5 items-center">Login</div>
-                <div className={buttonVariants({ size: 'lg' })}>Sign up for free</div>
+              <div className="hidden lg:flex gap-4 lg:flex-1 lg:justify-end">
+                <div className="flex gap-1.5 items-center">
+                  <Link href="/login">🔒 Already in? Login</Link>
+                </div>
               </div>
             </nav>
           </header>
