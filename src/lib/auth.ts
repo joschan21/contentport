@@ -3,9 +3,32 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { createAuthMiddleware } from 'better-auth/api'
 
+import { PostHog } from 'posthog-node'
+
+const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+  host: 'https://eu.i.posthog.com',
+})
+
 const database = drizzleAdapter(db, { provider: 'pg' })
 
 export const auth = betterAuth({
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          client.capture({
+            distinctId: user.id,
+            event: 'user_signed_up',
+            properties: {
+              email: user.email,
+            },
+          })
+
+          await client.shutdown()
+        },
+      },
+    },
+  },
   account: {
     accountLinking: {
       enabled: true,
@@ -39,6 +62,9 @@ export const auth = betterAuth({
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
       const session = ctx.context.newSession
+
+      if (session) {
+      }
 
       const allowlist = [
         'akashp1712@gmail.com',

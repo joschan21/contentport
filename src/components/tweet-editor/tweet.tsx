@@ -3,10 +3,9 @@
 import DuolingoButton from '@/components/ui/duolingo-button'
 import DuolingoCheckbox from '@/components/ui/duolingo-checkbox'
 import { useConfetti } from '@/hooks/use-confetti'
-import { initialConfig, MediaFile, useTweets } from '@/hooks/use-tweets'
+import { MediaFile, useTweets } from '@/hooks/use-tweets'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
 import { cn } from '@/lib/utils'
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
@@ -15,27 +14,25 @@ import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 
 import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
 import { client } from '@/lib/client'
+import { ShadowEditorSyncPlugin } from '@/lib/lexical-plugins/sync-plugin'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
-  BLUR_COMMAND,
-  COMMAND_PRIORITY_LOW,
   EditorState,
-  FOCUS_COMMAND,
-  LexicalEditor,
+  LexicalEditor
 } from 'lexical'
 import {
   AlertCircle,
   Calendar,
-  Copy,
   ImagePlus,
-  LinkIcon,
-  Pencil,
   Trash2,
-  X,
+  X
 } from 'lucide-react'
+import Link from 'next/link'
+import posthog from 'posthog-js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { Icons } from '../icons'
@@ -53,12 +50,8 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '../ui/drawer'
-import { ImageTool } from './image-tool'
-import { ShadowEditorSyncPlugin } from '@/lib/lexical-plugins/sync-plugin'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $createAdditionNode, AdditionNode } from '@/lib/nodes'
 import { Loader } from '../ui/loader'
-import Link from 'next/link'
+import { ImageTool } from './image-tool'
 
 interface TweetProps {
   id: string | undefined
@@ -246,8 +239,18 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
 
       return await res.json()
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       toast.success('Tweet posted successfully!')
+
+      posthog.capture('tweet_posted', {
+        tweetId: data.tweetId,
+        accountId: data.accountId,
+        accountName: data.accountName,
+        content: variables.content,
+        s3Keys: variables.s3Keys,
+        mediaIds: variables.mediaIds,
+      })
+
       fire({
         particleCount: 100,
         spread: 110,
@@ -276,14 +279,16 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
       mediaIds?: string[]
       s3Keys?: string[]
     }) => {
-      await client.tweet.schedule.$post({
+      const res = await client.tweet.schedule.$post({
         content,
         scheduledUnix,
         mediaIds,
         s3Keys,
       })
+
+      return await res.json()
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       toast.success(
         <div className="flex gap-1.5 items-center">
           <p>Tweet scheduled!</p>
@@ -295,6 +300,16 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
           </Link>
         </div>,
       )
+
+      posthog.capture('tweet_scheduled', {
+        tweetId: data.tweetId,
+        accountId: data.accountId,
+        accountName: data.accountName,
+        content: variables.content,
+        scheduledUnix: variables.scheduledUnix,
+        mediaIds: variables.mediaIds,
+        s3Keys: variables.s3Keys,
+      })
 
       setMediaFiles([])
 
@@ -418,6 +433,13 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
               : mf,
           ),
         )
+
+        posthog.capture('tweet_media_uploaded', {
+          mediaType: validation.type,
+          mediaId: twitterResult.media_id,
+          mediaKey: twitterResult.media_key,
+          s3Key: s3Result.fileKey,
+        })
 
         // toast.success('Upload done!')
       } catch (error) {

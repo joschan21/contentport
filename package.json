@@ -82,6 +82,8 @@
     "nuqs": "^2.4.3",
     "openai": "^4.91.1",
     "pdf-parse": "^1.1.1",
+    "posthog-js": "^1.256.1",
+    "posthog-node": "^5.1.1",
     "prism": "^4.1.2",
     "prismjs": "^1.30.0",
     "react": "^19.0.0",

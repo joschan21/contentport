@@ -5,12 +5,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   $createParagraphNode,
   $createTextNode,
-  $getNodeByKey,
   $getRoot,
-  createEditor,
+  createEditor
 } from 'lexical'
 import { nanoid } from 'nanoid'
 import { useParams, usePathname, useSearchParams } from 'next/navigation'
+import posthog from 'posthog-js'
 import React, {
   createContext,
   PropsWithChildren,
@@ -96,7 +96,6 @@ interface TweetContextType {
   shadowEditor: ReturnType<typeof createEditor>
   // setTweetId: (id: string) => void
   setTweetContent: (content: string) => void
-  setTweetImage: (image: TweetImage) => void
   removeTweetImage: () => void
   listImprovements: (diffs: DiffWithReplacement[]) => void
   showImprovementsInEditor: (diffs: DiffWithReplacement[]) => void
@@ -192,9 +191,7 @@ export function TweetProvider({ children }: PropsWithChildren) {
     setCurrentTweet((prev) => ({ ...prev, content }))
   }
 
-  const setTweetImage = (image: TweetImage) => {
-    setCurrentTweet((prev) => ({ ...prev, image }))
-  }
+
 
   const removeTweetImage = () => {
     setCurrentTweet((prev) => ({ ...prev, image: undefined }))
@@ -335,6 +332,14 @@ export function TweetProvider({ children }: PropsWithChildren) {
         }
       }),
     )
+
+    const content = shadowEditor.read(() => $getRoot().getTextContent())
+
+    posthog.capture('improvement_accepted', {
+      improvementType: acceptedDiff.type,
+      content,
+      diff: acceptedDiff,
+    })
   }
 
   const rejectImprovement = (rejectedDiff: DiffWithReplacement) => {
@@ -403,6 +408,14 @@ export function TweetProvider({ children }: PropsWithChildren) {
         }
       }),
     )
+
+    const content = shadowEditor.read(() => $getRoot().getTextContent())
+
+    posthog.capture('improvement_rejected', {
+      improvementType: rejectedDiff.type,
+      content,
+      diff: rejectedDiff,
+    })
   }
 
   /**
@@ -534,7 +547,6 @@ export function TweetProvider({ children }: PropsWithChildren) {
         setMediaFiles,
         // setTweetId,
         setTweetContent,
-        setTweetImage,
         removeTweetImage,
         listImprovements,
         showImprovementsInEditor,

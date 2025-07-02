@@ -1,16 +1,11 @@
+import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
 import { useTweets } from '@/hooks/use-tweets'
 import { cn, DiffWithReplacement } from '@/lib/utils'
-import { Check, ChevronRight, X, ChevronLeft, Trash, Sparkles } from 'lucide-react'
+import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import { Check, ChevronLeft, ChevronRight, Trash, X } from 'lucide-react'
+import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import DuolingoButton from './ui/duolingo-button'
-import { useEditor } from '@/hooks/use-editors'
-import { useLocalStorage } from '@/hooks/use-local-storage'
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
-import { Icons } from './icons'
-import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
-import toast from 'react-hot-toast'
-import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
-import { usePathname } from 'next/navigation'
 
 const CATEGORY_LABELS: Record<string, string> = {
   'write-initial-content': 'Initial Content',
@@ -317,7 +312,6 @@ function DraftsSelector({ drafts }: { drafts: Draft[] }) {
 
 export const Improvements = ({ empty }: { empty?: boolean }) => {
   const { improvements, acceptImprovement, rejectImprovement, drafts } = useTweets()
-  console.log('improvements', improvements);
 
   const visibleImprovements = empty
     ? []

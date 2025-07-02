@@ -45,7 +45,8 @@ import {
   UserPlus,
   X,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import posthog from 'posthog-js'
+import { useState } from 'react'
 import toast from 'react-hot-toast'
 
 interface TweetCard {
@@ -138,6 +139,12 @@ export default function AccountsPage() {
       return await res.json()
     },
     onSuccess: ({ account }) => {
+      posthog.capture('account_switched', {
+        accountId: account.id,
+        accountName: account.name,
+        accountUsername: account.username,
+      })
+
       queryClient.setQueryData(['get-active-account'], mapToConnectedAccount(account))
 
       queryClient.setQueryData(['accounts'], (oldData: any) => {

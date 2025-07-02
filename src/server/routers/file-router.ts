@@ -32,7 +32,7 @@ const ALLOWED_IMAGE_TYPES = [
 const TWITTER_MEDIA_TYPES = {
   image: ['image/jpeg', 'image/png', 'image/webp'],
   gif: ['image/gif'],
-  video: ['video/mp4', 'video/quicktime', 'video/x-msvideo']
+  video: ['video/mp4', 'video/quicktime', 'video/x-msvideo'],
 } as const
 
 const TWITTER_SIZE_LIMITS = {
@@ -68,7 +68,7 @@ export const fileRouter = j.router({
       }
 
       const fileExtension = input.fileName.split('.').pop() || ''
-      const fileKey = `${input.source ?? "chat"}/${user.id}/${nanoid()}.${fileExtension}`
+      const fileKey = `${input.source ?? 'chat'}/${user.id}/${nanoid()}.${fileExtension}`
 
       const { url, fields } = await createPresignedPost(s3Client, {
         Bucket: BUCKET_NAME,
@@ -90,8 +90,6 @@ export const fileRouter = j.router({
         type,
       })
     }),
-
-    
 
   uploadTweetMedia: privateProcedure
     .input(
@@ -118,7 +116,8 @@ export const fileRouter = j.router({
         sizeLimit = TWITTER_SIZE_LIMITS.video
       } else {
         throw new HTTPException(400, {
-          message: 'Invalid media type. Twitter supports JPG, PNG, WEBP, GIF, and MP4 files.',
+          message:
+            'Invalid media type. Twitter supports JPG, PNG, WEBP, GIF, and MP4 files.',
         })
       }
 
@@ -183,7 +182,7 @@ export const fileRouter = j.router({
         )
         const buffer = await response.arrayBuffer()
         const { info, text } = await pdfParse(Buffer.from(buffer))
-        
+
         let metadataDescription = ''
         if (info?.Title) {
           metadataDescription += info.Title
@@ -192,10 +191,15 @@ export const fileRouter = j.router({
           metadataDescription += metadataDescription ? ` - ${info.Subject}` : info.Subject
         }
         if (info?.Author) {
-          metadataDescription += metadataDescription ? ` by ${info.Author}` : `by ${info.Author}`
+          metadataDescription += metadataDescription
+            ? ` by ${info.Author}`
+            : `by ${info.Author}`
         }
-        
-        description = (metadataDescription.trim() + ' ' + text.slice(0, 100)).slice(0, 100)
+
+        description = (metadataDescription.trim() + ' ' + text.slice(0, 100)).slice(
+          0,
+          100,
+        )
       } else if (type === 'docx') {
         const response = await fetch(
           `https://contentport-dev.s3.amazonaws.com/${fileKey}`,

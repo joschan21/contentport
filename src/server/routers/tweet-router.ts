@@ -358,7 +358,12 @@ export const tweetRouter = j.router({
         throw new HTTPException(500, { message: 'Problem with database' })
       }
 
-      return c.json({ success: true })
+      return c.json({
+        success: true,
+        tweetId,
+        accountId: account.id,
+        accountName: account.name,
+      })
     }),
 
   post: publicProcedure.post(async ({ c }) => {
@@ -529,7 +534,12 @@ export const tweetRouter = j.router({
           isPublished: true,
         })
 
-        return c.json({ success: true, tweetId: response.data.id })
+        return c.json({
+          success: true,
+          tweetId: response.data.id,
+          accountId: account.id,
+          accountName: account.name,
+        })
       } catch (error) {
         console.error('Failed to post tweet:', error)
         throw new HTTPException(500, {

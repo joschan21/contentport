@@ -6,14 +6,11 @@ import {
   ArrowUp,
   Check,
   Eye,
-  Loader2,
   Paperclip,
   Plus,
-  Save,
-  Settings,
-  Sparkles,
-  X,
+  X
 } from 'lucide-react'
+import posthog from 'posthog-js'
 import { useContext, useEffect, useState } from 'react'
 
 import { Loader } from '@/components/ui/loader'
@@ -28,6 +25,7 @@ import {
 } from '@/components/ui/sidebar'
 import { AccountAvatar } from '@/hooks/account-ctx'
 import { useAttachments } from '@/hooks/use-attachments'
+import { useEditor } from '@/hooks/use-editors'
 import { useTweets } from '@/hooks/use-tweets'
 import { client } from '@/lib/client'
 import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
@@ -38,9 +36,8 @@ import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { UIMessage } from 'ai'
-import { HTTPException } from 'hono/http-exception'
 import {
   $createParagraphNode,
   $createTextNode,
@@ -49,7 +46,6 @@ import {
   KEY_ENTER_COMMAND,
 } from 'lexical'
 import { nanoid } from 'nanoid'
-import { useQueryState } from 'nuqs'
 import toast from 'react-hot-toast'
 import { AttachmentItem } from './attachment-item'
 import { Improvements } from './improvements'
@@ -57,11 +53,8 @@ import { KnowledgeSelector, SelectedKnowledgeDocument } from './knowledge-select
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import DuolingoButton from './ui/duolingo-button'
 import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-upload'
-import { Separator } from './ui/separator'
-import { Tabs, TabsContent } from './ui/tabs'
 import { TextShimmer } from './ui/text-shimmer'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
-import { useEditor } from '@/hooks/use-editors'
 
 const initialConfig = {
   namespace: 'app-sidebar-input',
@@ -94,6 +87,8 @@ function ChatInput() {
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+
+    posthog.capture('assistant_used', { input })
 
     if (hasUploading) {
       toast.error('Please wait for file uploads to complete')
@@ -587,7 +582,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
               <DuolingoButton
                 onClick={toggleSidebar}
                 variant="secondary"
-                className='aspect-square'
+                className="aspect-square"
                 size="icon"
                 title="Close Sidebar"
               >

@@ -1,6 +1,5 @@
 'use client'
 
-import { buttonVariants } from '@/components/ui/button'
 import DuolingoBadge from '@/components/ui/duolingo-badge'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import DuolingoInput from '@/components/ui/duolingo-input'
@@ -10,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, FileText, FolderOpen, Link, Upload, X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import posthog from 'posthog-js'
 import { useCallback, useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -36,6 +36,12 @@ export default function NewKnowledgePage() {
       return res.json()
     },
     onSuccess: (data) => {
+      posthog.capture('knowledge_imported', {
+        source: 'url',
+        url: data.url,
+        title: data.title,
+      })
+
       queryClient.refetchQueries({ queryKey: ['knowledge-documents'] })
       toast.success(`Successfully imported content from ${data.url}`)
       setTitle('')
@@ -136,13 +142,21 @@ export default function NewKnowledgePage() {
     reset: resetProcessing,
   } = useMutation({
     mutationFn: async ({ fileKey, fileName, title }: ProcessFileArgs) => {
-      await client.file.promoteToKnowledgeDocument.$post({
+      const res = await client.file.promoteToKnowledgeDocument.$post({
         fileKey,
         fileName,
         title,
       })
+
+      return await res.json()
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      posthog.capture('knowledge_imported', {
+        source: 'upload',
+        title: variables.title,
+        fileKey: variables.fileKey,
+      })
+
       toast.success('Knowledge added!')
       setUploadState(null)
       setTitle('')

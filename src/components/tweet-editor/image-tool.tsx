@@ -192,7 +192,12 @@ const Frame = ({ type, borderRadius, backgroundColor, children }: FrameProps) =>
   return children
 }
 
-export function ImageTool({ onClose, onSave, onUpload, initialEditorState }: ImageBeautifierProps) {
+export function ImageTool({
+  onClose,
+  onSave,
+  onUpload,
+  initialEditorState,
+}: ImageBeautifierProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [blob, setBlob] = useState<ScreenshotBlob>({
@@ -685,7 +690,10 @@ export function ImageTool({ onClose, onSave, onUpload, initialEditorState }: Ima
                           preserveAspectRatio="none"
                         >
                           <defs>
-                            <clipPath id="diagonal-curve" clipPathUnits="objectBoundingBox">
+                            <clipPath
+                              id="diagonal-curve"
+                              clipPathUnits="objectBoundingBox"
+                            >
                               <path
                                 className="outline outline-red-500"
                                 d="M 0 0 L 0 1 Q 0.2 1.2, 0.65 0 L 0.65 0 Z"
@@ -694,7 +702,10 @@ export function ImageTool({ onClose, onSave, onUpload, initialEditorState }: Ima
                           </defs>
                         </svg>
 
-                        <div className="glass" style={{ clipPath: 'url(#diagonal-curve)' }}>
+                        <div
+                          className="glass"
+                          style={{ clipPath: 'url(#diagonal-curve)' }}
+                        >
                           <div className="glass-edge"></div>
                         </div>
                       </div>
@@ -747,7 +758,9 @@ export function ImageTool({ onClose, onSave, onUpload, initialEditorState }: Ima
                                 setCanvasWidth(Math.min(newWidth, maxWidth))
                               }
 
-                              setCanvasHeight(Math.max(200, Math.min(newHeight, maxHeight)))
+                              setCanvasHeight(
+                                Math.max(200, Math.min(newHeight, maxHeight)),
+                              )
                               setUserResized(true)
                             }
 
@@ -937,16 +950,16 @@ export function ImageTool({ onClose, onSave, onUpload, initialEditorState }: Ima
                       </button>
                     </PopoverTrigger>
                   </div>
-                  <PopoverContent 
-                    align="end" 
-                    className="relative z-[9999] w-80 pointer-events-auto" 
-                    onClick={(e) => e.stopPropagation()} 
+                  <PopoverContent
+                    align="end"
+                    className="relative z-[9999] w-80 pointer-events-auto"
+                    onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                     onMouseUp={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
                     onPointerUp={(e) => e.stopPropagation()}
                   >
-                    <div 
+                    <div
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       onMouseUp={(e) => e.stopPropagation()}
@@ -1171,16 +1184,16 @@ export function ImageTool({ onClose, onSave, onUpload, initialEditorState }: Ima
                         </button>
                       </PopoverTrigger>
                     </div>
-                    <PopoverContent 
-                      align="end" 
-                      className="relative z-[9999] w-80 pointer-events-auto" 
-                      onClick={(e) => e.stopPropagation()} 
+                    <PopoverContent
+                      align="end"
+                      className="relative z-[9999] w-80 pointer-events-auto"
+                      onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       onMouseUp={(e) => e.stopPropagation()}
                       onPointerDown={(e) => e.stopPropagation()}
                       onPointerUp={(e) => e.stopPropagation()}
                     >
-                      <div 
+                      <div
                         onClick={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
                         onMouseUp={(e) => e.stopPropagation()}
@@ -1273,7 +1286,7 @@ export function ImageTool({ onClose, onSave, onUpload, initialEditorState }: Ima
                       onPointerDown={(e) => e.stopPropagation()}
                       onPointerUp={(e) => e.stopPropagation()}
                     >
-                      <div 
+                      <div
                         onClick={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
                         onMouseUp={(e) => e.stopPropagation()}
