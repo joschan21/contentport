@@ -11,6 +11,7 @@ import { HTTPException } from 'hono/http-exception'
 import { Menu } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import posthog from 'posthog-js'
 import { useState } from 'react'
 import { toast } from 'react-hot-toast'
 
@@ -37,6 +38,9 @@ const Page = () => {
     },
     onSuccess: () => {
       refetch()
+
+      posthog.capture('waitlist_joined', { email })
+
       toast.success('Successfully joined the waitlist!')
       setEmail('')
     },
