@@ -1,178 +1,38 @@
+import { allowlist } from '@/constants/allow-list'
 import { auth } from '@/lib/auth'
 import { HTTPException } from 'hono/http-exception'
 import { jstack } from 'jstack'
 
 interface Env {
-  Bindings: {}
+  Bindings: {
+    OPENAI_API_KEY: string
+    DEEPL_API_KEY: string
+    GOOGLE_GENERATIVE_AI_API_KEY: string
+    ANTHROPIC_API_KEY: string
+    TWITTER_BEARER_TOKEN: string
+    XAI_API_KEY: string
+    UPSTASH_REDIS_REST_URL: string
+    UPSTASH_REDIS_REST_TOKEN: string
+    TWITTER_API_KEY: string
+    TWITTER_API_SECRET: string
+    TWITTER_ACCESS_TOKEN: string
+    TWITTER_ACCESS_TOKEN_SECRET: string
+    BETTER_AUTH_SECRET: string
+    DATABASE_URL: string
+    GOOGLE_CLIENT_ID: string
+    GOOGLE_CLIENT_SECRET: string
+    RESEND_API_KEY: string
+    FIRECRAWL_API_KEY: string
+    AWS_GENERAL_ACCESS_KEY: string
+    AWS_GENERAL_SECRET_KEY: string
+    AWS_REGION: string
+    STRIPE_PUBLIC_KEY: string
+    STRIPE_SECRET_KEY: string
+    STRIPE_WEBHOOK_SECRET: string
+  }
 }
 
 export const j = jstack.init<Env>()
-
-const allowlist = [
-  'akashp1712@gmail.com',
-  'akshathg7@gmail.com',
-  'alvarofragosoc@gmail.com',
-  'dtlvan@gmail.com',
-  'harsh@formbricks.com',
-  'hey@omidshabab.com',
-  'jarrerh@gmail.com',
-  'khoaizahmmed@gmail.com',
-  'khvala@macpaw.com',
-  'lindorf85@gmail.com',
-  'liweizhismd@gmail.com',
-  'luca@studiopiccinotti.it',
-  'michel.binkhorst@xs4all.nl',
-  'neske.joscha@gmail.com',
-  'oluwaseunmauwedo@gmail.com',
-  'p.homoky@gmail.com',
-  'priart@gmail.com',
-  'rohitmeshram000@gmail.com',
-  'tommy.roman.hater@gmail.com',
-  'vurukondasaiteja13@gmail.com',
-  'joscha7676@gmail.com',
-  'jcodog@cleoai.cloud',
-  'hola@tomasholtz.com',
-  'jorge@heyjorge.dev',
-  'hello@joshtriedcoding.com',
-  '8020ui@gmail.com',
-  'danielcspaiva@gmail.com',
-  'getoaarm1@gmail.com',
-  'johnyeocx@gmail.com',
-  'joscha7676@gmail.com',
-  'me@nevillebrem.com',
-  'myhappyagency@gmail.com',
-  'ourrahmaan@gmail.com',
-  'ratan.maurya@gmail.com',
-  'stefanbinoj.007@gmail.com',
-  'taikimingqu@gmail.com',
-  'nizabizaher@gmail.com',
-  'jokirillmeerkatz@outlook.de',
-  '2607jojo@gmail.com',
-  'pietro.dev.07@gmail.com',
-  'lucapiccinotti.lp@gmail.com',
-  'rathoursourabh5@gmail.com',
-  'jonathan@fabworks.com',
-  'justin.s.ragland@gmail.com',
-  'shahram.ask.546@gmail.com',
-  'hello@developeratul.com',
-  'thepiyushchandwani@gmail.com',
-  'jdaly2991@gmail.com',
-  'dev.algomax@gmail.com',
-  'vladanilic017@gmail.com',
-  'heywinit@gmail.com',
-  'chriszeuch.cz@gmail.com',
-  'Danpvernon@gmail.com',
-  'danpvernon@gmail.com',
-  'ask199768@gmail.com',
-  'theorcdev@gmail.com',
-  'mazewinther@gmail.com',
-  'shivanandasai.38@gmail.com',
-  'camgadams@gmail.com',
-  'hellokartikk@gmail.com',
-  'onydabs@gmail.com',
-  'ran162534@gmail.com',
-  'swiftkr@gmail.com',
-  'steveb599@gmail.com',
-  'Lucaswyland11@gmail.com',
-  'melvynx.dev@gmail.com',
-  'danpvernon@gmail.com',
-  'demonic.coder.sid@gmail.com',
-  'jiangjialin@gmail.com',
-  'akshathg7@gmail.com',
-  'nevski00@gmail.com',
-  'obthenull@gmail.com',
-  'shahram.ask.546@gmail.com',
-  'shrivatskrishna25@gmail.com',
-  'adithyashreshti@gmail.com',
-  'feng73440@gmail.com',
-  'junaidhussnain369@gmail.com',
-  'pt.alexandremarques@gmail.com',
-  'rahulg@gmail.com',
-  'soumilrathi@gmail.com',
-  'dioggosoares35@gmail.com',
-  'puspaanupam@gmail.com',
-  'shubh.porwal24@gmail.com',
-  'arthurmedeiros32@gmail.com',
-  'austinogiza@gmail.com',
-  'calebcoffie@gmail.com',
-  'sebastian.hallquist@gmail.com',
-  'skandeshbe@gmail.com',
-  'webcredo@gmail.com',
-  'adamreklama12@gmail.com',
-  'aminejguirim10@gmail.com',
-  'ask199768@gmail.com',
-  'sujoykrhaldar@gmail.com',
-  'costelgn@gmail.com',
-  'devdanielsepulveda@gmail.com',
-  'gillgurpal699@gmail.com',
-  'thomsonnguems@gmail.com',
-  'akashp1712@gmail.com',
-  'gabsco208309@gmail.com',
-  'jackwida68@gmail.com',
-  'my7alt7@gmail.com',
-  'wiserishabh@gmail.com',
-  'intelligentjimmy@gmail.com',
-  'patelpiyu468@gmail.com',
-  'aaronlan95@gmail.com',
-  'codezera3@gmail.com',
-  'g.funicello@gmail.com',
-  'igmtofficial@gmail.com',
-  'martins.laucis@gmail.com',
-  'sumeya4hmed@gmail.com',
-  'yago.cunha123@gmail.com',
-  'whyleonardo.dev@gmail.com',
-  'bwcummings1@gmail.com',
-  'ebioweijnr199@gmail.com',
-  'harshith10295032@gmail.com',
-  'hidramas1@gmail.com',
-  'martin.solev@gmail.com',
-  'tanpreet2002@gmail.com',
-  'parweb@gmail.com',
-  'cysliac@gmail.com',
-  'efoss3badri@gmail.com',
-  'joscha7676@gmail.com',
-  'nazeeh.xyz@gmail.com',
-  'alexchristou17@gmail.com',
-  'drodriguez.dcr@gmail.com',
-  'mammadataei@gmail.com',
-  'miryaboy@gmail.com',
-  'ashwinparande1156610c@gmail.com',
-  'contactehraz@gmail.com',
-  'gozmansunday@gmail.com',
-  'hemant.is.there@gmail.com',
-  'parthbrajput30@gmail.com',
-  'test@gmail.com',
-  'ray.fitzgerald.cbc@gmail.com',
-  'ambitionai007@gmail.com',
-  'cseaasim@gmail.com',
-  'harsh121102@gmail.com',
-  'merdnuh35@gmail.com',
-  'ladislav.martincik@gmail.com',
-  'maciekpul@gmail.com',
-  'serverhostinghelp@gmail.com',
-  'andrefelipexcontato@gmail.com',
-  'bhowmickshresht@gmail.com',
-  'gustavo.meireles@gmail.com',
-  'j.timoransky@gmail.com',
-  'shawn.jones.wk@gmail.com',
-  'ymattia.tstella@gmail.com',
-  'tristan.remy1@gmail.com',
-  'vj2k02@gmail.com',
-  'abdullah.enes189@gmail.com',
-  'atifriaz.se@gmail.com',
-  'barakataudu@gmail.com',
-  'mishrayashaswikumar@gmail.com',
-  'samuelzenebe7@gmail.com',
-  'stephengh@gmail.com',
-  'yassinebelatar@gmail.com',
-  'anuarshaidenov@gmail.com',
-  'neske.joscha@gmail.com',
-  'onlineplattformjjs@gmail.com',
-  'themujahidkhan2507@gmail.com',
-  'irasubizadivinprince@gmail.com',
-  'Jayan110105@gmail.com',
-  'jayan110105@gmail.com',
-]
 
 const authMiddleware = j.middleware(async ({ c, next }) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
