@@ -71,7 +71,7 @@ export const stripeRouter = j.router({
           customer: customer.id,
           success_url: `${getBaseUrl()}/studio/settings?s=processing`,
           cancel_url: `${getBaseUrl()}/studio/settings?s=cancelled`,
-          payment_method_types: ['card', 'link', 'paypal'],
+          payment_method_types: ['card', 'link'],
           adaptive_pricing: {
             enabled: true,
           },
