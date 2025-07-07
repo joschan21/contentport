@@ -12,6 +12,11 @@ const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
 const database = drizzleAdapter(db, { provider: 'pg' })
 
 export const auth = betterAuth({
+  trustedOrigins: [
+    'http://localhost:3000',
+    'https://contentport.io',
+    'https://www.contentport.io',
+  ],
   databaseHooks: {
     user: {
       create: {
@@ -65,7 +70,11 @@ export const auth = betterAuth({
     after: createAuthMiddleware(async (ctx) => {
       const session = ctx.context.newSession
 
-      console.log('UFCKING ALLOWLIST CHECK', session?.user.email, allowlist.includes(session?.user.email!));
+      console.log(
+        'UFCKING ALLOWLIST CHECK',
+        session?.user.email,
+        allowlist.includes(session?.user.email!),
+      )
 
       if (session && allowlist.includes(session.user.email)) {
         ctx.redirect('/studio')

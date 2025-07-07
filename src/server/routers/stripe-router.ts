@@ -40,7 +40,6 @@ export const stripeRouter = j.router({
         },
         input: { trial },
       }) => {
-        const url = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
         let customer: Stripe.Customer | undefined
 
         if (stripeId) {
@@ -70,8 +69,8 @@ export const stripeRouter = j.router({
           billing_address_collection: 'auto',
           line_items: [{ price: STRIPE_SUBSCRIPTION_DATA.priceId!, quantity: 1 }],
           customer: customer.id,
-          success_url: `${url}/studio/settings?s=processing`,
-          cancel_url: `${url}/studio/settings?s=cancelled`,
+          success_url: `${getBaseUrl()}/studio/settings?s=processing`,
+          cancel_url: `${getBaseUrl()}/studio/settings?s=cancelled`,
           payment_method_types: ['card', 'link', 'paypal'],
           adaptive_pricing: {
             enabled: true,
