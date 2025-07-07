@@ -25,6 +25,7 @@ export const metadata: Metadata = {
     images: ['/images/og-image.png'],
     creator: '@joshtriedcoding',
   },
+  metadataBase: new URL('https://contentport.io'),
 }
 
 const elegant = Instrument_Serif({

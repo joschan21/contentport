@@ -38,6 +38,12 @@ export const authRouter = j.router({
     .query(async ({ c, input, ctx }) => {
       console.log('⚠️⚠️⚠️ callback url:', `${getBaseUrl()}/api/auth_router/callback`)
 
+      if (ctx.user.plan !== 'pro') {
+        throw new HTTPException(402, {
+          message: 'Upgrade to Pro to connect more accounts.',
+        })
+      }
+
       try {
         const { url, oauth_token, oauth_token_secret } = await client.generateAuthLink(
           `${getBaseUrl()}/api/auth_router/callback`,
@@ -57,6 +63,12 @@ export const authRouter = j.router({
     }),
 
   createInviteLink: privateProcedure.query(async ({ c, input, ctx }) => {
+    if (ctx.user.plan !== 'pro') {
+      throw new HTTPException(402, {
+        message: 'Upgrade to Pro to connect more accounts.',
+      })
+    }
+
     const inviteId = nanoid()
 
     // invite valid for 24 hours

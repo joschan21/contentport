@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 interface DuolingoButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
-  variant?: "primary" | "secondary" | "disabled" | "icon" | "destructive" | "dashedOutline"
+  variant?: "primary" | "secondary" | "disabled" | "icon" | "destructive" | "dashedOutline" | "emerald"
   size?: "sm" | "md" | "lg" | "icon"
   className?: string
   loading?: boolean
@@ -34,6 +34,8 @@ export default function DuolingoButton({
       "bg-red-500 text-white border-b-2 border-red-600 hover:bg-red-600 shadow-[0_3px_0_#B91C1C] focus:ring-red-500",
     dashedOutline:
       "bg-white text-gray-600 border-2 bg-clip-padding border-dashed border-stone-300 border-b-[4px] hover:bg-stone-50 focus:ring-gray-400",
+    emerald:
+      "bg-emerald-600 text-white border bg-clip-padding border-b-2 border-emerald-700 hover:bg-emerald-500 shadow-[0_3px_0_#065f46] focus:ring-emerald-600",
   }
 
   const sizeStyles = {

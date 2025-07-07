@@ -12,6 +12,7 @@ import { PropsWithChildren, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { EnhancedSlider } from '../ui/enhanced-slider'
 import { Separator } from '../ui/separator'
+import { authClient } from '@/lib/auth-client'
 
 interface ImageBeautifierProps {
   onClose?: () => void
@@ -203,6 +204,7 @@ export function ImageTool({
   const [blob, setBlob] = useState<ScreenshotBlob>({
     src: initialEditorState?.blob.src || '',
   })
+  const { data } = authClient.useSession()
   const [canvasWidth, setCanvasWidth] = useState(initialEditorState?.canvasWidth || 600)
   const [canvasHeight, setCanvasHeight] = useState(
     initialEditorState?.canvasHeight || 400,
@@ -400,7 +402,7 @@ export function ImageTool({
 
       toast.success('Image added! 🎉', { id: savingToast })
     } catch (error) {
-      toast.error('something went wrong')
+      toast.error('Something went wrong')
     }
   }
 
@@ -776,6 +778,22 @@ export function ImageTool({
                     </Frame>
                   </div>
                 </div>
+
+                {data?.user?.plan !== 'pro' && (
+                  <div
+                    className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none"
+                    style={{ 
+                      textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+                      backdropFilter: 'blur(2px)',
+                    }}
+                  >
+                    <div className="bg-gray-700/25 backdrop-blur-sm rounded-md px-3 py-0">
+                      <span className="text-white text-sm/6">
+                        contentport.io
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 <div
                   tabIndex={0}
@@ -1426,7 +1444,7 @@ export function ImageTool({
             <Button
               className="w-full gap-2 h-11"
               size="lg"
-              onClick={() => saveImage(3)}
+              onClick={() => saveImage(1)}
               disabled={!blob?.src}
             >
               Add to Tweet 🎉

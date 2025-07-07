@@ -54,12 +54,24 @@ FEATURE IDEAS
 
 - [ ] Show related documents to user query in chat (e.g. typed in ...about contentport) -> suggest docs related to contentport above certain threshold (0.9)
 
-NEW MIGRATION TODO:
+### Before pushing to prod
 
-- put all "connected-account:${user.email}" also as "active-account:${user.email}"
+- Set the stripe secret and public keys to prod values
+- Check that the values in `src/constants/stripe-prodcuts.ts` have the values you want for the production product
+- Reset values of `src/constants/stripe-subscription.ts` to `null` so that seeding will populate the constant used in the code to production product values
+- Run the seed-stripe command
+- Commit the seeded product json file
+- Push to prod
 
-TODO:
-- add confirm modal to not DIRECTLY post (X)
-- queue improvements to allow nav during edits (X)
-- some kinda persistence to not delete current tweet (X)
-- add v2 verification badge check to adding account
+
+
+
+- q: how do I upload videos? dragging not too intuitive
+
+
+
+UX problems
+- pages not integrated well with each other
+- no visual option to add images / videos directly
+- no realistic twitter preview
+- you cannot @people

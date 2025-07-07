@@ -15,34 +15,26 @@ import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
 import { client } from '@/lib/client'
 import { ShadowEditorSyncPlugin } from '@/lib/lexical-plugins/sync-plugin'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  $createParagraphNode,
-  $createTextNode,
-  $getRoot,
-  EditorState,
-  LexicalEditor
-} from 'lexical'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { $createParagraphNode, $getRoot, EditorState, LexicalEditor } from 'lexical'
 import {
   AlertCircle,
   Calendar,
+  CalendarCog,
   ImagePlus,
+  Pen,
+  Plus,
+  Save,
   Trash2,
-  X
+  X,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import posthog from 'posthog-js'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { PropsWithChildren, useCallback, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { Icons } from '../icons'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '../ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import {
   Drawer,
   DrawerClose,
@@ -51,14 +43,19 @@ import {
   DrawerTitle,
 } from '../ui/drawer'
 import { Loader } from '../ui/loader'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
+import { Calendar20 } from './date-picker'
 import { ImageTool } from './image-tool'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '../ui/tooltip'
+import { HTTPException } from 'hono/http-exception'
 
 interface TweetProps {
   id: string | undefined
   initialContent?: string
   onDelete?: () => void
   onAdd?: () => void
-  selectionMode?: boolean
+  editMode?: boolean
+  editTweetId?: string | null
 }
 
 // Twitter media type validation
@@ -76,7 +73,12 @@ const TWITTER_SIZE_LIMITS = {
 
 const MAX_MEDIA_COUNT = 4
 
-export default function Tweet({ id, initialContent, selectionMode = false }: TweetProps) {
+export default function Tweet({
+  id,
+  initialContent,
+  editMode = false,
+  editTweetId,
+}: TweetProps) {
   const {
     setTweetContent,
     currentTweet,
@@ -87,13 +89,15 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
   } = useTweets()
 
   const { fire } = useConfetti()
+  const router = useRouter()
   const [charCount, setCharCount] = useState(0)
   const [open, setOpen] = useState(false)
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false)
-  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [showPostConfirmModal, setShowPostConfirmModal] = useState(false)
   const [dontShowAgain, setDontShowAgain] = useState(false)
+
+  console.log('media files', mediaFiles)
 
   const renderMediaOverlays = (mediaFile: MediaFile, index: number) => (
     <>
@@ -114,52 +118,40 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
         </div>
       )}
 
-      {!selectionMode && (
-        <DuolingoButton
-          size="icon"
-          variant="destructive"
-          onClick={() => removeMediaFile(mediaFile.url)}
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <X className="h-4 w-4" />
-        </DuolingoButton>
-      )}
+      <DuolingoButton
+        size="icon"
+        variant="destructive"
+        onClick={() => removeMediaFile(mediaFile.url)}
+        className="absolute top-2 right-2"
+      >
+        <X className="h-4 w-4" />
+      </DuolingoButton>
     </>
   )
 
-  const getDefaultScheduleDateTime = (): { date: string; time: string } => {
-    const now = new Date()
-    now.setMinutes(now.getMinutes() + 1)
+  // Single controller per file - much simpler!
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map())
 
-    const date = now.toISOString().split('T')[0] || ''
-    const time = now.toTimeString().slice(0, 5) || ''
-
-    return { date, time }
-  }
-
-  const [scheduleDate, setScheduleDate] = useState('')
-  const [scheduleTime, setScheduleTime] = useState('')
-
-  const s3Controller = useRef<AbortController | null>(null)
-  const twitterController = useRef<AbortController | null>(null)
-
-  // Media upload mutations
   const uploadToS3Mutation = useMutation({
     mutationFn: async ({
       file,
       mediaType,
+      fileUrl,
     }: {
       file: File
       mediaType: 'image' | 'gif' | 'video'
+      fileUrl: string
     }) => {
-      s3Controller.current = new AbortController()
+      // Create and store single controller for this file
+      const controller = new AbortController()
+      abortControllersRef.current.set(fileUrl, controller)
 
       const res = await client.file.uploadTweetMedia.$post(
         {
           fileName: file.name,
           fileType: file.type,
         },
-        { init: { signal: s3Controller.current.signal } },
+        { init: { signal: controller.signal } },
       )
 
       const { url, fields, fileKey } = await res.json()
@@ -170,21 +162,18 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
       })
       formData.append('file', file)
 
+      // Use same controller for S3 upload
       const uploadResponse = await fetch(url, {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       })
 
       if (!uploadResponse.ok) {
         throw new Error('Failed to upload to S3')
       }
 
-      return { fileKey, mediaType, file }
-    },
-    onSettled: () => {
-      if (s3Controller.current) {
-        s3Controller.current = null
-      }
+      return { fileKey, mediaType, file, fileUrl }
     },
   })
 
@@ -192,18 +181,24 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
     mutationFn: async ({
       s3Key,
       mediaType,
+      fileUrl,
     }: {
       s3Key: string
       mediaType: 'image' | 'gif' | 'video'
+      fileUrl: string
     }) => {
-      twitterController.current = new AbortController()
+      const controller = abortControllersRef.current.get(fileUrl)
+
+      if (!controller) {
+        throw new Error('Upload controller not found')
+      }
 
       const res = await client.tweet.uploadMediaToTwitter.$post(
         {
           s3Key,
           mediaType,
         },
-        { init: { signal: twitterController.current.signal } },
+        { init: { signal: controller.signal } },
       )
 
       return await res.json()
@@ -214,27 +209,23 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
         mediaIds: [...prev.mediaIds, media_id],
       }))
     },
-    onSettled: () => {
-      if (s3Controller.current) {
-        s3Controller.current = null
-      }
+    onSettled: (data, error, variables) => {
+      // Clean up controller after both uploads complete
+      abortControllersRef.current.delete(variables.fileUrl)
     },
   })
 
   const postTweetMutation = useMutation({
     mutationFn: async ({
       content,
-      mediaIds = [],
-      s3Keys = [],
+      media,
     }: {
       content: string
-      mediaIds?: string[]
-      s3Keys?: string[]
+      media: { s3Key: string; media_id: string }[]
     }) => {
       const res = await client.tweet.postImmediate.$post({
         content,
-        mediaIds,
-        s3Keys,
+        media,
       })
 
       return await res.json()
@@ -247,8 +238,7 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
         accountId: data.accountId,
         accountName: data.accountName,
         content: variables.content,
-        s3Keys: variables.s3Keys,
-        mediaIds: variables.mediaIds,
+        media: variables.media,
       })
 
       fire({
@@ -256,8 +246,6 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
         spread: 110,
         origin: { y: 0.6 },
       })
-
-      localStorage.removeItem('tweet')
     },
     onError: (error) => {
       console.error('Failed to post tweet:', error)
@@ -267,69 +255,119 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
 
   const queryClient = useQueryClient()
 
+  const { data: editTweetData } = useQuery({
+    queryKey: ['edit-tweet', editTweetId],
+    queryFn: async () => {
+      if (!editTweetId) return null
+      const res = await client.tweet.getTweet.$get({ tweetId: editTweetId })
+      return await res.json()
+    },
+    enabled: editMode && Boolean(editTweetId),
+  })
+
+  console.log('editTweetData', editTweetData)
+
+  const updateTweetMutation = useMutation({
+    mutationFn: async ({
+      tweetId,
+      content,
+      scheduledUnix,
+      media,
+    }: {
+      tweetId: string
+      content: string
+      scheduledUnix: number
+      media: { s3Key: string; media_id: string }[]
+    }) => {
+      if (!scheduledUnix) {
+        toast.error('Something went wrong, please reload the page.')
+        return
+      }
+
+      await client.tweet.delete.$post({ id: tweetId })
+
+      if (scheduledUnix) {
+        const res = await client.tweet.schedule.$post({
+          content,
+          scheduledUnix,
+          media,
+        })
+        return await res.json()
+      }
+    },
+    onSuccess: () => {
+      toast.success('Tweet updated successfully!')
+
+      // setMediaFiles([])
+
+      // shadowEditor.update(
+      //   () => {
+      //     const root = $getRoot()
+      //     root.clear()
+      //     root.append($createParagraphNode())
+      //   },
+      //   { tag: 'force-sync' },
+      // )
+
+      queryClient.invalidateQueries({ queryKey: ['scheduled-and-published-tweets'] })
+      router.push('/studio/scheduled')
+    },
+    onError: () => {
+      toast.error('Failed to update tweet')
+    },
+  })
+
   const scheduleTweetMutation = useMutation({
     mutationFn: async ({
       content,
       scheduledUnix,
-      mediaIds = [],
-      s3Keys = [],
+      media,
     }: {
       content: string
       scheduledUnix: number
-      mediaIds?: string[]
-      s3Keys?: string[]
+      media: { s3Key: string; media_id: string }[]
     }) => {
-      const res = await client.tweet.schedule.$post({
+      const promise = client.tweet.schedule.$post({
         content,
         scheduledUnix,
-        mediaIds,
-        s3Keys,
+        media,
       })
 
-      return await res.json()
+      const schedulePromiseToast = toast.promise(promise, {
+        loading: 'Scheduling...',
+        success: (
+          <div className="flex gap-1.5 items-center">
+            <p>Tweet scheduled!</p>
+            <Link
+              href="/studio/scheduled"
+              className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
+            >
+              See schedule
+            </Link>
+          </div>
+        ),
+      })
+
+      return (await schedulePromiseToast).json()
     },
     onSuccess: (data, variables) => {
-      toast.success(
-        <div className="flex gap-1.5 items-center">
-          <p>Tweet scheduled!</p>
-          <Link
-            href="/studio/scheduled"
-            className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
-          >
-            See schedule
-          </Link>
-        </div>,
-      )
-
       posthog.capture('tweet_scheduled', {
         tweetId: data.tweetId,
         accountId: data.accountId,
         accountName: data.accountName,
         content: variables.content,
         scheduledUnix: variables.scheduledUnix,
-        mediaIds: variables.mediaIds,
-        s3Keys: variables.s3Keys,
+        media: variables.media,
       })
-
-      setMediaFiles([])
-
-      shadowEditor.update(
-        () => {
-          const root = $getRoot()
-          root.clear()
-          root.append($createParagraphNode())
-        },
-        { tag: 'force-sync' },
-      )
-
-      setScheduleDialogOpen(false)
-      setScheduleDate('')
-      setScheduleTime('')
 
       queryClient.invalidateQueries({ queryKey: ['scheduled-and-published-tweets'] })
     },
-    onError: () => {
-      toast.error('Failed to schedule tweet')
+    onError: (error: HTTPException) => {
+      if (error.status === 402) {
+        toast(`🔒 ${error.message}`)
+      } else {
+        toast.error(error.message)
+      }
     },
   })
 
@@ -411,12 +449,14 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
         const s3Result = await uploadToS3Mutation.mutateAsync({
           file,
           mediaType: validation.type!,
+          fileUrl: url,
         })
 
         // Upload to Twitter
         const twitterResult = await uploadToTwitterMutation.mutateAsync({
           s3Key: s3Result.fileKey,
           mediaType: s3Result.mediaType,
+          fileUrl: url,
         })
 
         setMediaFiles((prev) =>
@@ -453,12 +493,14 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
   }
 
   const removeMediaFile = (url: string) => {
-    if (s3Controller.current) {
-      s3Controller.current.abort('Media file removed')
-    }
+    console.log('REMOVE MEDIA FILE!!', url)
 
-    if (twitterController.current) {
-      twitterController.current.abort('Media file removed')
+    // Get and abort the single controller
+    const controller = abortControllersRef.current.get(url)
+
+    if (controller) {
+      controller.abort('Media file removed')
+      abortControllersRef.current.delete(url)
     }
 
     setMediaFiles((prev) => {
@@ -482,72 +524,48 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
     setIsDragging(false)
   }, [])
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setIsDragging(false)
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
 
-      if (selectionMode) return
-
-      const files = e.dataTransfer.files
-      if (files.length > 0) {
-        handleFiles(files)
-      }
-    },
-    [selectionMode],
-  )
-
-  useEffect(() => {
-    const tweet = localStorage.getItem('tweet')
-
-    if (tweet) {
-      shadowEditor?.update(() => {
-        const root = $getRoot()
-        const p = $createParagraphNode()
-        const text = $createTextNode(tweet)
-
-        p.append(text)
-        root.clear()
-        root.append(p)
-      })
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      handleFiles(files)
     }
-  }, [shadowEditor])
+  }
 
-  useEffect(() => {
-    if (initialContent) {
-      shadowEditor?.update(() => {
-        const root = $getRoot()
-        const p = $createParagraphNode()
-        const text = $createTextNode(initialContent)
+  // useEffect(() => {
+  //   if (initialContent) {
+  //     shadowEditor?.update(() => {
+  //       const root = $getRoot()
+  //       const p = $createParagraphNode()
+  //       const text = $createTextNode(initialContent)
 
-        p.append(text)
-        root.clear()
-        root.append(p)
-      })
-    }
-  }, [initialContent, shadowEditor])
+  //       p.append(text)
+  //       root.clear()
+  //       root.append(p)
+  //     })
+  //   }
+  // }, [initialContent, shadowEditor])
 
   const onEditorChange = (
     editorState: EditorState,
     editor: LexicalEditor,
     tags: Set<string>,
   ) => {
-    const content = editorState.read(() => $getRoot().getTextContent())
-
-    setCharCount(content.length)
-    setTweetContent(content)
-
-    localStorage.setItem('tweet', content)
+    // const content = editorState.read(() => $getRoot().getTextContent())
+    // setCharCount(content.length)
+    // setTweetContent(content)
   }
 
-  const handleScheduleTweet = () => {
-    if (!scheduleDate || !scheduleTime) {
-      toast.error('Please select both date and time')
-      return
-    }
+  const handleScheduleTweet = (date: Date, time: string) => {
+    const [hours, minutes] = time.split(':').map(Number)
+    const scheduledDateTime = new Date(date)
+    scheduledDateTime.setHours(hours || 0, minutes || 0, 0, 0)
 
-    const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`)
+    const content = shadowEditor?.read(() => $getRoot().getTextContent()) || ''
+
     const now = new Date()
 
     if (scheduledDateTime <= now) {
@@ -555,21 +573,34 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
       return
     }
 
+    if (!content.trim()) {
+      toast.error('Tweet cannot be empty')
+      return
+    }
+
     const scheduledUnix = Math.floor(scheduledDateTime.getTime() / 1000)
-    const uploadedMedia = mediaFiles.filter((f) => f.uploaded && f.media_id)
-    const mediaIds = uploadedMedia.map((f) => f.media_id!)
 
-    const s3Keys = mediaFiles
-      .filter((f) => Boolean(f.s3Key))
-      .map((f) => f.s3Key)
-      .filter(Boolean)
+    const media = mediaFiles
+      .filter((f) => Boolean(f.s3Key) && Boolean(f.media_id))
+      .map((f) => ({
+        s3Key: f.s3Key!,
+        media_id: f.media_id!,
+      }))
 
-    scheduleTweetMutation.mutate({
-      content: currentTweet.content,
-      scheduledUnix,
-      mediaIds,
-      s3Keys,
-    })
+    if (editTweetId) {
+      updateTweetMutation.mutate({
+        tweetId: editTweetId,
+        content,
+        scheduledUnix,
+        media,
+      })
+    } else {
+      scheduleTweetMutation.mutate({
+        content,
+        scheduledUnix,
+        media,
+      })
+    }
   }
 
   const handlePostTweet = () => {
@@ -601,18 +632,17 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
 
   const performPostTweet = () => {
     const content = shadowEditor?.read(() => $getRoot().getTextContent()) || ''
-    const uploadedMedia = mediaFiles.filter((f) => f.uploaded && f.media_id)
-    const mediaIds = uploadedMedia.map((f) => f.media_id!)
 
-    const s3Keys = mediaFiles
-      .filter((f) => Boolean(f.s3Key))
-      .map((f) => f.s3Key)
-      .filter(Boolean)
+    const media = mediaFiles
+      .filter((f) => Boolean(f.s3Key) && Boolean(f.media_id))
+      .map((f) => ({
+        s3Key: f.s3Key!,
+        media_id: f.media_id!,
+      }))
 
     postTweetMutation.mutate({
       content,
-      mediaIds: mediaIds.length > 0 ? mediaIds : undefined,
-      s3Keys,
+      media,
     })
   }
 
@@ -624,13 +654,66 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
     performPostTweet()
   }
 
+  const handleUpdateTweet = () => {
+    if (!editTweetId) return
+
+    const content = shadowEditor?.read(() => $getRoot().getTextContent()) || ''
+
+    if (!content.trim() && mediaFiles.length === 0) {
+      toast.error('Tweet cannot be empty')
+      return
+    }
+
+    if (mediaFiles.some((f) => f.uploading)) {
+      toast.error('Please wait for media uploads to complete')
+      return
+    }
+
+    if (mediaFiles.some((f) => f.error)) {
+      toast.error('Please remove failed media uploads')
+      return
+    }
+
+    let scheduledUnix: number | undefined
+
+    if (editTweetData?.tweet?.scheduledFor) {
+      scheduledUnix = Math.floor(
+        new Date(editTweetData.tweet.scheduledFor).getTime() / 1000,
+      )
+    }
+
+    if (!scheduledUnix) {
+      toast.error('Scheduled time is required')
+      return
+    }
+
+    const media = mediaFiles
+      .filter((f) => Boolean(f.s3Key) && Boolean(f.media_id))
+      .map((f) => ({
+        s3Key: f.s3Key!,
+        media_id: f.media_id!,
+      }))
+
+    updateTweetMutation.mutate({
+      tweetId: editTweetId,
+      content,
+      scheduledUnix,
+      media,
+    })
+  }
+
+  const handleCancelEdit = () => {
+    router.push('/studio/scheduled')
+  }
+
   const handleClearTweet = () => {
-    if (s3Controller.current) {
-      s3Controller.current.abort('Media file removed')
-    }
-    if (twitterController.current) {
-      twitterController.current.abort('Media file removed')
-    }
+    // Abort all pending uploads
+    abortControllersRef.current.forEach((controller) => {
+      controller.abort('Tweet cleared')
+    })
+
+    // Clear all controllers
+    abortControllersRef.current.clear()
 
     shadowEditor.update(
       () => {
@@ -642,29 +725,8 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
     )
 
     setMediaFiles([])
-    localStorage.removeItem('tweet')
     setCharCount(0)
     setTweetContent('')
-  }
-
-  const copyTweetImageToClipboard = async () => {
-    if (!currentTweet?.image) return
-
-    try {
-      const response = await fetch(currentTweet.image.src)
-      const blob = await response.blob()
-
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          [blob.type]: blob,
-        }),
-      ])
-
-      toast.success('Image copied to clipboard! 📋')
-    } catch (error) {
-      console.error('Failed to copy image to clipboard:', error)
-      toast.error('Failed to copy image to clipboard')
-    }
   }
 
   const getProgressColor = () => {
@@ -677,149 +739,171 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
   const circumference = 2 * Math.PI * 10
   const strokeDashoffset = circumference - (progress / 100) * circumference
 
-  const [editor] = useLexicalComposerContext()
-  // const [focus, setFocus] = useState(false)
+  const EditModeWrapper = ({ children }: PropsWithChildren) => {
+    if (!editMode) return children
 
-  // useEffect(
-  //   () =>
-  //     editor.registerCommand(
-  //       BLUR_COMMAND,
-  //       () => {
-  //         setFocus(false)
-  //         return false
-  //       },
-  //       COMMAND_PRIORITY_LOW,
-  //     ),
-  //   [],
-  // )
+    if (editMode)
+      return (
+        <div className="border-indigo-600 border-2 bg-clip-padding shadow rounded-[20px] overflow-hidden">
+          <div className="py-1.5 px-6 bg-indigo-600 flex justify-between">
+            <div className="flex items-center gap-2">
+              <Pen className="size-4 text-white" />
+              <p className="text-sm/6 font-semibold text-white uppercase">
+                Editing scheduled tweet
+              </p>
+            </div>
+            <DuolingoButton
+              size="sm"
+              className="h-fit w-fit"
+              variant="destructive"
+              onClick={handleCancelEdit}
+            >
+              Cancel
+            </DuolingoButton>
+          </div>
 
-  // useEffect(
-  //   () =>
-  //     editor.registerCommand(
-  //       FOCUS_COMMAND,
-  //       () => {
-  //         setFocus(true)
-  //         return false
-  //       },
-  //       COMMAND_PRIORITY_LOW,
-  //     ),
-  //   [],
-  // )
+          {children}
+        </div>
+      )
+  }
 
   return (
     <>
-      <Drawer modal={false} open={open && !selectionMode} onOpenChange={setOpen}>
-        <div
-          className={cn(
-            'relative bg-white p-6 rounded-2xl w-full border border-stone-200 border-transparent bg-clip-padding shadow-sm transition-colors',
-            isDragging && !selectionMode && 'border-indigo-600 border-dashed border-2',
-          )}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <div className="flex gap-3 relative z-10">
-            <AccountAvatar className="size-12" />
+      <Drawer modal={false} open={open} onOpenChange={setOpen}>
+        <EditModeWrapper>
+          <div
+            className={cn(
+              'relative bg-white p-6 rounded-2xl w-full border border-gray-900 border-opacity-10 bg-clip-padding shadow transition-colors',
+              isDragging && 'border-indigo-600 border-dashed',
+            )}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <div className="flex gap-3 relative z-10">
+              <AccountAvatar className="size-12" />
 
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
+              <div className="flex-1">
                 <div className="flex items-center gap-1">
                   <AccountName />
                   <AccountHandle />
                 </div>
-              </div>
 
-              <div className="mt-1 text-stone-800 leading-relaxed">
-                <PlainTextPlugin
-                  contentEditable={
-                    <ContentEditable
-                      autoFocus={!selectionMode}
-                      spellCheck={false}
-                      className={cn(
-                        'w-full !min-h-16 resize-none text-base/7 leading-relaxed text-stone-800 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
-                        selectionMode && 'pointer-events-none',
-                      )}
-                    />
-                  }
-                  ErrorBoundary={LexicalErrorBoundary}
-                />
-                <PlaceholderPlugin placeholder="What's happening?" />
-                <OnChangePlugin onChange={onEditorChange} />
-                <HistoryPlugin />
-                <ShadowEditorSyncPlugin />
-              </div>
-
-              {/* Media Files Display */}
-              {mediaFiles.length > 0 && (
-                <div className="mt-3">
-                  {mediaFiles.length === 1 && mediaFiles[0] && (
-                    <div className="relative group">
-                      <div className="relative overflow-hidden rounded-2xl border border-stone-200">
-                        {mediaFiles[0].type === 'video' ? (
-                          <video
-                            src={mediaFiles[0].url}
-                            className="w-full max-h-[510px] object-cover"
-                            controls={false}
-                          />
-                        ) : (
-                          <img
-                            src={mediaFiles[0].url}
-                            alt="Upload preview"
-                            className="w-full max-h-[510px] object-cover"
-                          />
+                <div className="text-stone-800 leading-relaxed">
+                  <PlainTextPlugin
+                    contentEditable={
+                      <ContentEditable
+                        spellCheck={false}
+                        className={cn(
+                          'w-full !min-h-16 resize-none text-base/7 leading-relaxed text-stone-800 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
                         )}
-                        {renderMediaOverlays(mediaFiles[0], 0)}
-                      </div>
-                    </div>
-                  )}
+                      />
+                    }
+                    ErrorBoundary={LexicalErrorBoundary}
+                  />
+                  <PlaceholderPlugin placeholder="What's happening?" />
+                  <OnChangePlugin onChange={onEditorChange} />
+                  <HistoryPlugin />
+                  <ShadowEditorSyncPlugin />
+                </div>
 
-                  {mediaFiles.length === 2 && (
-                    <div className="grid grid-cols-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200">
-                      {mediaFiles.map((mediaFile, index) => (
-                        <div key={mediaFile.url} className="relative group">
-                          <div className="relative overflow-hidden h-[254px]">
-                            {mediaFile.type === 'video' ? (
-                              <video
-                                src={mediaFile.url}
-                                className="w-full h-full object-cover"
-                                controls={false}
-                              />
-                            ) : (
-                              <img
-                                src={mediaFile.url}
-                                alt="Upload preview"
-                                className="w-full h-full object-cover"
-                              />
-                            )}
-                            {renderMediaOverlays(mediaFile, index)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {mediaFiles.length === 3 && mediaFiles[0] && (
-                    <div className="grid grid-cols-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200 h-[254px]">
+                {/* Media Files Display */}
+                {mediaFiles.length > 0 && (
+                  <div className="mt-3">
+                    {mediaFiles.length === 1 && mediaFiles[0] && (
                       <div className="relative group">
-                        <div className="relative overflow-hidden h-full">
+                        <div className="relative overflow-hidden rounded-2xl border border-stone-200">
                           {mediaFiles[0].type === 'video' ? (
                             <video
                               src={mediaFiles[0].url}
-                              className="w-full h-full object-cover"
+                              className="w-full max-h-[510px] object-cover"
                               controls={false}
                             />
                           ) : (
                             <img
                               src={mediaFiles[0].url}
                               alt="Upload preview"
-                              className="w-full h-full object-cover"
+                              className="w-full max-h-[510px] object-cover"
                             />
                           )}
                           {renderMediaOverlays(mediaFiles[0], 0)}
                         </div>
                       </div>
-                      <div className="grid grid-rows-2 gap-0.5">
-                        {mediaFiles.slice(1).map((mediaFile, index) => (
+                    )}
+
+                    {mediaFiles.length === 2 && (
+                      <div className="grid grid-cols-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200">
+                        {mediaFiles.map((mediaFile, index) => (
+                          <div key={mediaFile.url} className="relative group">
+                            <div className="relative overflow-hidden h-[254px]">
+                              {mediaFile.type === 'video' ? (
+                                <video
+                                  src={mediaFile.url}
+                                  className="w-full h-full object-cover"
+                                  controls={false}
+                                />
+                              ) : (
+                                <img
+                                  src={mediaFile.url}
+                                  alt="Upload preview"
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                              {renderMediaOverlays(mediaFile, index)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {mediaFiles.length === 3 && mediaFiles[0] && (
+                      <div className="grid grid-cols-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200 h-[254px]">
+                        <div className="relative group">
+                          <div className="relative overflow-hidden h-full">
+                            {mediaFiles[0].type === 'video' ? (
+                              <video
+                                src={mediaFiles[0].url}
+                                className="w-full h-full object-cover"
+                                controls={false}
+                              />
+                            ) : (
+                              <img
+                                src={mediaFiles[0].url}
+                                alt="Upload preview"
+                                className="w-full h-full object-cover"
+                              />
+                            )}
+                            {renderMediaOverlays(mediaFiles[0], 0)}
+                          </div>
+                        </div>
+                        <div className="grid grid-rows-2 gap-0.5">
+                          {mediaFiles.slice(1).map((mediaFile, index) => (
+                            <div key={mediaFile.url} className="relative group">
+                              <div className="relative overflow-hidden h-full">
+                                {mediaFile.type === 'video' ? (
+                                  <video
+                                    src={mediaFile.url}
+                                    className="w-full h-full object-cover"
+                                    controls={false}
+                                  />
+                                ) : (
+                                  <img
+                                    src={mediaFile.url}
+                                    alt="Upload preview"
+                                    className="w-full h-full object-cover"
+                                  />
+                                )}
+                                {renderMediaOverlays(mediaFile, index + 1)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {mediaFiles.length === 4 && (
+                      <div className="grid grid-cols-2 grid-rows-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200 h-[254px]">
+                        {mediaFiles.map((mediaFile, index) => (
                           <div key={mediaFile.url} className="relative group">
                             <div className="relative overflow-hidden h-full">
                               {mediaFile.type === 'video' ? (
@@ -835,219 +919,216 @@ export default function Tweet({ id, initialContent, selectionMode = false }: Twe
                                   className="w-full h-full object-cover"
                                 />
                               )}
-                              {renderMediaOverlays(mediaFile, index + 1)}
+                              {renderMediaOverlays(mediaFile, index)}
                             </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                )}
 
-                  {mediaFiles.length === 4 && (
-                    <div className="grid grid-cols-2 grid-rows-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200 h-[254px]">
-                      {mediaFiles.map((mediaFile, index) => (
-                        <div key={mediaFile.url} className="relative group">
-                          <div className="relative overflow-hidden h-full">
-                            {mediaFile.type === 'video' ? (
-                              <video
-                                src={mediaFile.url}
-                                className="w-full h-full object-cover"
-                                controls={false}
-                              />
-                            ) : (
-                              <img
-                                src={mediaFile.url}
-                                alt="Upload preview"
-                                className="w-full h-full object-cover"
-                              />
-                            )}
-                            {renderMediaOverlays(mediaFile, index)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
+                  <div
+                    className={cn(
+                      'flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg',
+                    )}
+                  >
+                    <label htmlFor="media-upload" className="cursor-pointer">
+                      <DuolingoButton
+                        variant="secondary"
+                        size="icon"
+                        className="rounded-md"
+                        onClick={() => setImageDrawerOpen(true)}
+                      >
+                        <ImagePlus className="size-4" />
+                        <span className="sr-only">Add media</span>
+                      </DuolingoButton>
+                    </label>
+                    <input
+                      id="media-upload"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/x-msvideo"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          handleFiles(e.target.files)
+                        }
+                        e.target.value = ''
+                      }}
+                    />
 
-              <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
-                <div
-                  className={cn(
-                    'flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg',
-                    selectionMode && 'pointer-events-none opacity-50',
-                  )}
-                >
-                  <label htmlFor="media-upload" className="cursor-pointer">
+                    {/* <div className="w-px h-4 bg-stone-300 mx-2" /> */}
+
                     <DuolingoButton
                       variant="secondary"
                       size="icon"
                       className="rounded-md"
-                      onClick={() => setImageDrawerOpen(true)}
-                      disabled={selectionMode}
+                      onClick={handleClearTweet}
                     >
-                      <ImagePlus className="size-4" />
-                      <span className="sr-only">Add media</span>
+                      <Trash2 className="size-4" />
+                      <span className="sr-only">Clear tweet</span>
                     </DuolingoButton>
-                  </label>
-                  <input
-                    id="media-upload"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/x-msvideo"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        handleFiles(e.target.files)
-                      }
-                      e.target.value = ''
-                    }}
-                  />
 
-                  <div className="w-px h-4 bg-stone-300 mx-2" />
+                    <div className="w-px h-4 bg-stone-300 mx-2" />
 
-                  <DuolingoButton
-                    variant="secondary"
-                    size="icon"
-                    className="rounded-md"
-                    onClick={handleClearTweet}
-                    disabled={selectionMode}
-                  >
-                    <Trash2 className="size-4" />
-                    <span className="sr-only">Clear tweet</span>
-                  </DuolingoButton>
-
-                  <div className="w-px h-4 bg-stone-300 mx-2" />
-
-                  <div className="relative flex items-center justify-center">
-                    <div className="h-8 w-8">
-                      <svg className="-ml-[5px] -rotate-90 w-full h-full">
-                        <circle
-                          className="text-stone-200"
-                          strokeWidth="2"
-                          stroke="currentColor"
-                          fill="transparent"
-                          r="10"
-                          cx="16"
-                          cy="16"
-                        />
-                        <circle
-                          className={`${getProgressColor()} transition-all duration-200`}
-                          strokeWidth="2"
-                          strokeDasharray={circumference}
-                          strokeDashoffset={strokeDashoffset}
-                          strokeLinecap="round"
-                          stroke="currentColor"
-                          fill="transparent"
-                          r="10"
-                          cx="16"
-                          cy="16"
-                        />
-                      </svg>
-                    </div>
-                    {charCount > 260 && charCount < 280 && (
-                      <div
-                        className={`text-sm/6 ${280 - charCount < 1 ? 'text-red-500' : 'text-stone-800'} mr-3.5`}
-                      >
-                        <p>{280 - charCount < 20 ? 280 - charCount : charCount}</p>
+                    <div className="relative flex items-center justify-center">
+                      <div className="h-8 w-8">
+                        <svg className="-ml-[5px] -rotate-90 w-full h-full">
+                          <circle
+                            className="text-stone-200"
+                            strokeWidth="2"
+                            stroke="currentColor"
+                            fill="transparent"
+                            r="10"
+                            cx="16"
+                            cy="16"
+                          />
+                          <circle
+                            className={`${getProgressColor()} transition-all duration-200`}
+                            strokeWidth="2"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={strokeDashoffset}
+                            strokeLinecap="round"
+                            stroke="currentColor"
+                            fill="transparent"
+                            r="10"
+                            cx="16"
+                            cy="16"
+                          />
+                        </svg>
                       </div>
+                      {charCount > 260 && charCount < 280 && (
+                        <div
+                          className={`text-sm/6 ${280 - charCount < 1 ? 'text-red-500' : 'text-stone-800'} mr-3.5`}
+                        >
+                          <p>{280 - charCount < 20 ? 280 - charCount : charCount}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {editMode ? (
+                      <>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <Popover>
+                              <TooltipTrigger asChild>
+                                <PopoverTrigger asChild>
+                                  <DuolingoButton
+                                    loading={scheduleTweetMutation.isPending}
+                                    disabled={
+                                      updateTweetMutation.isPending ||
+                                      scheduleTweetMutation.isPending
+                                    }
+                                    variant="secondary"
+                                    size="icon"
+                                    className="aspect-square h-11 w-11"
+                                  >
+                                    <CalendarCog className="size-5" />
+                                    <span className="sr-only">Reschedule tweet</span>
+                                  </DuolingoButton>
+                                </PopoverTrigger>
+                              </TooltipTrigger>
+                              <PopoverContent className="max-w-3xl w-full">
+                                <Calendar20
+                                  editMode={editMode}
+                                  onSchedule={handleScheduleTweet}
+                                  isPending={scheduleTweetMutation.isPending}
+                                  initialScheduledTime={
+                                    editTweetData?.tweet?.scheduledFor
+                                      ? new Date(editTweetData.tweet.scheduledFor)
+                                      : undefined
+                                  }
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <TooltipContent>
+                              <p>Reschedule tweet</p>
+                            </TooltipContent>
+                          </Tooltip>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <DuolingoButton
+                                className="h-11"
+                                onClick={handleUpdateTweet}
+                                disabled={
+                                  updateTweetMutation.isPending ||
+                                  scheduleTweetMutation.isPending
+                                }
+                              >
+                                <Save className="size-5 mr-1.5" />
+                                <span className="text-sm">
+                                  {updateTweetMutation.isPending ? 'Saving...' : 'Save'}
+                                </span>
+                              </DuolingoButton>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Save tweet</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </>
+                    ) : (
+                      <>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <DuolingoButton
+                              loading={scheduleTweetMutation.isPending}
+                              disabled={
+                                postTweetMutation.isPending ||
+                                scheduleTweetMutation.isPending ||
+                                mediaFiles.some((f) => f.uploading)
+                              }
+                              variant="secondary"
+                              size="icon"
+                              className="aspect-square h-11 w-11"
+                            >
+                              <Calendar className="size-4" />
+                              <span className="sr-only">Schedule tweet</span>
+                            </DuolingoButton>
+                          </PopoverTrigger>
+                          <PopoverContent className="max-w-3xl w-full">
+                            <Calendar20
+                              onSchedule={handleScheduleTweet}
+                              isPending={scheduleTweetMutation.isPending}
+                            />
+                          </PopoverContent>
+                        </Popover>
+
+                        <DuolingoButton
+                          className="h-11"
+                          onClick={handlePostTweet}
+                          disabled={
+                            postTweetMutation.isPending ||
+                            scheduleTweetMutation.isPending ||
+                            mediaFiles.some((f) => f.uploading)
+                          }
+                        >
+                          <Icons.twitter className="size-4 mr-2" />
+                          <span className="text-sm">
+                            {postTweetMutation.isPending ? 'Posting...' : 'Post'}
+                          </span>
+                          <span className="sr-only">Post to Twitter</span>
+                        </DuolingoButton>
+                      </>
                     )}
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
-                    <DialogTrigger asChild>
-                      <DuolingoButton
-                        variant="secondary"
-                        size="icon"
-                        className="aspect-square h-11 w-11"
-                        disabled={selectionMode}
-                        onClick={() => {
-                          const defaultDateTime = getDefaultScheduleDateTime()
-                          setScheduleDate(defaultDateTime.date)
-                          setScheduleTime(defaultDateTime.time)
-                        }}
-                      >
-                        <Calendar className="size-4" />
-                        <span className="sr-only">Schedule tweet</span>
-                      </DuolingoButton>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Schedule Tweet</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <label
-                            htmlFor="date"
-                            className="text-right text-sm font-medium"
-                          >
-                            Date
-                          </label>
-                          <input
-                            id="date"
-                            type="date"
-                            value={scheduleDate}
-                            onChange={(e) => setScheduleDate(e.target.value)}
-                            className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <label
-                            htmlFor="time"
-                            className="text-right text-sm font-medium"
-                          >
-                            Time
-                          </label>
-                          <input
-                            id="time"
-                            type="time"
-                            value={scheduleTime}
-                            onChange={(e) => setScheduleTime(e.target.value)}
-                            className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          />
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <DuolingoButton
-                            variant="secondary"
-                            onClick={() => setScheduleDialogOpen(false)}
-                          >
-                            Cancel
-                          </DuolingoButton>
-                          <DuolingoButton
-                            onClick={handleScheduleTweet}
-                            disabled={scheduleTweetMutation.isPending}
-                          >
-                            {scheduleTweetMutation.isPending
-                              ? 'Scheduling...'
-                              : 'Schedule Tweet'}
-                          </DuolingoButton>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  <DuolingoButton
-                    className="h-11"
-                    onClick={handlePostTweet}
-                    disabled={selectionMode || postTweetMutation.isPending}
-                  >
-                    <Icons.twitter className="size-4 mr-2" />
-                    <span className="text-sm">
-                      {postTweetMutation.isPending ? 'Posting...' : 'Post'}
-                    </span>
-                    <span className="sr-only">Post to Twitter</span>
-                  </DuolingoButton>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </EditModeWrapper>
 
-        <Drawer
-          modal={false}
-          open={imageDrawerOpen && !selectionMode}
-          onOpenChange={setImageDrawerOpen}
-        >
+        {/* <div className="flex justify-center">
+          <button className="border inline-flex items-center gap-0.5 border-dashed shadow-sm border-gray-200 px-2 text-sm/6 rounded-md bg-white">
+            <Plus className="size-3" /> <p className='opacity-80'>Thread</p>
+          </button>
+        </div> */}
+
+        <Drawer modal={false} open={imageDrawerOpen} onOpenChange={setImageDrawerOpen}>
           <DrawerContent className="h-full">
             <div className="max-w-6xl mx-auto w-full">
               <DrawerHeader className="px-0">

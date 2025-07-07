@@ -3,6 +3,7 @@
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HTTPException } from 'hono/http-exception'
 import { ReactNode, useState } from 'react'
+import toast from 'react-hot-toast'
 
 interface ProvidersProps {
   children: ReactNode
@@ -15,8 +16,10 @@ export function Providers({ children }: ProvidersProps) {
         queryCache: new QueryCache({
           onError(error, query) {
             if (error instanceof HTTPException) {
-              if (window.location.pathname !== '/login') {
+              if (error.status === 401 && window.location.pathname !== '/login') {
                 window.location.href = '/login'
+              } else {
+                toast.error(error.message)
               }
             }
           },

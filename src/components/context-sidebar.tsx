@@ -2,25 +2,13 @@
 
 import { buttonVariants } from '@/components/ui/button'
 import { useChat } from '@/hooks/use-chat'
-import { useEditor } from '@/hooks/use-editors'
-import { useTweets } from '@/hooks/use-tweets'
 import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
-import { useQueryClient } from '@tanstack/react-query'
-import { $getRoot } from 'lexical'
-import {
-  ArrowLeftFromLine,
-  ArrowRightFromLine,
-  PanelLeft,
-  Plus,
-  User,
-  Users,
-} from 'lucide-react'
+import { ArrowLeftFromLine, ArrowRightFromLine, PanelLeft, Settings } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { createSerializer, parseAsString } from 'nuqs'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
-import DuolingoButton from './ui/duolingo-button'
 import {
   Sidebar,
   SidebarContent,
@@ -31,8 +19,6 @@ import {
   SidebarHeader,
   useSidebar,
 } from './ui/sidebar'
-import { Separator } from './ui/separator'
-import { nanoid } from 'nanoid'
 import { Icons } from './icons'
 
 const searchParams = {
@@ -44,16 +30,11 @@ const serialize = createSerializer(searchParams)
 
 export const LeftSidebar = () => {
   const { state } = useSidebar()
-  const queryClient = useQueryClient()
   const { data } = authClient.useSession()
-  const { resetImprovements, setCurrentTweet, setDrafts } = useTweets()
-
-  const router = useRouter()
-  const editor = useEditor('tweet-editor')
 
   const pathname = usePathname()
 
-  const { chatId, setChatId } = useChat()
+  const { chatId } = useChat()
 
   const isCollapsed = state === 'collapsed'
 
@@ -76,14 +57,15 @@ export const LeftSidebar = () => {
               )}
             </div>
           </button>
-          <p
+          <div
             className={cn(
-              'text-sm/6 text-stone-800 transition-all duration-200 ease-out',
+              'flex items-center gap-1 transition-all duration-200 ease-out',
               isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
             )}
           >
-            contentport.
-          </p>
+            {/* <Icons.logo className="size-4" /> */}
+            <p className={cn('text-sm/6 text-stone-800 ')}>Contentport</p>
+          </div>
         </div>
       </SidebarHeader>
 
@@ -125,27 +107,6 @@ export const LeftSidebar = () => {
                 Studio
               </span>
             </Link>
-            {/* <DuolingoButton
-              size="sm"
-              className="w-full flex gap-1.5 justify-start items-center h-10"
-              onClick={() => {
-                if (chatId) {
-                  router.push(`/studio?chatId=${chatId}`)
-                } else {
-                  router.push('/studio')
-                }
-              }}
-            >
-              <Icons.twitter className="size-4 shrink-0" />
-              <span
-                className={cn(
-                  'transition-all opacity-0 duration-200 ease-out delay-200',
-                  isCollapsed ? 'opacity-0 w-0 overflow-hidden hidden' : 'opacity-100',
-                )}
-              >
-                Studio
-              </span>
-            </DuolingoButton> */}
           </SidebarGroupContent>
         </SidebarGroup>
 
@@ -157,7 +118,7 @@ export const LeftSidebar = () => {
               isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
             )}
           >
-            Content
+            Manage
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <div className="flex flex-col gap-1">
@@ -257,125 +218,6 @@ export const LeftSidebar = () => {
             </Link>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {/* <div
-          className={cn(
-            'transition-all duration-200 ease-out overflow-hidden',
-            isCollapsed ? 'opacity-0 max-h-0' : 'opacity-100 max-h-[1000px]',
-          )}
-        >
-          <SidebarGroup>
-            <div className="px-3 py-2">
-              <h3 className="text-xs text-stone-600">Recents</h3>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              {draft.content !== '' ? (
-                <Link
-                  href={{
-                    pathname: `/studio`,
-                    search: serialize({ chatId }),
-                  }}
-                  className={cn(
-                    buttonVariants({
-                      variant: 'ghost',
-                      size: 'sm',
-                      className: 'justify-between group/tweet gap-2 px-3 py-2 h-auto',
-                    }),
-                    pathname === '/studio' && 'bg-stone-200 hover:bg-stone-200',
-                  )}
-                >
-                  <div className="flex gap-1.5 items-center truncate">
-                    <span className="truncate text-xs">{draft.content || 'Draft'}</span>
-                  
-                  </div>
-                  <DuolingoButton
-                    variant="destructive"
-                    size="icon"
-                    className="size-6 shrink-0 opacity-0 group-hover/tweet:opacity-100 transition-opacity"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setDraft({ content: '', isVisible: false })
-                   
-                    }}
-                  >
-                    <X className="size-3" />
-                  </DuolingoButton>
-                </Link>
-              ) : null}
-
-              {recentTweets && recentTweets.length > 0 ? (
-                <>
-                  {recentTweets.slice(0, 5).map((tweet) => {
-                    const isActive = (params.tweetId || 'draft') === tweet.id
-
-                    return (
-                      <Link
-                        key={tweet.id}
-                        href={{
-                          pathname: `/studio/t/${tweet.id}`,
-                          search: serialize({ chatId }),
-                        }}
-                        className={cn(
-                          buttonVariants({
-                            variant: 'ghost',
-                            size: 'sm',
-                            className:
-                              'justify-between group/tweet gap-2 px-3 py-2 h-auto',
-                          }),
-                          isActive && 'bg-stone-200 hover:bg-stone-200',
-                        )}
-                      >
-                        <div className="flex gap-1.5 items-center truncate">
-                          <span className="truncate text-xs">
-                            {tweet.content || 'Empty Tweet'}
-                          </span>
-                          {queuedImprovements[tweet.id] && (
-                            <div className="ml-1 size-2 rounded-full bg-blue-500 flex-shrink-0" />
-                          )}
-                        </div>
-                        <DuolingoButton
-                          variant="destructive"
-                          size="icon"
-                          className="size-6 shrink-0 opacity-0 group-hover/tweet:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            deleteTweet(tweet.id)
-                          }}
-                        >
-                          <X className="size-3" />
-                        </DuolingoButton>
-                      </Link>
-                    )
-                  })}
-
-                  {recentTweets && recentTweets.length > 5 && (
-                    <button
-                      disabled
-                      className={cn(
-                        buttonVariants({
-                          variant: 'ghost',
-                          size: 'sm',
-                          className: 'justify-start px-3 py-2',
-                        }),
-                        'text-xs text-muted-foreground',
-                      )}
-                    >
-                      <CircleEllipsis className="size-4 mr-1" />
-                      All tweets (soon)
-                    </button>
-                  )}
-                </>
-              ) : isPending || draft.isVisible ? null : (
-                <div className="px-3 py-4 text-center">
-                  <p className="text-xs text-stone-500">No tweets yet</p>
-                </div>
-              )}
-            </div>
-          </SidebarGroup>
-        </div> */}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-border/40 p-4">
@@ -386,7 +228,7 @@ export const LeftSidebar = () => {
           )}
         >
           <div className="flex flex-col gap-2">
-            {data?.user && (
+            {data?.user ? (
               <Link
                 href={{
                   pathname: `/studio/settings`,
@@ -411,14 +253,15 @@ export const LeftSidebar = () => {
                   <span className="truncate text-sm font-medium text-stone-800">
                     {data.user.name ?? 'Account'}
                   </span>
+
                   {data.user.plan && (
                     <span className="truncate text-xs text-muted-foreground">
-                      {data.user.plan === 'free' ? 'Free' : null}
+                      {data.user.plan === 'free' ? 'Free' : '🐐 Pro'}
                     </span>
                   )}
                 </div>
               </Link>
-            )}
+            ) : null}
             {/* <a
               href="https://docs.google.com/forms/d/e/1FAIpQLSdCtO75IY051uoGcxBQ_vK3uNnNnokb_Z8VTrp5JZJnzUI02g/viewform?usp=dialog"
               className={buttonVariants({ variant: 'outline' })}
@@ -427,6 +270,29 @@ export const LeftSidebar = () => {
             >
               Feedback 🫶
             </a> */}
+          </div>
+        </div>
+
+        {/* Doesn't look right with the other non-collapsed footer, can remove if cannot be fixed. */}
+        <div
+          className={cn(
+            'transition-all duration-0 ease-out overflow-hidden',
+            isCollapsed ? 'opacity-100 max-h-[1000px]' : 'opacity-0 max-h-0',
+          )}
+        >
+          <div className="flex flex-col gap-2">
+            <Link
+              href={{
+                pathname: `/studio/settings`,
+                search: chatId ? `?chatId=${chatId}` : undefined,
+              }}
+              className={buttonVariants({
+                variant: 'ghost',
+                className: 'text-muted-foreground hover:text-foreground',
+              })}
+            >
+              <Settings className="size-5" />
+            </Link>
           </div>
         </div>
       </SidebarFooter>

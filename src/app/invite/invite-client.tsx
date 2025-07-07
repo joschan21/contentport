@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { HTTPException } from 'hono/http-exception'
+import { Icons } from '@/components/icons'
 
 type Props = {
   isInvalid: boolean
@@ -72,20 +73,11 @@ export default function InviteClient({ isInvalid, inviteId, inviterName }: Props
             <div className="space-y-4">
               <DuolingoButton
                 onClick={() => acceptInvite()}
-                disabled={isAccepting}
+                loading={isAccepting}
                 className="w-full"
               >
-                {isAccepting ? (
-                  <>
-                    <Loader2 className="mr-2 size-5 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    <Twitter className="mr-2 size-5" />
-                    Connect Twitter Account
-                  </>
-                )}
+                <Icons.twitter className="mr-2 size-5" />
+                Connect Twitter Account
               </DuolingoButton>
 
               <p className="text-xs text-stone-500">

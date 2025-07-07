@@ -16,6 +16,9 @@ const Page = () => {
   const queryClient = useQueryClient()
 
   const { account, isLoading } = useAccount()
+  
+  const editTweetId = searchParams?.get('edit')
+  const isEditMode = Boolean(editTweetId)
 
   useEffect(() => {
     // Check for ?account_connected=true in URL
@@ -34,8 +37,8 @@ const Page = () => {
   }, [searchParams, queryClient, router])
 
   useEffect(() => {
-    if (!Boolean(account) && !Boolean(isLoading)) setIsOpen(true)
-  }, [account, isLoading])
+    if (!Boolean(account) && !Boolean(isLoading) && !isEditMode) setIsOpen(true)
+  }, [account, isLoading, isEditMode])
 
   return (
     <>
@@ -47,7 +50,7 @@ const Page = () => {
         />
       ) : null}
       <div className="max-w-xl w-full mx-auto">
-        <TweetEditor />
+        <TweetEditor editMode={isEditMode} editTweetId={editTweetId} />
       </div>
     </>
   )

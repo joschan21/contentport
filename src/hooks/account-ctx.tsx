@@ -40,8 +40,6 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     },
   })
 
-  console.log('ACTUAL ACCOUNT', data)
-
   return (
     <AccountContext.Provider value={{ account: data ?? null, isLoading: isPending }}>
       {children}

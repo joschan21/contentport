@@ -11,6 +11,8 @@ import { z } from 'zod'
 import { j, privateProcedure, publicProcedure } from '../jstack'
 import { getBaseUrl } from '@/constants/base-url'
 import { getAccount } from './utils/get-account'
+import { Ratelimit } from '@upstash/ratelimit'
+import { redis } from '@/lib/redis'
 
 const receiver = new Receiver({
   currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY as string,
@@ -18,20 +20,18 @@ const receiver = new Receiver({
 })
 
 // Function to fetch media URLs from S3 keys using S3Client
-async function fetchMediaFromS3(
-  s3Keys: string[],
-): Promise<Array<{ url: string; type: 'image' | 'gif' | 'video' }>> {
+async function fetchMediaFromS3(media: { s3Key: string; media_id: string }[]) {
   const mediaData = await Promise.all(
-    s3Keys.map(async (s3Key) => {
+    media.map(async (m) => {
       try {
         const headResponse = await s3Client.send(
           new HeadObjectCommand({
             Bucket: BUCKET_NAME,
-            Key: s3Key,
+            Key: m.s3Key,
           }),
         )
 
-        const url = `https://contentport-dev.s3.amazonaws.com/${s3Key}`
+        const url = `https://contentport-dev.s3.amazonaws.com/${m.s3Key}`
         const contentType = headResponse.ContentType || ''
 
         // Determine media type from content-type or file extension
@@ -39,17 +39,20 @@ async function fetchMediaFromS3(
 
         if (
           contentType.startsWith('video/') ||
-          s3Key.toLowerCase().includes('.mp4') ||
-          s3Key.toLowerCase().includes('.mov')
+          m.s3Key.toLowerCase().includes('.mp4') ||
+          m.s3Key.toLowerCase().includes('.mov')
         ) {
           type = 'video'
-        } else if (contentType === 'image/gif' || s3Key.toLowerCase().endsWith('.gif')) {
+        } else if (
+          contentType === 'image/gif' ||
+          m.s3Key.toLowerCase().endsWith('.gif')
+        ) {
           type = 'gif'
         } else if (contentType.startsWith('image/')) {
           type = 'image'
         }
 
-        return { url, type }
+        return { url, type, media_id: m.media_id, s3Key: m.s3Key }
       } catch (error) {
         console.error('Failed to fetch media from S3:', error)
         throw new Error('Failed to fetch media from S3')
@@ -298,13 +301,19 @@ export const tweetRouter = j.router({
       z.object({
         content: z.string().min(1).max(4000),
         scheduledUnix: z.number(),
-        mediaIds: z.array(z.string()).default([]),
-        s3Keys: z.array(z.string()).default([]),
+        media: z.array(
+          z.object({
+            media_id: z.string(),
+            s3Key: z.string(),
+          }),
+        ),
+        // mediaIds: z.array(z.string()).default([]),
+        // s3Keys: z.array(z.string()).default([]),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { content, scheduledUnix, mediaIds, s3Keys } = input
+      const { content, scheduledUnix, media } = input
 
       const account = await getAccount({
         email: user.email,
@@ -324,6 +333,22 @@ export const tweetRouter = j.router({
         throw new HTTPException(400, {
           message: 'Twitter account not connected or access token missing',
         })
+      }
+
+      if (user.plan !== 'pro') {
+        const limiter = new Ratelimit({
+          redis,
+          limiter: Ratelimit.slidingWindow(1, '7d'),
+        })
+
+        const { success } = await limiter.limit(user.email)
+
+        if (!success) {
+          throw new HTTPException(402, {
+            message:
+              'Free plan scheduling limit reached. Upgrade to Pro to schedule unlimited tweets.',
+          })
+        }
       }
 
       const tweetId = crypto.randomUUID()
@@ -348,8 +373,7 @@ export const tweetRouter = j.router({
           content,
           isScheduled: true,
           scheduledFor: new Date(scheduledUnix * 1000),
-          mediaIds,
-          s3Keys,
+          media,
           qstashId: messageId,
         })
         .returning()
@@ -422,13 +446,14 @@ export const tweetRouter = j.router({
       })
 
       // Create tweet payload
-      const tweetPayload: any = {
+      const tweetPayload: Partial<SendTweetV2Params> = {
         text: tweet.content,
       }
 
       // Add media if present
       if (tweet.mediaIds && tweet.mediaIds.length > 0) {
         tweetPayload.media = {
+          // @ts-expect-error tuple type vs. string[]
           media_ids: tweet.mediaIds,
         }
       }
@@ -469,13 +494,19 @@ export const tweetRouter = j.router({
     .input(
       z.object({
         content: z.string().min(1).max(4000),
-        mediaIds: z.array(z.string()).default([]),
-        s3Keys: z.array(z.string()).default([]),
+        media: z.array(
+          z.object({
+            media_id: z.string(),
+            s3Key: z.string(),
+          }),
+        ),
+        // mediaIds: z.array(z.string()).default([]),
+        // s3Keys: z.array(z.string()).default([]),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { content, mediaIds, s3Keys } = input
+      const { content, media } = input
 
       const account = await getAccount({
         email: user.email,
@@ -514,10 +545,10 @@ export const tweetRouter = j.router({
         }
 
         // Add media if present
-        if (mediaIds && mediaIds.length > 0) {
+        if (media && media.length > 0) {
           tweetPayload.media = {
             // @ts-expect-error tuple
-            media_ids: mediaIds,
+            media_ids: media.map((m) => m.media_id),
           }
         }
 
@@ -528,8 +559,7 @@ export const tweetRouter = j.router({
           accountId: account.id,
           userId: user.id,
           content,
-          mediaIds,
-          s3Keys,
+          media,
           isScheduled: false,
           isPublished: true,
         })
@@ -612,8 +642,11 @@ export const tweetRouter = j.router({
     // Fetch media URLs for each tweet
     const tweetsWithMedia = await Promise.all(
       allTweets.map(async (tweet) => {
-        const mediaData = await fetchMediaFromS3(tweet.s3Keys || [])
-        return { ...tweet, mediaData }
+        const enrichedMedia = await fetchMediaFromS3(tweet.media || [])
+        return {
+          ...tweet,
+          media: enrichedMedia,
+        }
       }),
     )
 

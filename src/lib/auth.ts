@@ -37,6 +37,8 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       plan: { type: 'string', defaultValue: 'free' },
+      stripeId: { type: 'string', defaultValue: null, required: false },
+      hadTrial: { type: 'boolean', defaultValue: false, required: true },
     },
   },
   database,
@@ -62,6 +64,8 @@ export const auth = betterAuth({
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
       const session = ctx.context.newSession
+
+      console.log('UFCKING ALLOWLIST CHECK', session?.user.email, allowlist.includes(session?.user.email!));
 
       if (session && allowlist.includes(session.user.email)) {
         ctx.redirect('/studio')

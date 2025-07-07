@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ExternalLink,
+  Pencil,
 } from 'lucide-react'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { Card } from '@/components/ui/card'
@@ -28,25 +29,34 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import MediaDisplay from '@/components/media-display'
 import DuolingoBadge from '@/components/ui/duolingo-badge'
-import { AccountAvatar } from '@/hooks/account-ctx'
+import { AccountAvatar, AccountName, AccountHandle } from '@/hooks/account-ctx'
+import { LexicalComposer } from '@lexical/react/LexicalComposer'
+import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
+import { ContentEditable } from '@lexical/react/LexicalContentEditable'
+import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
+import { initialConfig, useTweets } from '@/hooks/use-tweets'
+import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useRouter } from 'next/navigation'
+import { InferOutput } from '@/server'
+import Link from 'next/link'
+import { buttonVariants } from '@/components/ui/button'
 
-interface MediaFile {
-  url: string
-  type: 'image' | 'gif' | 'video'
-  uploading: boolean
-  uploaded: boolean
-  error?: string
-}
+function InitialContentPlugin({ content }: { content: string }) {
+  const [editor] = useLexicalComposerContext()
 
-interface ScheduledTweet {
-  id: string
-  content: string
-  scheduledFor: Date | null
-  createdAt: Date
-  updatedAt: Date
-  isScheduled: boolean
-  isPublished: boolean
-  mediaFiles: MediaFile[]
+  useEffect(() => {
+    editor.update(() => {
+      const root = $getRoot()
+      const p = $createParagraphNode()
+      const text = $createTextNode(content)
+      p.append(text)
+      root.clear()
+      root.append(p)
+    })
+  }, [editor, content])
+
+  return null
 }
 
 const getStatusBadge = (tweet: ScheduledTweet) => {
@@ -87,32 +97,32 @@ const getStatusBadge = (tweet: ScheduledTweet) => {
   )
 }
 
+type ScheduledTweet = InferOutput['tweet']['getScheduledAndPublished']['tweets'][number]
+
 export default function ScheduledTweetsPage() {
   const queryClient = useQueryClient()
+  const { shadowEditor, setMediaFiles } = useTweets()
+  const router = useRouter()
 
   const { data: scheduledTweets, isLoading } = useQuery({
     queryKey: ['scheduled-and-published-tweets'],
     queryFn: async () => {
       const res = await client.tweet.getScheduledAndPublished.$get()
       const { tweets } = await res.json()
-      return tweets.map((tweet: any) => ({
-        ...tweet,
-        mediaFiles: tweet.mediaData.map((media: { url: string; type: 'image' | 'gif' | 'video' }) => ({
-          url: media.url,
-          type: media.type,
-          uploading: false,
-          uploaded: true,
-        })),
-      })) as ScheduledTweet[]
+      return tweets
     },
   })
 
-  const { mutate: deleteTweet, isPending: isDeleting, variables } = useMutation({
-    mutationFn: async ({tweetId}: {tweetId: string}) => {
+  const {
+    mutate: deleteTweet,
+    isPending: isDeleting,
+    variables,
+  } = useMutation({
+    mutationFn: async ({ tweetId }: { tweetId: string }) => {
       await client.tweet.delete.$post({ id: tweetId })
     },
     onSuccess: () => {
-      toast.success('Deleted & un-scheduled')
+      toast.success('Post deleted and unscheduled')
       queryClient.invalidateQueries({ queryKey: ['scheduled-and-published-tweets'] })
     },
     onError: () => {
@@ -146,7 +156,7 @@ export default function ScheduledTweetsPage() {
     {} as Record<string, ScheduledTweet[]>,
   )
 
-  Object.keys(groupedTweets).forEach(date => {
+  Object.keys(groupedTweets).forEach((date) => {
     groupedTweets[date]?.sort((a, b) => {
       const timeA = a.scheduledFor ? new Date(a.scheduledFor) : new Date(a.createdAt)
       const timeB = b.scheduledFor ? new Date(b.scheduledFor) : new Date(b.createdAt)
@@ -213,6 +223,45 @@ export default function ScheduledTweetsPage() {
     )
   }
 
+  const handleEditTweet = (tweet: ScheduledTweet) => {
+    console.log(tweet)
+
+    shadowEditor.update(() => {
+      const root = $getRoot()
+      const p = $createParagraphNode()
+      const text = $createTextNode(tweet.content)
+      p.append(text)
+      root.clear()
+      root.append(p)
+    })
+
+    setMediaFiles(
+      tweet.media.map((media) => ({
+        ...media,
+        file: null,
+        media_id: media.media_id,
+        s3Key: media.s3Key,
+        type: media.type as 'image' | 'gif' | 'video',
+        uploading: false,
+        uploaded: true,
+      })),
+    )
+
+    // setMediaFiles(
+    //   tweet.mediaFiles.map((media) => ({
+    //     ...media,
+    //     file: null as unknown as File,
+    //     media_id: media.media_id,
+    //     s3Key: media.s3Key,
+    //     type: media.type,
+    //     uploading: false,
+    //     uploaded: true,
+    //   })),
+    // )
+
+    router.push(`/studio?edit=${tweet.id}`)
+  }
+
   return (
     <div className="relative z-10 container max-w-4xl mx-auto p-6">
       <div className="space-y-6 max-w-xl">
@@ -232,9 +281,19 @@ export default function ScheduledTweetsPage() {
 
         {Object.keys(groupedTweets).length === 0 ? (
           <Card className="p-12 text-center">
-            <Calendar className="size-12 text-stone-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-stone-800 mb-2">No tweets found</h3>
-            <p className="text-stone-600">Schedule your first tweet to see it here.</p>
+            <div className="flex flex-col gap-2">
+              <Calendar className="size-12 text-stone-400 mx-auto" />
+              <h3 className="text-lg font-medium text-stone-800">
+                No scheduled tweets yet
+              </h3>
+              <p className="text-stone-600">Schedule your first tweet to see it here.</p>
+            </div>
+            <DuolingoButton
+              onClick={() => router.push('/studio')}
+              className="w-fit mx-auto"
+            >
+              Start writing ✏️
+            </DuolingoButton>
           </Card>
         ) : (
           <div className="space-y-8">
@@ -249,23 +308,27 @@ export default function ScheduledTweetsPage() {
                   {tweets.map((tweet: ScheduledTweet) => (
                     <Card
                       key={tweet.id}
-                      className="pl-6 pr-3 py-3 group hover:shadow-md transition-shadow"
+                      className="p-4 group hover:shadow-md transition-shadow"
                     >
-                      <div className="flex gap-4">
+                      <div className="flex gap-3">
+                        {/* <AccountAvatar className="size-10 flex-shrink-0" /> */}
+
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-1 text-sm text-stone-600">
-                                <Clock className="size-3" />
-                                <p className="text-xs text-gray-700">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-1 text-sm">
+                              <DuolingoBadge variant="streak" className="px-2">
+                                <Clock className="size-3 mr-1.5" />
+                                <span className="text-xs">
                                   {tweet.scheduledFor
                                     ? format(new Date(tweet.scheduledFor), 'HH:mm')
                                     : 'No time set'}
-                                </p>
-                              </div>
+                                </span>
+                              </DuolingoBadge>
+
+                              <p>{tweet.scheduledFor?.getTime()}</p>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               {tweet.isPublished && (
                                 <DuolingoButton
                                   variant="secondary"
@@ -277,47 +340,63 @@ export default function ScheduledTweetsPage() {
                                     )
                                   }
                                 >
-                                  <ExternalLink className="size-4 mr-1" />
-                                  View on X
+                                  <ExternalLink className="size-3 mr-1" />
+                                  View
                                 </DuolingoButton>
                               )}
 
-                              {!tweet.isPublished ? (
+                              <DuolingoButton
+                                variant="secondary"
+                                size="icon"
+                                onClick={() => handleEditTweet(tweet)}
+                                disabled={isDeleting && variables?.tweetId === tweet.id}
+                              >
+                                <Pencil className="size-4" />
+                                <span className="sr-only">Edit</span>
+                              </DuolingoButton>
+
+                              {!tweet.isPublished && (
                                 <DuolingoButton
                                   variant="destructive"
                                   size="icon"
                                   onClick={() => handleDeleteScheduled(tweet.id)}
                                   disabled={isDeleting && variables?.tweetId === tweet.id}
-                                  className=""
                                 >
                                   <Trash2 className="size-4" />
-                                  <span className="sr-only">Delete scheduled tweet</span>
+                                  <span className="sr-only">Delete</span>
                                 </DuolingoButton>
-                              ) : null}
+                              )}
                             </div>
                           </div>
 
-                          <p className="text-stone-800 leading-relaxed mb-3">
-                            {tweet.content}
-                          </p>
+                          <div className="mt-2 text-stone-900 leading-relaxed">
+                            <LexicalComposer
+                              initialConfig={{ ...initialConfig, editable: false }}
+                            >
+                              <PlainTextPlugin
+                                contentEditable={
+                                  <ContentEditable className="w-full resize-none leading-relaxed text-stone-900 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none pointer-events-none" />
+                                }
+                                ErrorBoundary={LexicalErrorBoundary}
+                              />
+                              <InitialContentPlugin content={tweet.content} />
+                            </LexicalComposer>
+                          </div>
 
-                          <MediaDisplay
-                            mediaFiles={tweet.mediaFiles}
-                            removeMediaFile={() => {}}
-                          />
-
-                          {/* <div className="flex items-center justify-between text-xs text-stone-500">
-                              <span>
-                                Created {format(tweet.createdAt, 'MMM d, h:mm a')}
-                              </span>
-                              {tweet.updatedAt &&
-                                tweet.updatedAt.getTime() !==
-                                  tweet.createdAt.getTime() && (
-                                  <span>
-                                    Updated {format(tweet.updatedAt, 'MMM d, h:mm a')}
-                                  </span>
-                                )}
-                            </div> */}
+                          {tweet.media.length > 0 && (
+                            <div className="mt-3">
+                              <MediaDisplay
+                                mediaFiles={tweet.media.map((media) => ({
+                                  ...media,
+                                  uploading: false,
+                                  media_id: media.media_id,
+                                  s3Key: media.s3Key,
+                                  type: media.type as 'image' | 'gif' | 'video',
+                                }))}
+                                removeMediaFile={() => {}}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </Card>

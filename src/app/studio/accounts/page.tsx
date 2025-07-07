@@ -26,7 +26,9 @@ import DuolingoInput from '@/components/ui/duolingo-input'
 import DuolingoTextarea from '@/components/ui/duolingo-textarea'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AccountAvatar, mapToConnectedAccount, useAccount } from '@/hooks/account-ctx'
+import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
 import type { Account } from '@/server/routers/settings-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -38,6 +40,7 @@ import {
   Copy,
   Link as LinkIcon,
   Loader2,
+  Lock,
   Plus,
   Save,
   Sparkles,
@@ -88,6 +91,7 @@ export default function AccountsPage() {
   const [showInviteDialog, setShowInviteDialog] = useState(false)
   const [isStyleSettingsOpen, setIsStyleSettingsOpen] = useState(false)
   const { account } = useAccount()
+  const { data } = authClient.useSession()
   const queryClient = useQueryClient()
 
   const { mutate: createOAuthLink, isPending: isCreatingOAuthLink } = useMutation({
@@ -280,57 +284,79 @@ export default function AccountsPage() {
               Your personal accounts and accounts delegated to you
             </p>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <DuolingoButton size="sm" className="w-auto relative z-20">
-                <Plus className="size-4 mr-2" />
-                <span className="whitespace-nowrap">Add Account</span>
-                <ChevronDown className="size-4 ml-2" />
-              </DuolingoButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="p-3 border-2 shadow-xl">
-              <div className="space-y-2">
-                <DropdownMenuItem asChild>
-                  <button
-                    onClick={() => setShowConnectDialog(true)}
-                    className="flex items-center gap-4 p-4 rounded-xl hover:bg-blue-50 transition-all cursor-pointer border-0 w-full group hover:shadow-sm"
-                  >
-                    <div className="flex-shrink-0 size-10 bg-gray-100 border border-gray-900 border-opacity-10 bg-clip-padding shadow-sm rounded-md flex items-center justify-center transition-all">
-                      <Plus className="size-5 text-gray-600 transition-colors" />
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <h4 className="font-semibold text-gray-900 group-hover:text-blue-900 transition-colors">
-                        Personal Account
-                      </h4>
-                      <p className="text-sm opacity-60 leading-relaxed">
-                        Add a personal Twitter account
-                      </p>
-                    </div>
-                  </button>
-                </DropdownMenuItem>
 
-                <DropdownMenuItem asChild>
-                  <button
-                    onClick={() => createInviteLink()}
-                    disabled={isCreatingInviteLink}
-                    className="flex items-center gap-4 p-4 rounded-xl hover:bg-blue-50 transition-all cursor-pointer border-0 w-full group hover:shadow-sm disabled:opacity-50"
-                  >
-                    <div className="flex-shrink-0 size-10 bg-gray-100 border border-gray-900 border-opacity-10 bg-clip-padding shadow-sm rounded-md flex items-center justify-center transition-all">
-                      <UserPlus className="size-5 text-gray-600 transition-colors" />
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <h4 className="font-semibold text-gray-900 group-hover:text-blue-900 transition-colors">
-                        Delegate Access
-                      </h4>
-                      <p className="text-sm opacity-60 leading-relaxed">
-                        Add a client/brand account
-                      </p>
-                    </div>
-                  </button>
-                </DropdownMenuItem>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {data?.user.plan === 'free' ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DuolingoButton
+                  size="sm"
+                  onClick={() => {
+                    toast('🔒 Please upgrade to Pro to add unlimited accounts')
+                  }}
+                  className="w-auto relative z-20 transition-all duration-200"
+                >
+                  <Lock className="size-4 mr-2" />
+                  <span className="whitespace-nowrap">Add Account</span>
+                  <ChevronDown className="size-4 ml-2" />
+                </DuolingoButton>
+              </TooltipTrigger>
+              <TooltipContent className="bg-gray-900 text-white border-gray-700">
+                <p className="font-medium">Upgrade to Pro to add unlimited accounts</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <DuolingoButton size="sm" className="w-auto relative z-20">
+                  <Plus className="size-4 mr-2" />
+                  <span className="whitespace-nowrap">Add Account</span>
+                  <ChevronDown className="size-4 ml-2" />
+                </DuolingoButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="p-3 border-2 shadow-xl">
+                <div className="space-y-2">
+                  <DropdownMenuItem asChild>
+                    <button
+                      onClick={() => setShowConnectDialog(true)}
+                      className="flex items-center gap-4 p-4 rounded-xl hover:bg-blue-50 transition-all cursor-pointer border-0 w-full group hover:shadow-sm"
+                    >
+                      <div className="flex-shrink-0 size-10 bg-gray-100 border border-gray-900 border-opacity-10 bg-clip-padding shadow-sm rounded-md flex items-center justify-center transition-all">
+                        <Plus className="size-5 text-gray-600 transition-colors" />
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <h4 className="font-semibold text-gray-900 group-hover:text-blue-900 transition-colors">
+                          Personal Account
+                        </h4>
+                        <p className="text-sm opacity-60 leading-relaxed">
+                          Add a personal Twitter account
+                        </p>
+                      </div>
+                    </button>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild>
+                    <button
+                      onClick={() => createInviteLink()}
+                      disabled={isCreatingInviteLink}
+                      className="flex items-center gap-4 p-4 rounded-xl hover:bg-blue-50 transition-all cursor-pointer border-0 w-full group hover:shadow-sm disabled:opacity-50"
+                    >
+                      <div className="flex-shrink-0 size-10 bg-gray-100 border border-gray-900 border-opacity-10 bg-clip-padding shadow-sm rounded-md flex items-center justify-center transition-all">
+                        <UserPlus className="size-5 text-gray-600 transition-colors" />
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <h4 className="font-semibold text-gray-900 group-hover:text-blue-900 transition-colors">
+                          Delegate Access
+                        </h4>
+                        <p className="text-sm opacity-60 leading-relaxed">
+                          Add a client/brand account
+                        </p>
+                      </div>
+                    </button>
+                  </DropdownMenuItem>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {isLoadingAccounts ? (

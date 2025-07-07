@@ -1,5 +1,6 @@
 'use client'
 
+import { Icons } from '@/components/icons'
 import { buttonVariants } from '@/components/ui/button'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import DuolingoInput from '@/components/ui/duolingo-input'
@@ -17,6 +18,11 @@ import { toast } from 'react-hot-toast'
 
 const Testimonials = dynamic(
   () => import('@/app/testimonials').then((mod) => ({ default: mod.Testimonials })),
+  { ssr: false },
+)
+
+const SenjaWidgetDynamic = dynamic(
+  () => import('@/components/senja-widget').then((mod) => ({ default: mod.SenjaWidget })),
   { ssr: false },
 )
 
@@ -68,8 +74,8 @@ const Page = () => {
               className="flex items-center justify-between p-6 lg:px-8"
             >
               <div className="flex lg:flex-1">
-                <a href="#" className="-m-1.5 p-1.5">
-                  <span className="sr-only">Your Company</span>
+                <a href="#" className="-m-1.5 p-1.5 flex items-center gap-1.5">
+                  <Icons.logo className="size-5" />
                   Contentport
                 </a>
               </div>
@@ -110,13 +116,22 @@ const Page = () => {
                 <div className="flex flex-col justify-center items-center">
                   <div className="flex items-center justify-center gap-2 mb-4"></div>
                   <h1 className="text-5xl font-semibold tracking-tight text-balance text-gray-900 sm:text-6xl">
-                    The easiest way to{' '}
+                    The <span className="text-indigo-600">content engine</span> for
+                    software companies
+                    {/* The easiest way to{' '}
                     <span className="text-indigo-600">grow your business</span> on
-                    Twitter.
+                    Twitter. */}
                   </h1>
-                  <p className="mt-8 text-base text-pretty text-gray-500 sm:text-xl/8 max-w-2xl">
-                    Work with an AI writing partner that helps you turn rough ideas into
-                    tweets people care about - perfect for for busy founders.
+                  <p className="mt-8 text-base text-pretty sm:text-xl/8 max-w-2xl">
+                    <span className="opacity-60">Contentport helps technical teams </span>
+                    <span className="opacity-100">
+                      create, schedule & manage content
+                    </span>{' '}
+                    <span className="opacity-60">
+                      at scale. Perfect for busy founders & content managers.
+                    </span>
+                    {/* Work with an AI writing partner that helps you turn rough ideas into
+                    tweets people care about - perfect for for busy founders. */}
                   </p>
 
                   <div className="max-w-lg w-full mt-8 flex flex-col gap-4 items-center">
@@ -125,19 +140,22 @@ const Page = () => {
                         <p>✅</p>
                         <p className="text-gray-800">
                           {' '}
-                          Turn ideas, updates, and insights into content
+                          Turn ideas, company updates, or insights into content
                         </p>
                       </div>
                       <div className="flex items-center gap-2 text-gray-500">
                         <p>✅</p>
                         <p className="text-gray-800">
-                          Instantly create beautiful visuals (no design skills needed)
+                          Plan & schedule a week of content at once
                         </p>
                       </div>
                       <div className="flex items-center gap-2 text-gray-500">
                         <p>✅</p>
-                        <p className="text-gray-800">
+                        {/* <p className="text-gray-800">
                           Pull in notes, tweets, articles, even screenshots
+                        </p> */}
+                        <p className="text-gray-800">
+                          Create beautiful visuals (no design skills needed)
                         </p>
                       </div>
                     </div>
@@ -234,8 +252,10 @@ const Page = () => {
               Great software doesn't sell itself.
             </h2>
             <p className="max-w-xl text-base text-pretty text-gray-500 sm:text-xl/8 text-center">
-              Contentport helps software teams turn ideas, updates, and insights into
-              content that drives growth.
+              A built-in AI assistant that helps you put your ideas into clear words
+              people care about.
+              {/* Contentport helps software teams turn ideas, updates, and insights into
+              content that drives growth. */}
             </p>
           </div>
 

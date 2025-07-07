@@ -2,12 +2,7 @@ import { AdditionNode, DeletionNode, ReplacementNode, UnchangedNode } from '@/li
 import { DiffWithReplacement } from '@/lib/utils'
 import { InferOutput } from '@/server'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  $createParagraphNode,
-  $createTextNode,
-  $getRoot,
-  createEditor
-} from 'lexical'
+import { $createParagraphNode, $createTextNode, $getRoot, createEditor } from 'lexical'
 import { nanoid } from 'nanoid'
 import { useParams, usePathname, useSearchParams } from 'next/navigation'
 import posthog from 'posthog-js'
@@ -125,7 +120,7 @@ export type CurrentTweet = {
 }
 
 export interface MediaFile {
-  file: File
+  file: File | null
   url: string
   type: 'image' | 'gif' | 'video'
   uploading: boolean
@@ -190,8 +185,6 @@ export function TweetProvider({ children }: PropsWithChildren) {
   const setTweetContent = (content: string) => {
     setCurrentTweet((prev) => ({ ...prev, content }))
   }
-
-
 
   const removeTweetImage = () => {
     setCurrentTweet((prev) => ({ ...prev, image: undefined }))

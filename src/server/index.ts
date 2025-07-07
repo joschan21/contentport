@@ -1,5 +1,6 @@
 import { dynamic, InferRouterInputs, InferRouterOutputs } from 'jstack'
 import { j } from './jstack'
+
 /**
  * This is your base API.
  * Here you can handle errors, not-found responses, cors and more.
@@ -26,6 +27,8 @@ const appRouter = j.mergeRouters(api, {
   style: dynamic(() => import('./routers/style-router')),
   settings: dynamic(() => import('./routers/settings-router')),
   auth_router: dynamic(() => import('./routers/auth-router')),
+  stripe: dynamic(() => import('./routers/stripe-router')),
+  
 })
 
 export type AppRouter = typeof appRouter

@@ -111,8 +111,6 @@ async function incrementChatCount(userEmail: string): Promise<void> {
   await redis.hincrby(key, today, 1)
 }
 
-const chatLimiter = new Ratelimit({ redis, limiter: Ratelimit.fixedWindow(20, '1 d') })
-
 // ==================== Route Handlers ====================
 
 export const chatRouter = j.router({
@@ -149,6 +147,11 @@ export const chatRouter = j.router({
     .post(async ({ input, ctx }) => {
       const { user } = ctx
 
+      const limiter =
+        user.plan === 'pro'
+          ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(40, '4h') })
+          : new Ratelimit({ redis, limiter: Ratelimit.fixedWindow(5, '1d') })
+
       const chatId = input.message.chatId
       const attachments = input.message.metadata?.attachments
       const { tweet } = input
@@ -160,12 +163,18 @@ export const chatRouter = j.router({
       }
 
       if (process.env.NODE_ENV === 'production') {
-        const { success } = await chatLimiter.limit(user.email)
+        const { success } = await limiter.limit(user.email)
 
         if (!success) {
-          throw new HTTPException(429, {
-            message: 'Too Many Requests - Daily chat limit reached.',
-          })
+          if (user.plan === 'pro') {
+            throw new HTTPException(429, {
+              message: "You've reached a rate limit, please try again soon."
+            })
+          } else {
+            throw new HTTPException(429, {
+              message: 'Daily chat limit reached.',
+            })
+          }
         }
       }
 
@@ -194,7 +203,7 @@ export const chatRouter = j.router({
 
       if (isConversationEmpty) {
         editorState.add(
-          `This is the first message in your conversation. Therefore, only for the first message, create THREE drafts by calling the edit_tweet tool THREE times. The user can choose the draft they like most.`,
+          `This is the first message in your conversation. Therefore, only for the first message, create three drafts. The user can choose the draft they like most.`,
         )
       }
 

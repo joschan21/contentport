@@ -57,7 +57,7 @@ export default function MediaDisplay({
         <img
           src={mediaFile.url}
           alt="Upload preview"
-          className={`${className} cursor-pointer hover:opacity-90 transition-opacity`}
+          className={`${className} cursor-pointer rounded-lg hover:opacity-90 transition-opacity`}
         />
       </DialogTrigger>
       <DialogContent
@@ -89,7 +89,7 @@ export default function MediaDisplay({
     <div className="mt-3 max-w-full">
       {mediaFiles.length === 1 && mediaFiles[0] && (
         <div className="relative group">
-          <div className="relative overflow-hidden border border-stone-200">
+          <div className="relative overflow-hidden">
             {mediaFiles[0].type === 'video' ? (
               <video
                 src={mediaFiles[0].url}
@@ -105,7 +105,7 @@ export default function MediaDisplay({
       )}
 
       {mediaFiles.length === 2 && (
-        <div className="grid grid-cols-2 gap-0.5 overflow-hidden border border-stone-200">
+        <div className="grid grid-cols-2 gap-0.5 overflow-hidden">
           {mediaFiles.map((mediaFile, index) => (
             <div key={mediaFile.url} className="relative group">
               <div className="relative overflow-hidden h-[254px]">
@@ -126,7 +126,7 @@ export default function MediaDisplay({
       )}
 
       {mediaFiles.length === 3 && mediaFiles[0] && (
-        <div className="grid grid-cols-2 gap-0.5 overflow-hidden border border-stone-200 h-[254px]">
+        <div className="grid grid-cols-2 gap-0.5 overflow-hidden h-[254px]">
           <div className="relative group">
             <div className="relative overflow-hidden h-full">
               {mediaFiles[0].type === 'video' ? (
@@ -163,7 +163,7 @@ export default function MediaDisplay({
       )}
 
       {mediaFiles.length === 4 && (
-        <div className="grid grid-cols-2 grid-rows-2 gap-0.5 overflow-hidden border border-stone-200 h-[254px]">
+        <div className="grid grid-cols-2 grid-rows-2 gap-0.5 overflow-hidden h-[254px]">
           {mediaFiles.map((mediaFile, index) => (
             <div key={mediaFile.url} className="relative group">
               <div className="relative overflow-hidden h-full">
