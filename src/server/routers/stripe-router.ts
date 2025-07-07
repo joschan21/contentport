@@ -18,6 +18,7 @@ import { eq } from 'drizzle-orm'
 import type Stripe from 'stripe'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
+import { getBaseUrl } from '@/constants/base-url'
 
 export const stripeRouter = j.router({
   /**
@@ -111,7 +112,6 @@ export const stripeRouter = j.router({
         user: { id, name, email, stripeId },
       },
     }) => {
-      const url = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
       let customer: Stripe.Customer | undefined
 
       if (stripeId) {
@@ -138,7 +138,7 @@ export const stripeRouter = j.router({
 
       const portal = await stripe.billingPortal.sessions.create({
         customer: customer.id,
-        return_url: `${url}/studio/settings`,
+        return_url: `${getBaseUrl()}/studio/settings`,
       })
 
       return c.json({ url: portal.url })
