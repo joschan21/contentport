@@ -4,6 +4,6 @@ export interface StripeSubscriptionData {
 }
 
 export const STRIPE_SUBSCRIPTION_DATA: StripeSubscriptionData = {
-  "id": "prod_SdTUFyIfmC3dGO",
-  "priceId": "price_1RiCXfA19umTXGu8XAnmgBvK"
+  "id": "prod_Sdai9fYhooL16t",
+  "priceId": "price_1RiJX1A19umTXGu8k9V4fMkn"
 };
