@@ -42,7 +42,6 @@ const Page = () => {
   useEffect(() => {
     if (status) {
       if (status === 'cancelled') {
-        toast.error('Checkout cancelled.')
         router.push('/studio/settings')
         return
       }
@@ -150,8 +149,7 @@ const Page = () => {
               {/* <Separator className="my-4" /> */}
               {data?.user.plan === 'free' ? (
                 <p className="text-sm opacity-60">
-                  Get unlimited access to Contentport for $20/mo -
-                  cancel anytime.
+                  Get unlimited access to Contentport for $20/mo - cancel anytime.
                 </p>
               ) : null}
               {data?.user.plan === 'free' ? <UpgradeDrawer /> : null}
