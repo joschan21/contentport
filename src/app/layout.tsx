@@ -6,10 +6,25 @@ import { Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
 import './globals.css'
 
+const title = 'Contentport'
+const description = "Create & manage your brand's content at scale"
+
 export const metadata: Metadata = {
-  title: 'contentport',
-  description: 'Created using JStack',
+  title,
+  description,
   icons: [{ rel: 'icon', url: '/favicon.ico' }],
+  openGraph: {
+    title,
+    description,
+    images: [{ url: '/images/og-image.png' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title,
+    description,
+    images: ['/images/og-image.png'],
+    creator: '@joshtriedcoding',
+  },
 }
 
 const elegant = Instrument_Serif({
