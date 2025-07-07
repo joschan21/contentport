@@ -108,8 +108,8 @@ export const create_edit_tweet = ({
       ]
 
       // const chatModel = openrouter.chat('alpindale/goliath-120b', {
-      const chatModel = openrouter.chat('anthropic/claude-3.5-haiku', {
-      // const chatModel = openrouter.chat('meta-llama/llama-3.2-90b-vision-instruct', {
+      const chatModel = openrouter.chat('anthropic/claude-3.7-sonnet', {
+        // const chatModel = openrouter.chat('meta-llama/llama-3.2-90b-vision-instruct', {
         reasoning: { effort: 'low' },
         models: ['anthropic/claude-3.7-sonnet', 'openai/o4-mini'],
       })
