@@ -76,6 +76,7 @@ export const stripeRouter = j.router({
             enabled: true,
           },
           currency: 'usd',
+          allow_promotion_codes: true,
           consent_collection: {
             payment_method_reuse_agreement: {
               position: 'auto',
