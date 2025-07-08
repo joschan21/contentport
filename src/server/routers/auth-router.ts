@@ -38,7 +38,7 @@ export const authRouter = j.router({
     .query(async ({ c, input, ctx }) => {
       console.log('⚠️⚠️⚠️ callback url:', `${getBaseUrl()}/api/auth_router/callback`)
 
-      if (ctx.user.plan !== 'pro') {
+      if (input.action === 'add-account' && ctx.user.plan !== 'pro') {
         throw new HTTPException(402, {
           message: 'Upgrade to Pro to connect more accounts.',
         })
