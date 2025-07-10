@@ -2,7 +2,10 @@ import { createAuthClient } from 'better-auth/react'
 import { inferAdditionalFields } from 'better-auth/client/plugins'
 
 export const authClient = createAuthClient({
-  baseURL: getBaseUrl(),
+  baseURL:
+    process.env.NODE_ENV === 'production'
+      ? 'https://contentport.io'
+      : 'http://localhost:3000',
   plugins: [
     inferAdditionalFields({
       user: {
@@ -11,9 +14,3 @@ export const authClient = createAuthClient({
     }),
   ],
 })
-
-function getBaseUrl() {
-  if (process.env.NODE_ENV === 'production') return `https://contentport.io`
-  if (typeof window !== 'undefined') return window.location.origin
-  return `http://localhost:3000`
-}
