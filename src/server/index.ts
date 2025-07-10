@@ -1,5 +1,6 @@
 import { dynamic, InferRouterInputs, InferRouterOutputs } from 'jstack'
 import { j } from './jstack'
+import { cors } from 'hono/cors'
 
 /**
  * This is your base API.
@@ -10,7 +11,18 @@ import { j } from './jstack'
 const api = j
   .router()
   .basePath('/api')
-  .use(j.defaults.cors)
+  .use(
+    cors({
+      origin: [
+        'http://localhost:3000',
+        'https://contentport.io',
+        'https://www.contentport.io',
+      ],
+      allowHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
+      exposeHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
+      credentials: true,
+    }),
+  )
   .onError(j.defaults.errorHandler)
 
 /**
@@ -28,7 +40,6 @@ const appRouter = j.mergeRouters(api, {
   settings: dynamic(() => import('./routers/settings-router')),
   auth_router: dynamic(() => import('./routers/auth-router')),
   stripe: dynamic(() => import('./routers/stripe-router')),
-  
 })
 
 export type AppRouter = typeof appRouter
