@@ -10,6 +10,7 @@ import toast from 'react-hot-toast'
 import { useTweets } from './use-tweets'
 import { ChatRequestOptions } from 'ai'
 import type { ThreeDrafts } from '@/server/routers/chat/create-three-drafts'
+import { $getRoot } from 'lexical'
 
 interface StartNewChatOpts {
   newId?: string
@@ -28,15 +29,14 @@ const ChatContext = createContext<TChatContext | null>(null)
 export const ChatProvider = ({ children }: PropsWithChildren) => {
   const [chatId, setChatId] = useQueryState('chatId')
   const {
-    currentTweet,
     draftCheckpoint,
     tweetId,
     listImprovements,
     showImprovementsInEditor,
     setDrafts,
-    setToolError,
     improvementRef,
     clearToolError,
+    shadowEditor,
   } = useTweets()
 
   const tweetIdRef = useRef(tweetId)
@@ -74,7 +74,8 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
       registerStreamHooks(response, {
         onThreeDrafts: async (data: ThreeDrafts) => {
           console.log('drafts are here', data)
-          draftCheckpoint.current = currentTweet.content
+          const currentContent = shadowEditor.read(() => $getRoot().getTextContent())
+          draftCheckpoint.current = currentContent
           setDrafts(data)
           clearToolError('three_drafts')
         },

@@ -147,6 +147,7 @@ export const create_three_drafts = ({
       // const chatModel = openrouter.chat('anthropic/claude-2.1', {
       // const chatModel = openrouter.chat('alpindale/magnum-72b', {
       const chatModel = openrouter.chat('anthropic/claude-3.7-sonnet', {
+      // const chatModel = openrouter.chat('x-ai/grok-4', {
       // const chatModel = openrouter.chat('anthracite-org/magnum-v4-72b', {
         reasoning: { effort: 'low' },
         models: ['anthropic/claude-opus-4', 'google/gemini-2.5-pro'],

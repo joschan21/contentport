@@ -1,6 +1,6 @@
-"use client"
+'use client'
 
-import { SidebarInset } from "../ui/sidebar"
+import { SidebarInset } from '../ui/sidebar'
 
 import {
   Breadcrumb,
@@ -9,7 +9,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+} from '@/components/ui/breadcrumb'
 import {
   Command,
   CommandEmpty,
@@ -17,62 +17,55 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+} from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   FolderClock,
   Save,
   PanelLeft,
   ArrowLeftFromLine,
   ArrowRightFromLine,
-} from "lucide-react"
-import { SidebarTrigger, useSidebar } from "../ui/sidebar"
-import { useMutation, useQuery } from "@tanstack/react-query"
-import { useState } from "react"
-import { client } from "@/lib/client"
-import { Input } from "../ui/input"
+} from 'lucide-react'
+import { SidebarTrigger, useSidebar } from '../ui/sidebar'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { client } from '@/lib/client'
+import { Input } from '../ui/input'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import DuolingoButton from "../ui/duolingo-button"
+} from '@/components/ui/tooltip'
+import DuolingoButton from '../ui/duolingo-button'
 
 const mockIdeas = [
   {
-    value: "ai-powered content generation",
-    label: "AI-Powered Content Generation",
-    description:
-      "Create an AI system that generates engaging content for social media",
+    value: 'ai-powered content generation',
+    label: 'AI-Powered Content Generation',
+    description: 'Create an AI system that generates engaging content for social media',
   },
   {
-    value: "idea-2",
-    label: "Smart Task Management",
-    description:
-      "Build a task manager that uses AI to prioritize and organize tasks",
+    value: 'idea-2',
+    label: 'Smart Task Management',
+    description: 'Build a task manager that uses AI to prioritize and organize tasks',
   },
   {
-    value: "idea-3",
-    label: "Voice-Controlled Dashboard",
-    description:
-      "Develop a dashboard that can be controlled through voice commands",
+    value: 'idea-3',
+    label: 'Voice-Controlled Dashboard',
+    description: 'Develop a dashboard that can be controlled through voice commands',
   },
   {
-    value: "idea-4",
-    label: "Automated Code Review",
+    value: 'idea-4',
+    label: 'Automated Code Review',
     description:
-      "Create a tool that automatically reviews code and suggests improvements",
+      'Create a tool that automatically reviews code and suggests improvements',
   },
 ]
 
 export function AppSidebarInset({ children }: { children: React.ReactNode }) {
   const { state, toggleSidebar } = useSidebar()
-  const isCollapsed = state === "collapsed"
+  const isCollapsed = state === 'collapsed'
 
   return (
     <SidebarInset className="w-full flex-1 overflow-x-hidden bg-stone-100 border border-gray-200">
@@ -80,14 +73,14 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       <div
         className="absolute inset-0 z-0 pointer-events-none"
         style={{
-          boxShadow: "inset 0 0 10px rgba(0, 0, 0, 0.03)",
+          boxShadow: 'inset 0 0 10px rgba(0, 0, 0, 0.03)',
         }}
       >
         <div
           className="absolute inset-0"
           style={{
             backgroundImage: `radial-gradient(circle, #d1d5db 1.5px, transparent 1.5px)`,
-            backgroundSize: "20px 20px",
+            backgroundSize: '20px 20px',
             opacity: 0.5,
           }}
         />
@@ -200,10 +193,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                     </div>
                   </DuolingoButton>
                 </TooltipTrigger>
-                <TooltipContent
-                  side="bottom"
-                  className="bg-stone-800 text-white font-medium"
-                >
+                <TooltipContent side="bottom" className="bg-stone-800 text-white ">
                   Toggle Sidebar
                 </TooltipContent>
               </Tooltip>

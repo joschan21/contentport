@@ -1,4 +1,11 @@
-import { AdditionNode, DeletionNode, ReplacementNode, UnchangedNode } from '@/lib/nodes'
+import {
+  AdditionNode,
+  DeletionNode,
+  MentionNode,
+  MentionNode2,
+  ReplacementNode,
+  UnchangedNode,
+} from '@/lib/nodes'
 import { DiffWithReplacement } from '@/lib/utils'
 import { InferOutput } from '@/server'
 import { useQueryClient } from '@tanstack/react-query'
@@ -78,7 +85,14 @@ export const initialConfig = {
   onError: (error: Error) => {
     console.error('[Tweet Editor Error]', error)
   },
-  nodes: [DeletionNode, AdditionNode, UnchangedNode, ReplacementNode],
+  nodes: [
+    DeletionNode,
+    AdditionNode,
+    UnchangedNode,
+    ReplacementNode,
+    MentionNode,
+    MentionNode2,
+  ],
 }
 
 interface TweetContextType {
@@ -108,6 +122,8 @@ interface TweetContextType {
   setSelectedDraftIndex: React.Dispatch<React.SetStateAction<number>>
   mediaFiles: MediaFile[]
   setMediaFiles: React.Dispatch<React.SetStateAction<MediaFile[]>>
+  charCount: number
+  setCharCount: React.Dispatch<React.SetStateAction<number>>
 }
 
 const TweetContext = createContext<TweetContextType | undefined>(undefined)
@@ -133,8 +149,6 @@ export interface MediaFile {
 
 export function TweetProvider({ children }: PropsWithChildren) {
   const { tweetId } = useParams() as { tweetId: string | null }
-  const queryClient = useQueryClient()
-  const hasLoaded = useRef(false)
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
 
   // fallback after rejecting all drafts
@@ -145,6 +159,8 @@ export function TweetProvider({ children }: PropsWithChildren) {
     content: '',
     mediaIds: [],
   })
+
+  const [charCount, setCharCount] = useState(0)
 
   const shadowEditorRef = useRef(createEditor({ ...initialConfig }))
   const shadowEditor = shadowEditorRef.current
@@ -191,22 +207,23 @@ export function TweetProvider({ children }: PropsWithChildren) {
   }
 
   // initial load
-  useEffect(() => {
-    if (!hasLoaded.current && currentTweet) {
-      shadowEditor.update(
-        () => {
-          const root = $getRoot()
-          const p = $createParagraphNode()
-          const text = $createTextNode(currentTweet.content)
-          p.append(text)
-          root.clear()
-          root.append(p)
-        },
-        { tag: 'system-update' },
-      )
-      hasLoaded.current = true
-    }
-  }, [currentTweet, shadowEditor])
+  // useEffect(() => {
+  //   if (!hasLoaded.current && currentTweet) {
+  //     shadowEditor.update(
+  //       () => {
+  //         const root = $getRoot()
+  //         const p = $createParagraphNode()
+  //         const text = $createTextNode('')
+  //         // const text = $createTextNode(currentTweet.content)
+  //         p.append(text)
+  //         root.clear()
+  //         root.append(p)
+  //       },
+  //       { tag: 'system-update' },
+  //     )
+  //     hasLoaded.current = true
+  //   }
+  // }, [currentTweet, shadowEditor])
 
   // show list of improvements in chat
   const listImprovements = async (diffs: DiffWithReplacement[]) => {
@@ -530,6 +547,8 @@ export function TweetProvider({ children }: PropsWithChildren) {
     <TweetContext.Provider
       value={{
         // tweets,
+        charCount,
+        setCharCount,
         improvements,
         drafts,
         currentTweet,

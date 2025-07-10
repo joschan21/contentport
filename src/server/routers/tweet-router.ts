@@ -1,18 +1,19 @@
+import { getBaseUrl } from '@/constants/base-url'
 import { db } from '@/db'
 import { account as accountSchema, tweets } from '@/db/schema'
 import { qstash } from '@/lib/qstash'
+import { redis } from '@/lib/redis'
 import { BUCKET_NAME, s3Client } from '@/lib/s3'
 import { HeadObjectCommand } from '@aws-sdk/client-s3'
 import { Receiver } from '@upstash/qstash'
+import { Ratelimit } from '@upstash/ratelimit'
 import { and, desc, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-import { SendTweetV2Params, TwitterApi } from 'twitter-api-v2'
+import { SendTweetV2Params, TwitterApi, UserV2 } from 'twitter-api-v2'
 import { z } from 'zod'
 import { j, privateProcedure, publicProcedure } from '../jstack'
-import { getBaseUrl } from '@/constants/base-url'
 import { getAccount } from './utils/get-account'
-import { Ratelimit } from '@upstash/ratelimit'
-import { redis } from '@/lib/redis'
+import { waitUntil } from '@vercel/functions'
 
 const receiver = new Receiver({
   currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY as string,
@@ -52,7 +53,15 @@ async function fetchMediaFromS3(media: { s3Key: string; media_id: string }[]) {
           type = 'image'
         }
 
-        return { url, type, media_id: m.media_id, s3Key: m.s3Key }
+        return {
+          url,
+          type,
+          media_id: m.media_id,
+          s3Key: m.s3Key,
+          uploaded: true,
+          uploading: false,
+          file: null,
+        }
       } catch (error) {
         console.error('Failed to fetch media from S3:', error)
         throw new Error('Failed to fetch media from S3')
@@ -652,4 +661,290 @@ export const tweetRouter = j.router({
 
     return c.superjson({ tweets: tweetsWithMedia })
   }),
+
+  getPosted: privateProcedure.get(async ({ c, ctx }) => {
+    const { user } = ctx
+
+    const account = await getAccount({
+      email: user.email,
+    })
+
+    if (!account?.id) {
+      throw new HTTPException(400, {
+        message: 'Please connect your Twitter account',
+      })
+    }
+
+    const postedTweets = await db.query.tweets.findMany({
+      where: and(eq(tweets.accountId, account.id), eq(tweets.isPublished, true)),
+      orderBy: [desc(tweets.updatedAt)],
+    })
+
+    // Fetch media URLs for each tweet
+    const tweetsWithMedia = await Promise.all(
+      postedTweets.map(async (tweet) => {
+        const enrichedMedia = await fetchMediaFromS3(tweet.media || [])
+        return {
+          ...tweet,
+          media: enrichedMedia,
+        }
+      }),
+    )
+
+    return c.superjson({ tweets: tweetsWithMedia })
+  }),
+
+  getNextQueueSlot: privateProcedure
+    .input(
+      z.object({
+        currentTimeUnix: z.number(), // User's current time as Unix timestamp
+      }),
+    )
+    .get(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { currentTimeUnix } = input
+
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
+      }
+
+      // Get all scheduled tweets for this account
+      const scheduledTweets = await db.query.tweets.findMany({
+        where: and(eq(tweets.accountId, account.id), eq(tweets.isScheduled, true)),
+        columns: { scheduledFor: true },
+      })
+
+      // Queue times: 8am, 12pm, 2pm
+      const queueTimes = [8, 12, 14] // Hours in 24-hour format
+      const userNow = new Date(currentTimeUnix * 1000)
+
+      // Find next available slot
+      for (let daysAhead = 0; daysAhead < 365; daysAhead++) {
+        const checkDate = new Date(userNow)
+        checkDate.setDate(userNow.getDate() + daysAhead)
+
+        for (const hour of queueTimes) {
+          // Create slot time in user's timezone
+          const slotTime = new Date(checkDate)
+          slotTime.setHours(hour, 0, 0, 0)
+
+          // Skip if this slot is in the past
+          if (slotTime <= userNow) continue
+
+          // Check if this slot is already taken
+          const isSlotTaken = scheduledTweets.some((tweet) => {
+            if (!tweet.scheduledFor) return false
+            const tweetTime = new Date(tweet.scheduledFor)
+            const timeDiff = Math.abs(tweetTime.getTime() - slotTime.getTime())
+            return timeDiff < 60000 // Within 1 minute = same slot
+          })
+
+          if (!isSlotTaken) {
+            return c.json({
+              scheduledUnix: Math.floor(slotTime.getTime() / 1000),
+              displayTime: slotTime.toLocaleString('en-US', {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              }),
+            })
+          }
+        }
+      }
+
+      throw new HTTPException(400, {
+        message: 'No available queue slots found in the next year',
+      })
+    }),
+
+  getQueueSlots: privateProcedure
+    .input(
+      z.object({
+        timezone: z.string(),
+        startDate: z.string(), // ISO date string
+        endDate: z.string(), // ISO date string
+      }),
+    )
+    .get(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { timezone, startDate, endDate } = input
+
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
+      }
+
+      // Get all scheduled tweets in the date range
+      const scheduledTweets = await db.query.tweets.findMany({
+        where: and(eq(tweets.accountId, account.id), eq(tweets.isScheduled, true)),
+      })
+
+      const tweetsWithMedia = await Promise.all(
+        scheduledTweets.map(async (tweet) => {
+          const enrichedMedia = await fetchMediaFromS3(tweet.media || [])
+          return {
+            ...tweet,
+            media: enrichedMedia,
+          }
+        }),
+      )
+
+      // Generate all queue slots for the date range
+      const queueTimes = [8, 12, 14] // 8am, 12pm, 2pm
+      const slots: Array<{
+        date: string
+        time: string
+        scheduledUnix: number
+        displayTime: string
+        tweet: (typeof tweetsWithMedia)[number] | undefined | null
+        isQueueSlot: boolean
+      }> = []
+
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        for (const hour of queueTimes) {
+          // Create slot time in user's timezone
+          const slotTime = new Date(d.toLocaleDateString('en-US', { timeZone: timezone }))
+          slotTime.setHours(hour, 0, 0, 0)
+
+          // Find tweet scheduled for this slot
+          const tweet = tweetsWithMedia.find((t) => {
+            if (!t.scheduledFor) return false
+            const tweetTime = new Date(t.scheduledFor)
+            const timeDiff = Math.abs(tweetTime.getTime() - slotTime.getTime())
+            return timeDiff < 60000 // Within 1 minute = same slot
+          })
+
+          slots.push({
+            date: d.toISOString().split('T')[0]!,
+            time: `${hour.toString().padStart(2, '0')}:00`,
+            scheduledUnix: Math.floor(slotTime.getTime() / 1000),
+            displayTime: slotTime.toLocaleString('en-US', {
+              timeZone: timezone,
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            }),
+            tweet: tweet || null,
+            isQueueSlot: true,
+          })
+        }
+      }
+
+      // Add all other scheduled tweets (manual scheduling)
+      tweetsWithMedia.forEach((tweet) => {
+        if (!tweet.scheduledFor) return
+
+        const tweetTime = new Date(tweet.scheduledFor)
+        const tweetDate = tweetTime.toISOString().split('T')[0]
+
+        // Check if it's already in a queue slot
+        const isInQueueSlot = slots.some((slot) => {
+          if (!tweet.scheduledFor) return false
+          const timeDiff = Math.abs(
+            new Date(tweet.scheduledFor).getTime() - slot.scheduledUnix * 1000,
+          )
+          return timeDiff < 60000
+        })
+
+        if (
+          !isInQueueSlot &&
+          tweetDate &&
+          tweetDate >= startDate &&
+          tweetDate <= endDate
+        ) {
+          slots.push({
+            date: tweetDate,
+            time: tweetTime.toTimeString().slice(0, 5),
+            scheduledUnix: Math.floor(tweetTime.getTime() / 1000),
+            displayTime: tweetTime.toLocaleString('en-US', {
+              timeZone: timezone,
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            }),
+            tweet,
+            isQueueSlot: false,
+          })
+        }
+      })
+
+      // Sort by date and time
+      slots.sort((a, b) => a.scheduledUnix - b.scheduledUnix)
+
+      return c.json({ slots })
+    }),
+
+  getHandles: privateProcedure
+    .input(
+      z.object({
+        query: z.string().min(1).max(15),
+      }),
+    )
+    .get(async ({ c, ctx, input }) => {
+      const { query } = input
+      const { user } = ctx
+
+      const cached = await redis.get<UserV2>(`cache:mention:${query}`)
+
+      if (cached) {
+        return c.json({ data: cached })
+      }
+
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
+      }
+
+      const dbAccount = await db.query.account.findFirst({
+        where: and(eq(accountSchema.userId, user.id), eq(accountSchema.id, account.id)),
+      })
+
+      if (!dbAccount || !dbAccount.accessToken) {
+        throw new HTTPException(400, {
+          message: 'Twitter account not connected or access token missing',
+        })
+      }
+
+      const consumerKey = 'dtcZgPjt85VKEe4XrxhmTs0n5'
+      const consumerSecret = 'dSWDC5M4kROfyQPpiQiZDs5Y8eT8IWTUZ9HHBP6p0T15Iy6xk1'
+
+      const client = new TwitterApi({
+        appKey: consumerKey as string,
+        appSecret: consumerSecret as string,
+        accessToken: dbAccount.accessToken as string,
+        accessSecret: dbAccount.accessSecret as string,
+      })
+
+      const { data } = await client.v2.userByUsername(query.replaceAll('@', ''), {
+        'user.fields': ['profile_image_url'],
+      })
+
+      if (data) {
+        waitUntil(redis.set(`cache:mention:${query}`, data))
+      }
+
+      return c.json({ data })
+    }),
 })

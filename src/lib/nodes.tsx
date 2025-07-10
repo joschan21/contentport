@@ -1,150 +1,33 @@
 import {
+  $applyNodeReplacement,
   DecoratorNode,
   DOMConversionMap,
+  DOMConversionOutput,
   DOMExportOutput,
   EditorConfig,
   LexicalEditor,
+  LexicalNode,
+  NodeKey,
   SerializedElementNode,
   SerializedTextNode,
+  Spread,
   TextNode,
-} from "lexical"
+} from 'lexical'
 
-import { LinkNode } from "@lexical/link"
+import { LinkNode } from '@lexical/link'
 
-export type DiffNodeType = "addition" | "unchanged" | "deletion"
+export type DiffNodeType = 'addition' | 'unchanged' | 'deletion'
 
-import { ElementNode } from "lexical"
-import { ReactNode } from "react"
-import { CodeBlockComponent } from "./code-highlight-plugin"
-
-export class MentionNode extends TextNode {
-  static getType(): string {
-    return "mention"
-  }
-
-  static clone(node: MentionNode): MentionNode {
-    return new MentionNode(node.__text, node.__key)
-  }
-
-  createDOM(config: EditorConfig): HTMLElement {
-    const element = super.createDOM(config)
-    element.spellcheck = false
-    element.className = "mention-text"
-    element.contentEditable = "false"
-    element.setAttribute("data-lexical-mention", "true")
-    return element
-  }
-
-  updateDOM(): false {
-    return false
-  }
-
-  isTextEntity(): true {
-    return true
-  }
-
-  canInsertTextBefore(): boolean {
-    return false
-  }
-
-  canInsertTextAfter(): boolean {
-    return false
-  }
-
-  exportJSON(): SerializedTextNode {
-    return {
-      ...super.exportJSON(),
-      type: "mention",
-    }
-  }
-
-  static importJSON(serializedNode: SerializedTextNode): MentionNode {
-    const { text } = serializedNode
-    return new MentionNode(text)
-  }
-}
-
-export function $createMentionNode(text: string): MentionNode {
-  return new MentionNode(text)
-}
+import { ElementNode } from 'lexical'
+import { ReactNode } from 'react'
 
 interface SerializedCodeNode extends SerializedElementNode {
   language: string
 }
 
-export class DecoratorCodeNode extends DecoratorNode<ReactNode> {
-  __language: string
-
-  constructor(language?: string, key?: string) {
-    super(key)
-    this.__language = language || "plain"
-  }
-
-  getLanguage(): string {
-    return this.__language
-  }
-
-  updateDOM(
-    _prevNode: unknown,
-    _dom: HTMLElement,
-    _config: EditorConfig
-  ): boolean {
-    return false
-  }
-
-  createDOM(config: EditorConfig): HTMLElement {
-    const dom = document.createElement("div")
-    dom.className = "my-custom-code"
-    return dom
-  }
-
-  setLanguage(language: string | null | undefined): this {
-    const writable = this.getWritable()
-    writable.__language = language || "plain"
-    return this
-  }
-
-  static clone(node: DecoratorCodeNode): DecoratorCodeNode {
-    return new DecoratorCodeNode(node.__language, node.__key)
-  }
-
-  static getType(): string {
-    return "code"
-  }
-
-  decorate(editor: LexicalEditor): ReactNode {
-    return <CodeBlockComponent node={this} />
-  }
-
-  getChildren(): never[] {
-    return []
-  }
-
-  exportJSON(): SerializedCodeNode {
-    return {
-      type: "code",
-      version: 1,
-      children: [],
-      format: "",
-      indent: 0,
-      direction: null,
-      language: this.__language,
-    }
-  }
-
-  static importJSON(serializedNode: SerializedCodeNode): DecoratorCodeNode {
-    const node = new DecoratorCodeNode(serializedNode.language)
-    return node
-  }
-}
-
-export function $createDecoratorCodeNode(text?: string): DecoratorCodeNode {
-  return new DecoratorCodeNode(text)
-}
-
 export class InlineNode extends ElementNode {
   static getType(): string {
-    return "inline-node"
+    return 'inline-node'
   }
 
   static clone(node: InlineNode): InlineNode {
@@ -156,12 +39,12 @@ export class InlineNode extends ElementNode {
   }
 
   static getContentType(): string {
-    return "block"
+    return 'block'
   }
 
   createDOM(): HTMLElement {
-    const dom = document.createElement("span")
-    dom.className = "inline-node"
+    const dom = document.createElement('span')
+    dom.className = 'inline-node'
     return dom
   }
 
@@ -181,7 +64,7 @@ export class InlineNode extends ElementNode {
   }
 
   exportDOM(): DOMExportOutput {
-    return { element: document.createElement("div") }
+    return { element: document.createElement('div') }
   }
 
   static importJSON(): InlineNode {
@@ -192,10 +75,10 @@ export class InlineNode extends ElementNode {
 
   exportJSON(): SerializedElementNode {
     return {
-      type: "el",
+      type: 'el',
       version: 1,
       children: [],
-      format: "",
+      format: '',
       indent: 0,
       direction: null,
     }
@@ -208,7 +91,7 @@ export class InlineNode extends ElementNode {
 
 export class ElNode extends ElementNode {
   static getType(): string {
-    return "el"
+    return 'el'
   }
 
   static clone(node: ElNode): ElNode {
@@ -220,12 +103,12 @@ export class ElNode extends ElementNode {
   }
 
   static getContentType(): string {
-    return "block"
+    return 'block'
   }
 
   createDOM(): HTMLElement {
-    const dom = document.createElement("div")
-    dom.className = "my-el-node"
+    const dom = document.createElement('div')
+    dom.className = 'my-el-node'
     return dom
   }
 
@@ -245,7 +128,7 @@ export class ElNode extends ElementNode {
   }
 
   exportDOM(): DOMExportOutput {
-    return { element: document.createElement("div") }
+    return { element: document.createElement('div') }
   }
 
   static importJSON(serializedNode: SerializedElementNode): ElNode {
@@ -256,10 +139,10 @@ export class ElNode extends ElementNode {
 
   exportJSON(): SerializedElementNode {
     return {
-      type: "el",
+      type: 'el',
       version: 1,
       children: [],
-      format: "",
+      format: '',
       indent: 0,
       direction: null,
     }
@@ -299,7 +182,7 @@ export class AdditionNode extends TextNode {
   }
 
   static getType(): string {
-    return "addition"
+    return 'addition'
   }
 
   static clone(node: AdditionNode): AdditionNode {
@@ -308,9 +191,9 @@ export class AdditionNode extends TextNode {
 
   createDOM(config: any): HTMLElement {
     const dom = super.createDOM(config)
-    dom.classList.add("addition-node")
+    dom.classList.add('addition-node')
     if (this.__id) {
-      dom.setAttribute("data-id", this.__id)
+      dom.setAttribute('data-id', this.__id)
     }
     return dom
   }
@@ -329,7 +212,7 @@ export class AdditionNode extends TextNode {
     return {
       ...super.exportJSON(),
       id: this.__id,
-      type: "addition",
+      type: 'addition',
     }
   }
 
@@ -341,7 +224,7 @@ export class AdditionNode extends TextNode {
 
 export class UnchangedNode extends TextNode {
   static getType(): string {
-    return "unchanged"
+    return 'unchanged'
   }
 
   static clone(node: UnchangedNode): UnchangedNode {
@@ -350,14 +233,14 @@ export class UnchangedNode extends TextNode {
 
   createDOM(config: any): HTMLElement {
     const dom = super.createDOM(config)
-    dom.classList.add("unchanged-node")
+    dom.classList.add('unchanged-node')
     return dom
   }
 
   exportJSON(): SerializedTextNode {
     return {
       ...super.exportJSON(),
-      type: "unchanged",
+      type: 'unchanged',
     }
   }
 
@@ -369,7 +252,7 @@ export class UnchangedNode extends TextNode {
 
 export class DeletionNode extends TextNode {
   static getType(): string {
-    return "deletion"
+    return 'deletion'
   }
 
   static clone(node: DeletionNode): DeletionNode {
@@ -378,14 +261,14 @@ export class DeletionNode extends TextNode {
 
   createDOM(config: any): HTMLElement {
     const dom = super.createDOM(config)
-    dom.classList.add("deletion-node")
+    dom.classList.add('deletion-node')
     return dom
   }
 
   exportJSON(): SerializedTextNode {
     return {
       ...super.exportJSON(),
-      type: "deletion",
+      type: 'deletion',
     }
   }
 
@@ -418,9 +301,47 @@ export class DeletionNode extends TextNode {
 //   }
 // }
 
+export class MentionNode2 extends TextNode {
+  static getType(): string {
+    return 'mention2'
+  }
+
+  static clone(node: MentionNode2): MentionNode2 {
+    return new MentionNode2(node.__text, node.__key)
+  }
+
+  createDOM(config: any): HTMLElement {
+    const dom = super.createDOM(config)
+    dom.classList.add('mention2-node')
+    dom.setAttribute('data-mention', this.__text)
+    return dom
+  }
+
+  updateDOM(prevNode: this, dom: HTMLElement, config: EditorConfig): boolean {
+    const updated = super.updateDOM(prevNode, dom, config)
+    if (prevNode.__text !== this.__text) {
+      dom.setAttribute('data-mention', this.__text)
+      return true
+    }
+    return updated
+  }
+
+  exportJSON(): SerializedTextNode {
+    return {
+      ...super.exportJSON(),
+      type: 'mention2',
+    }
+  }
+
+  static importJSON(serializedNode: SerializedTextNode): MentionNode2 {
+    const { text } = serializedNode
+    return new MentionNode2(text)
+  }
+}
+
 export class UnprocessedNode extends TextNode {
   static getType(): string {
-    return "unprocessed"
+    return 'unprocessed'
   }
 
   static clone(node: UnprocessedNode): UnprocessedNode {
@@ -429,14 +350,14 @@ export class UnprocessedNode extends TextNode {
 
   createDOM(config: any): HTMLElement {
     const dom = super.createDOM(config)
-    dom.classList.add("unprocessed-node")
+    dom.classList.add('unprocessed-node')
     return dom
   }
 
   exportJSON(): SerializedTextNode {
     return {
       ...super.exportJSON(),
-      type: "unprocessed",
+      type: 'unprocessed',
     }
   }
 
@@ -446,9 +367,121 @@ export class UnprocessedNode extends TextNode {
   }
 }
 
+export type SerializedMentionNode = Spread<
+  {
+    mentionName: string
+  },
+  SerializedTextNode
+>
+
+export function $createMentionNode(
+  mentionName: string,
+  textContent?: string,
+): MentionNode {
+  const mentionNode = new MentionNode(mentionName, (textContent = mentionName))
+  mentionNode.setMode('segmented').toggleDirectionless()
+  return $applyNodeReplacement(mentionNode)
+}
+
+export function $isMentionNode(
+  node: LexicalNode | null | undefined,
+): node is MentionNode {
+  return node instanceof MentionNode
+}
+
+function $convertMentionElement(domNode: HTMLElement): DOMConversionOutput | null {
+  const textContent = domNode.textContent
+  const mentionName = domNode.getAttribute('data-lexical-mention-name')
+
+  if (textContent !== null) {
+    const node = $createMentionNode(
+      typeof mentionName === 'string' ? mentionName : textContent,
+      textContent,
+    )
+    return {
+      node,
+    }
+  }
+
+  return null
+}
+
+const mentionStyle = 'background-color: rgba(24, 119, 232, 0.2)'
+
+export class MentionNode extends TextNode {
+  __mention: string
+
+  static getType(): string {
+    return 'mention'
+  }
+
+  static clone(node: MentionNode): MentionNode {
+    return new MentionNode(node.__mention, node.__text, node.__key)
+  }
+  static importJSON(serializedNode: SerializedMentionNode): MentionNode {
+    return $createMentionNode(serializedNode.mentionName).updateFromJSON(serializedNode)
+  }
+
+  constructor(mentionName: string, text?: string, key?: NodeKey) {
+    super(text ?? mentionName, key)
+    this.__mention = mentionName
+  }
+
+  exportJSON(): SerializedMentionNode {
+    return {
+      ...super.exportJSON(),
+      mentionName: this.__mention,
+    }
+  }
+
+  createDOM(config: EditorConfig): HTMLElement {
+    const dom = super.createDOM(config)
+    dom.style.cssText = mentionStyle
+    dom.className = 'mention'
+    dom.spellcheck = false
+    return dom
+  }
+
+  exportDOM(): DOMExportOutput {
+    const element = document.createElement('span')
+    element.setAttribute('data-lexical-mention', 'true')
+    if (this.__text !== this.__mention) {
+      element.setAttribute('data-lexical-mention-name', this.__mention)
+    }
+    element.textContent = this.__text
+    return { element }
+  }
+
+  static importDOM(): DOMConversionMap | null {
+    return {
+      span: (domNode: HTMLElement) => {
+        if (!domNode.hasAttribute('data-lexical-mention')) {
+          return null
+        }
+        return {
+          conversion: $convertMentionElement,
+          priority: 1,
+        }
+      },
+    }
+  }
+
+  isTextEntity(): true {
+    return true
+  }
+
+  canInsertTextBefore(): boolean {
+    return false
+  }
+
+  canInsertTextAfter(): boolean {
+    return false
+  }
+}
+
 export class AIEditNode extends TextNode {
   static getType(): string {
-    return "ai-edit"
+    return 'ai-edit'
   }
 
   static clone(node: AIEditNode): AIEditNode {
@@ -457,14 +490,14 @@ export class AIEditNode extends TextNode {
 
   createDOM(config: any): HTMLElement {
     const dom = super.createDOM(config)
-    dom.classList.add("ai-edit-node")
+    dom.classList.add('ai-edit-node')
     return dom
   }
 
   exportJSON(): SerializedTextNode {
     return {
       ...super.exportJSON(),
-      type: "ai-edit",
+      type: 'ai-edit',
     }
   }
 
@@ -511,7 +544,7 @@ export class CustomLinkNode extends LinkNode {
   }
 
   static getType() {
-    return "custom-link"
+    return 'custom-link'
   }
 
   static clone(node: CustomLinkNode) {
@@ -524,8 +557,8 @@ export class CustomLinkNode extends LinkNode {
   // }
 
   createDOM(config: EditorConfig) {
-    const anchorElement = document.createElement("a")
-    ;(anchorElement as HTMLAnchorElement).className = "custom-link"
+    const anchorElement = document.createElement('a')
+    ;(anchorElement as HTMLAnchorElement).className = 'custom-link'
 
     return anchorElement
   }
@@ -533,7 +566,7 @@ export class CustomLinkNode extends LinkNode {
 
 export class ReplacementNode extends TextNode {
   static getType(): string {
-    return "replacement"
+    return 'replacement'
   }
 
   static clone(node: ReplacementNode): ReplacementNode {
@@ -542,14 +575,14 @@ export class ReplacementNode extends TextNode {
 
   createDOM(config: any): HTMLElement {
     const dom = super.createDOM(config)
-    dom.classList.add("replacement-node")
+    dom.classList.add('replacement-node')
     return dom
   }
 
   exportJSON(): SerializedTextNode {
     return {
       ...super.exportJSON(),
-      type: "replacement",
+      type: 'replacement',
     }
   }
 

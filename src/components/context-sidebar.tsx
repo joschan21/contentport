@@ -159,7 +159,7 @@ export const LeftSidebar = () => {
                     variant: 'ghost',
                     className: 'justify-start gap-2 px-3 py-2',
                   }),
-                  pathname.includes('/studio/scheduled') &&
+                  pathname === '/studio/scheduled' &&
                     'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
                 )}
               >
@@ -173,6 +173,33 @@ export const LeftSidebar = () => {
                   )}
                 >
                   Schedule
+                </span>
+              </Link>
+
+              <Link
+                href={{
+                  pathname: '/studio/posted',
+                  search: serialize({ chatId }),
+                }}
+                className={cn(
+                  buttonVariants({
+                    variant: 'ghost',
+                    className: 'justify-start gap-2 px-3 py-2',
+                  }),
+                  pathname === '/studio/posted' &&
+                    'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
+                )}
+              >
+                <div className="size-6 flex items-center justify-center flex-shrink-0">
+                  📤
+                </div>
+                <span
+                  className={cn(
+                    'transition-all duration-200 ease-out',
+                    isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+                  )}
+                >
+                  Posted
                 </span>
               </Link>
             </div>

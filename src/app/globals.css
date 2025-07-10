@@ -179,6 +179,10 @@ body {
   @apply text-indigo-800 bg-indigo-100 rounded-sm px-1 py-0.5;
 }
 
+.mention2-node {
+  @apply text-blue-600 rounded-sm;
+}
+
 .addition-node {
   @apply text-emerald-700 bg-green-50 underline underline-offset-2 decoration-2 decoration-emerald-700;
 }

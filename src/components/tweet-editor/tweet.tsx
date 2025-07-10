@@ -9,23 +9,27 @@ import { cn } from '@/lib/utils'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
-import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 
 import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
 import { client } from '@/lib/client'
+import MentionsPlugin from '@/lib/lexical-plugins/mention-plugin'
+import { MentionTooltipPlugin } from '@/lib/lexical-plugins/mention-tooltip-plugin'
 import { ShadowEditorSyncPlugin } from '@/lib/lexical-plugins/sync-plugin'
+import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { HTTPException } from 'hono/http-exception'
 import { $createParagraphNode, $getRoot, EditorState, LexicalEditor } from 'lexical'
 import {
   AlertCircle,
-  Calendar,
   CalendarCog,
+  ChevronDown,
+  Clock,
   ImagePlus,
   Pen,
-  Plus,
   Save,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -44,14 +48,12 @@ import {
 } from '../ui/drawer'
 import { Loader } from '../ui/loader'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { Calendar20 } from './date-picker'
 import { ImageTool } from './image-tool'
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '../ui/tooltip'
-import { HTTPException } from 'hono/http-exception'
+import ContentLengthIndicator from './content-length-indicator'
 
 interface TweetProps {
-  id: string | undefined
-  initialContent?: string
   onDelete?: () => void
   onAdd?: () => void
   editMode?: boolean
@@ -73,31 +75,99 @@ const TWITTER_SIZE_LIMITS = {
 
 const MAX_MEDIA_COUNT = 4
 
-export default function Tweet({
-  id,
-  initialContent,
-  editMode = false,
-  editTweetId,
-}: TweetProps) {
-  const {
-    setTweetContent,
-    currentTweet,
-    shadowEditor,
-    mediaFiles,
-    setMediaFiles,
-    setCurrentTweet,
-  } = useTweets()
+export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
+  const { mediaFiles, setMediaFiles, setCurrentTweet, shadowEditor } = useTweets()
 
   const { fire } = useConfetti()
   const router = useRouter()
-  const [charCount, setCharCount] = useState(0)
   const [open, setOpen] = useState(false)
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [showPostConfirmModal, setShowPostConfirmModal] = useState(false)
   const [dontShowAgain, setDontShowAgain] = useState(false)
 
-  console.log('media files', mediaFiles)
+  // useEffect(() => {
+  //   const handleKeyDown = (e: KeyboardEvent) => {
+  //     if (e.key === 'Escape' && currentNodeRef.current !== null) {
+  //       currentNodeRef.current = null
+  //       popoverRef.current?.hide()
+  //     }
+  //   }
+
+  //   document.addEventListener('keydown', handleKeyDown)
+  //   return () => document.removeEventListener('keydown', handleKeyDown)
+  // }, [])
+
+  // const handleMentionClick = useCallback(
+  //   (event: Event, eventEditor: LexicalEditor, key: NodeKey) => {
+  //     justClickedRef.current = true
+
+  //     if (currentNodeRef.current === key) {
+  //       // Toggle off if clicking the same node
+  //       currentNodeRef.current = null
+  //       popoverRef.current?.hide()
+  //       setTimeout(() => { justClickedRef.current = false }, 100)
+  //       return
+  //     }
+
+  //     currentNodeRef.current = key
+
+  //     const nodeText = eventEditor.read(() => {
+  //       const node = eventEditor.getEditorState()._nodeMap.get(key)
+  //       return node ? node.getTextContent() : ''
+  //     })
+
+  //     const nodeElement = eventEditor.getElementByKey(key)
+  //     if (!nodeElement) return
+
+  //     const rect = nodeElement.getBoundingClientRect()
+
+  //     popoverRef.current?.show(
+  //       rect.left + window.scrollX,
+  //       rect.top + window.scrollY,
+  //       nodeText
+  //     )
+
+  //     // Reset the flag after a brief delay
+  //     setTimeout(() => { justClickedRef.current = false }, 100)
+  //   },
+  //   [],
+  // )
+
+  //   const checkSelectionInMention = useCallback((editor: LexicalEditor) => {
+  //   // Don't interfere immediately after a click
+  //   if (justClickedRef.current) return
+
+  //   editor.read(() => {
+  //     const selection = $getSelection()
+  //     if (!$isRangeSelection(selection)) {
+  //       if (currentNodeRef.current !== null) {
+  //         currentNodeRef.current = null
+  //         popoverRef.current?.hide()
+  //       }
+  //       return
+  //     }
+
+  //     const anchorNode = selection.anchor.getNode()
+  //     if (anchorNode instanceof MentionNode2) {
+  //       const nodeKey = anchorNode.getKey()
+  //       const nodeElement = editor.getElementByKey(nodeKey)
+  //       if (!nodeElement) return
+
+  //       const nodeText = anchorNode.getTextContent()
+
+  //       if (currentNodeRef.current === nodeKey) {
+  //         // Update text when typing in the same node
+  //         popoverRef.current?.updateText(nodeText)
+  //       }
+  //     } else {
+  //       if (currentNodeRef.current !== null) {
+  //         currentNodeRef.current = null
+  //         popoverRef.current?.hide()
+  //       }
+  //     }
+  //   })
+  // }, [])
 
   const renderMediaOverlays = (mediaFile: MediaFile, index: number) => (
     <>
@@ -231,7 +301,19 @@ export default function Tweet({
       return await res.json()
     },
     onSuccess: (data, variables) => {
-      toast.success('Tweet posted successfully!')
+      toast.success(
+        <div className="flex items-center gap-2">
+          <p>Tweet posted!</p>
+          <Link
+            target="_blank"
+            rel="noreferrer"
+            href={`https://x.com/${data.accountName}/status/${data.tweetId}`}
+            className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
+          >
+            See tweet
+          </Link>
+        </div>,
+      )
 
       posthog.capture('tweet_posted', {
         tweetId: data.tweetId,
@@ -246,6 +328,16 @@ export default function Tweet({
         spread: 110,
         origin: { y: 0.6 },
       })
+
+      setMediaFiles([])
+      shadowEditor.update(
+        () => {
+          const root = $getRoot()
+          root.clear()
+          root.append($createParagraphNode())
+        },
+        { tag: 'force-sync' },
+      )
     },
     onError: (error) => {
       console.error('Failed to post tweet:', error)
@@ -264,8 +356,6 @@ export default function Tweet({
     },
     enabled: editMode && Boolean(editTweetId),
   })
-
-  console.log('editTweetData', editTweetData)
 
   const updateTweetMutation = useMutation({
     mutationFn: async ({
@@ -317,15 +407,25 @@ export default function Tweet({
     },
   })
 
+  const getNextQueueSlotMutation = useMutation({
+    mutationFn: async () => {
+      const currentTimeUnix = Math.floor(Date.now() / 1000)
+      const res = await client.tweet.getNextQueueSlot.$get({ currentTimeUnix })
+      return await res.json()
+    },
+  })
+
   const scheduleTweetMutation = useMutation({
     mutationFn: async ({
       content,
       scheduledUnix,
       media,
+      showToast = true,
     }: {
       content: string
       scheduledUnix: number
       media: { s3Key: string; media_id: string }[]
+      showToast?: boolean
     }) => {
       const promise = client.tweet.schedule.$post({
         content,
@@ -333,22 +433,26 @@ export default function Tweet({
         media,
       })
 
-      const schedulePromiseToast = toast.promise(promise, {
-        loading: 'Scheduling...',
-        success: (
-          <div className="flex gap-1.5 items-center">
-            <p>Tweet scheduled!</p>
-            <Link
-              href="/studio/scheduled"
-              className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
-            >
-              See schedule
-            </Link>
-          </div>
-        ),
-      })
+      if (showToast) {
+        const schedulePromiseToast = toast.promise(promise, {
+          loading: 'Scheduling...',
+          success: (
+            <div className="flex gap-1.5 items-center">
+              <p>Tweet scheduled!</p>
+              <Link
+                href="/studio/scheduled"
+                className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
+              >
+                See schedule
+              </Link>
+            </div>
+          ),
+        })
 
-      return (await schedulePromiseToast).json()
+        return (await schedulePromiseToast).json()
+      }
+
+      return (await promise).json()
     },
     onSuccess: (data, variables) => {
       posthog.capture('tweet_scheduled', {
@@ -493,8 +597,6 @@ export default function Tweet({
   }
 
   const removeMediaFile = (url: string) => {
-    console.log('REMOVE MEDIA FILE!!', url)
-
     // Get and abort the single controller
     const controller = abortControllersRef.current.get(url)
 
@@ -549,14 +651,67 @@ export default function Tweet({
   //   }
   // }, [initialContent, shadowEditor])
 
-  const onEditorChange = (
-    editorState: EditorState,
-    editor: LexicalEditor,
-    tags: Set<string>,
-  ) => {
-    // const content = editorState.read(() => $getRoot().getTextContent())
-    // setCharCount(content.length)
-    // setTweetContent(content)
+  // const onEditorChange = (
+  //   editorState: EditorState,
+  //   editor: LexicalEditor,
+  //   tags: Set<string>,
+  // ) => {
+  //   checkSelectionInMention(editor)
+  //   // const content = editorState.read(() => $getRoot().getTextContent())
+  //   // setCharCount(content.length)
+  //   // setTweetContent(content)
+  // }
+
+  const handleAddToQueue = async () => {
+    const content = shadowEditor?.read(() => $getRoot().getTextContent()) || ''
+
+    if (!content.trim() && mediaFiles.length === 0) {
+      toast.error('Tweet cannot be empty')
+      return
+    }
+
+    if (mediaFiles.some((f) => f.uploading)) {
+      toast.error('Please wait for media uploads to complete')
+      return
+    }
+
+    if (mediaFiles.some((f) => f.error)) {
+      toast.error('Please remove failed media uploads')
+      return
+    }
+
+    try {
+      const nextSlot = await getNextQueueSlotMutation.mutateAsync()
+
+      const media = mediaFiles
+        .filter((f) => Boolean(f.s3Key) && Boolean(f.media_id))
+        .map((f) => ({
+          s3Key: f.s3Key!,
+          media_id: f.media_id!,
+        }))
+
+      await scheduleTweetMutation.mutateAsync({
+        content,
+        scheduledUnix: nextSlot.scheduledUnix,
+        media,
+        showToast: false,
+      })
+
+      toast.success(
+        <div className="flex gap-1.5 items-center">
+          <p>Queued for {nextSlot.displayTime}!</p>
+          <Link
+            href="/studio/scheduled"
+            className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
+          >
+            See queue
+          </Link>
+        </div>,
+      )
+    } catch (error) {
+      console.error('Failed to add to queue:', error)
+      toast.error('Failed to add to queue')
+    }
   }
 
   const handleScheduleTweet = (date: Date, time: string) => {
@@ -725,19 +880,7 @@ export default function Tweet({
     )
 
     setMediaFiles([])
-    setCharCount(0)
-    setTweetContent('')
   }
-
-  const getProgressColor = () => {
-    const percentage = (charCount / 280) * 100
-    if (percentage >= 100) return 'text-red-500'
-    return 'text-blue-500'
-  }
-
-  const progress = Math.min((charCount / 280) * 100, 100)
-  const circumference = 2 * Math.PI * 10
-  const strokeDashoffset = circumference - (progress / 100) * circumference
 
   const EditModeWrapper = ({ children }: PropsWithChildren) => {
     if (!editMode) return children
@@ -766,6 +909,14 @@ export default function Tweet({
         </div>
       )
   }
+
+  // const onEditorChange = useCallback(
+  //   (editorState: EditorState, editor: LexicalEditor, tags: Set<string>) => {
+  //     const content = editorState.read(() => $getRoot().getTextContent())
+  //     setCharCount(content.length)
+  //   },
+  //   [setCharCount]
+  // )
 
   return (
     <>
@@ -802,9 +953,11 @@ export default function Tweet({
                     ErrorBoundary={LexicalErrorBoundary}
                   />
                   <PlaceholderPlugin placeholder="What's happening?" />
-                  <OnChangePlugin onChange={onEditorChange} />
+                  {/* <OnChangePlugin onChange={onEditorChange} /> */}
                   <HistoryPlugin />
                   <ShadowEditorSyncPlugin />
+                  <MentionsPlugin />
+                  <MentionTooltipPlugin />
                 </div>
 
                 {/* Media Files Display */}
@@ -934,79 +1087,79 @@ export default function Tweet({
                       'flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg',
                     )}
                   >
-                    <label htmlFor="media-upload" className="cursor-pointer">
-                      <DuolingoButton
-                        variant="secondary"
-                        size="icon"
-                        className="rounded-md"
-                        onClick={() => setImageDrawerOpen(true)}
-                      >
-                        <ImagePlus className="size-4" />
-                        <span className="sr-only">Add media</span>
-                      </DuolingoButton>
-                    </label>
-                    <input
-                      id="media-upload"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/x-msvideo"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files.length > 0) {
-                          handleFiles(e.target.files)
-                        }
-                        e.target.value = ''
-                      }}
-                    />
-
-                    {/* <div className="w-px h-4 bg-stone-300 mx-2" /> */}
-
-                    <DuolingoButton
-                      variant="secondary"
-                      size="icon"
-                      className="rounded-md"
-                      onClick={handleClearTweet}
-                    >
-                      <Trash2 className="size-4" />
-                      <span className="sr-only">Clear tweet</span>
-                    </DuolingoButton>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DuolingoButton
+                            variant="secondary"
+                            size="icon"
+                            className="rounded-md"
+                            type="button"
+                            onClick={() => {
+                              const input = document.getElementById(
+                                'media-upload',
+                              ) as HTMLInputElement
+                              input?.click()
+                            }}
+                          >
+                            <Upload className="size-4" />
+                            <span className="sr-only">Upload files</span>
+                          </DuolingoButton>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Upload media</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DuolingoButton
+                            variant="secondary"
+                            size="icon"
+                            className="rounded-md"
+                            onClick={() => setImageDrawerOpen(true)}
+                          >
+                            <ImagePlus className="size-4" />
+                            <span className="sr-only">Screenshot editor</span>
+                          </DuolingoButton>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Screenshot editor</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <input
+                        id="media-upload"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/x-msvideo"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files.length > 0) {
+                            handleFiles(e.target.files)
+                          }
+                          e.target.value = ''
+                        }}
+                      />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DuolingoButton
+                            variant="secondary"
+                            size="icon"
+                            className="rounded-md"
+                            onClick={handleClearTweet}
+                          >
+                            <Trash2 className="size-4" />
+                            <span className="sr-only">Clear tweet</span>
+                          </DuolingoButton>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Clear tweet</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
 
                     <div className="w-px h-4 bg-stone-300 mx-2" />
 
-                    <div className="relative flex items-center justify-center">
-                      <div className="h-8 w-8">
-                        <svg className="-ml-[5px] -rotate-90 w-full h-full">
-                          <circle
-                            className="text-stone-200"
-                            strokeWidth="2"
-                            stroke="currentColor"
-                            fill="transparent"
-                            r="10"
-                            cx="16"
-                            cy="16"
-                          />
-                          <circle
-                            className={`${getProgressColor()} transition-all duration-200`}
-                            strokeWidth="2"
-                            strokeDasharray={circumference}
-                            strokeDashoffset={strokeDashoffset}
-                            strokeLinecap="round"
-                            stroke="currentColor"
-                            fill="transparent"
-                            r="10"
-                            cx="16"
-                            cy="16"
-                          />
-                        </svg>
-                      </div>
-                      {charCount > 260 && charCount < 280 && (
-                        <div
-                          className={`text-sm/6 ${280 - charCount < 1 ? 'text-red-500' : 'text-stone-800'} mr-3.5`}
-                        >
-                          <p>{280 - charCount < 20 ? 280 - charCount : charCount}</p>
-                        </div>
-                      )}
-                    </div>
+                    <ContentLengthIndicator />
                   </div>
                   <div className="flex items-center gap-2">
                     {editMode ? (
@@ -1073,46 +1226,74 @@ export default function Tweet({
                       </>
                     ) : (
                       <>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <DuolingoButton
-                              loading={scheduleTweetMutation.isPending}
-                              disabled={
-                                postTweetMutation.isPending ||
-                                scheduleTweetMutation.isPending ||
-                                mediaFiles.some((f) => f.uploading)
-                              }
-                              variant="secondary"
-                              size="icon"
-                              className="aspect-square h-11 w-11"
-                            >
-                              <Calendar className="size-4" />
-                              <span className="sr-only">Schedule tweet</span>
-                            </DuolingoButton>
-                          </PopoverTrigger>
-                          <PopoverContent className="max-w-3xl w-full">
-                            <Calendar20
-                              onSchedule={handleScheduleTweet}
-                              isPending={scheduleTweetMutation.isPending}
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <DuolingoButton
+                                className="h-11"
+                                variant="secondary"
+                                onClick={handlePostTweet}
+                                disabled={mediaFiles.some((f) => f.uploading)}
+                              >
+                                <span className="text-sm">
+                                  {postTweetMutation.isPending ? 'Posting...' : 'Post'}
+                                </span>
+                                <span className="sr-only">Post to Twitter</span>
+                              </DuolingoButton>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>A confirmation modal will open</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
 
-                        <DuolingoButton
-                          className="h-11"
-                          onClick={handlePostTweet}
-                          disabled={
-                            postTweetMutation.isPending ||
-                            scheduleTweetMutation.isPending ||
-                            mediaFiles.some((f) => f.uploading)
-                          }
-                        >
-                          <Icons.twitter className="size-4 mr-2" />
-                          <span className="text-sm">
-                            {postTweetMutation.isPending ? 'Posting...' : 'Post'}
-                          </span>
-                          <span className="sr-only">Post to Twitter</span>
-                        </DuolingoButton>
+                        <div className="flex">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <DuolingoButton
+                                  loading={getNextQueueSlotMutation.isPending}
+                                  disabled={mediaFiles.some((f) => f.uploading)}
+                                  className="h-11 px-3 rounded-r-none border-r-0"
+                                  onClick={handleAddToQueue}
+                                >
+                                  <Clock className="size-4 mr-2" />
+                                  <span className="text-sm">Queue</span>
+                                </DuolingoButton>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Add to next queue slot</p>
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <Popover>
+                                <TooltipTrigger asChild>
+                                  <PopoverTrigger asChild>
+                                    <DuolingoButton
+                                      loading={scheduleTweetMutation.isPending}
+                                      disabled={mediaFiles.some((f) => f.uploading)}
+                                      size="icon"
+                                      className="h-11 w-14 rounded-l-none border-l"
+                                    >
+                                      <ChevronDown className="size-4" />
+                                      <span className="sr-only">Schedule manually</span>
+                                    </DuolingoButton>
+                                  </PopoverTrigger>
+                                </TooltipTrigger>
+                                <PopoverContent className="max-w-3xl w-full">
+                                  <Calendar20
+                                    onSchedule={handleScheduleTweet}
+                                    isPending={scheduleTweetMutation.isPending}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <TooltipContent>
+                                <p>Schedule custom time</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
                       </>
                     )}
                   </div>

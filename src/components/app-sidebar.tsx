@@ -2,14 +2,7 @@
 
 import { Message, MessageContent } from '@/components/ui/message'
 import { useChat } from '@/hooks/use-chat'
-import {
-  ArrowUp,
-  Check,
-  Eye,
-  Paperclip,
-  Plus,
-  X
-} from 'lucide-react'
+import { ArrowUp, Check, Eye, Paperclip, Plus, X } from 'lucide-react'
 import posthog from 'posthog-js'
 import { useContext, useEffect, useState } from 'react'
 
@@ -55,6 +48,7 @@ import DuolingoButton from './ui/duolingo-button'
 import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-upload'
 import { TextShimmer } from './ui/text-shimmer'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
+import useTweetMetadata from '@/hooks/use-tweet-metdata'
 
 const initialConfig = {
   namespace: 'app-sidebar-input',
@@ -77,10 +71,12 @@ type ChatInput = InferInput['chat']['generate']
 function ChatInput() {
   const editor = useEditor('app-sidebar')
   let { chatId, startNewChat } = useChat()
-  const { handleInputChange, input, messages, handleSubmit, append } = useChat()
+  const { handleInputChange, input, messages, append } = useChat()
   const { currentTweet } = useTweets()
-  const { drafts, clearDrafts, draftCheckpoint, shadowEditor, selectedDraftIndex } =
-    useTweets()
+  const { drafts, clearDrafts, draftCheckpoint, selectedDraftIndex } = useTweets()
+  const { content } = useTweetMetadata()
+
+  const { shadowEditor } = useTweets()
 
   const { attachments, addChatAttachment, removeAttachment, hasUploading } =
     useAttachments()
@@ -138,7 +134,7 @@ function ChatInput() {
       body: {
         message,
         // do not transmit image
-        tweet: { ...currentTweet, image: undefined },
+        tweet: { ...currentTweet, content, image: undefined },
       },
     })
 
