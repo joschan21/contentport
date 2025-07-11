@@ -52,6 +52,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { Calendar20 } from './date-picker'
 import { ImageTool } from './image-tool'
 import ContentLengthIndicator from './content-length-indicator'
+import { format, isToday, isTomorrow } from 'date-fns'
 
 interface TweetProps {
   onDelete?: () => void
@@ -662,6 +663,53 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
   //   // setTweetContent(content)
   // }
 
+  interface EnqueuePostArgs {
+    content: string
+    media: {
+      s3Key: string
+      media_id: string
+    }[]
+  }
+
+  const { mutate: enqueueTweet, isPending: isQueueing } = useMutation({
+    mutationFn: async ({ content, media }: EnqueuePostArgs) => {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const userNow = new Date()
+
+      const res = await client.tweet.enqueue_tweet.$post({
+        content,
+        media,
+        timezone,
+        userNow,
+      })
+
+      return await res.json()
+    },
+    onSuccess({ scheduledUnix }) {
+      const scheduledDate = new Date(scheduledUnix)
+      const formattedTime = format(scheduledDate, 'h:mm a')
+      const formattedDate = isToday(scheduledDate)
+        ? 'today'
+        : isTomorrow(scheduledDate)
+          ? 'tomorrow'
+          : format(scheduledDate, 'MMM d')
+
+      toast.success(
+        <div className="flex gap-1.5 items-center">
+          <p>
+            Queued for {formattedTime} {formattedDate}!
+          </p>
+          <Link
+            href="/studio/scheduled"
+            className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
+          >
+            See queue
+          </Link>
+        </div>,
+      )
+    },
+  })
+
   const handleAddToQueue = async () => {
     const content = shadowEditor?.read(() => $getRoot().getTextContent()) || ''
 
@@ -680,38 +728,21 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
       return
     }
 
-    try {
-      const nextSlot = await getNextQueueSlotMutation.mutateAsync()
+    const media = mediaFiles
+      .filter((f) => Boolean(f.s3Key) && Boolean(f.media_id))
+      .map((f) => ({
+        s3Key: f.s3Key!,
+        media_id: f.media_id!,
+      }))
 
-      const media = mediaFiles
-        .filter((f) => Boolean(f.s3Key) && Boolean(f.media_id))
-        .map((f) => ({
-          s3Key: f.s3Key!,
-          media_id: f.media_id!,
-        }))
+    enqueueTweet({ content, media })
 
-      await scheduleTweetMutation.mutateAsync({
-        content,
-        scheduledUnix: nextSlot.scheduledUnix,
-        media,
-        showToast: false,
-      })
-
-      toast.success(
-        <div className="flex gap-1.5 items-center">
-          <p>Queued for {nextSlot.displayTime}!</p>
-          <Link
-            href="/studio/scheduled"
-            className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
-          >
-            See queue
-          </Link>
-        </div>,
-      )
-    } catch (error) {
-      console.error('Failed to add to queue:', error)
-      toast.error('Failed to add to queue')
-    }
+    // await scheduleTweetMutation.mutateAsync({
+    //   content,
+    //   scheduledUnix: nextSlot.scheduledUnix,
+    //   media,
+    //   showToast: false,
+    // })
   }
 
   const handleScheduleTweet = (date: Date, time: string) => {
@@ -1252,7 +1283,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <DuolingoButton
-                                  loading={getNextQueueSlotMutation.isPending}
+                                  loading={isQueueing}
                                   disabled={mediaFiles.some((f) => f.uploading)}
                                   className="h-11 px-3 rounded-r-none border-r-0"
                                   onClick={handleAddToQueue}

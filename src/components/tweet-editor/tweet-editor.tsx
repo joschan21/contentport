@@ -21,7 +21,6 @@ export default function TweetEditor({
   editTweetId,
   ...rest
 }: TweetEditorProps) {
-  console.log('parent rerender')
   return (
     <div className={cn('relative z-10 w-full rounded-lg font-sans', className)} {...rest}>
       <div className="space-y-4 w-full">

@@ -14,6 +14,16 @@ import { z } from 'zod'
 import { j, privateProcedure, publicProcedure } from '../jstack'
 import { getAccount } from './utils/get-account'
 import { waitUntil } from '@vercel/functions'
+import {
+  addDays,
+  addHours,
+  isAfter,
+  isBefore,
+  isSameDay,
+  setHours,
+  startOfDay,
+} from 'date-fns'
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 
 const receiver = new Receiver({
   currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY as string,
@@ -382,12 +392,21 @@ export const tweetRouter = j.router({
           content,
           isScheduled: true,
           scheduledFor: new Date(scheduledUnix * 1000),
+          scheduledUnix: scheduledUnix * 1000,
           media,
           qstashId: messageId,
         })
         .returning()
 
       if (!tweet) {
+        const messages = qstash.messages
+
+        try {
+          await messages.delete(messageId)
+        } catch (err) {
+          // fail silently
+        }
+
         throw new HTTPException(500, { message: 'Problem with database' })
       }
 
@@ -480,6 +499,7 @@ export const tweetRouter = j.router({
             isScheduled: false,
             isPublished: true,
             updatedAt: new Date(),
+            twitterId: res.data.id,
           })
           .where(eq(tweets.id, tweetId))
       } catch (err) {
@@ -561,7 +581,7 @@ export const tweetRouter = j.router({
           }
         }
 
-        const response = await client.v2.tweet(tweetPayload)
+        const res = await client.v2.tweet(tweetPayload)
 
         // Save to database
         await db.insert(tweets).values({
@@ -571,11 +591,12 @@ export const tweetRouter = j.router({
           media,
           isScheduled: false,
           isPublished: true,
+          twitterId: res.data.id,
         })
 
         return c.json({
           success: true,
-          tweetId: response.data.id,
+          tweetId: res.data.id,
           accountId: account.id,
           accountName: account.name,
         })
@@ -587,49 +608,6 @@ export const tweetRouter = j.router({
       }
     }),
 
-  // getScheduled: privateProcedure.get(async ({ c, ctx }) => {
-  //   const { user } = ctx
-
-  //   const scheduledTweets = await db
-  //     .select({
-  //       id: tweets.id,
-  //       content: tweets.content,
-  //       mediaIds: tweets.mediaIds,
-  //       scheduledFor: tweets.scheduledFor,
-  //       createdAt: tweets.createdAt,
-  //       updatedAt: tweets.updatedAt,
-  //       day: sql<string>`DATE(${tweets.scheduledFor})`.as('day'),
-  //     })
-  //     .from(tweets)
-  //     .where(and(eq(tweets.userId, user.id), eq(tweets.isScheduled, true)))
-  //     .orderBy(desc(sql`DATE(${tweets.scheduledFor})`), desc(tweets.scheduledFor))
-  //     .limit(50)
-
-  //   const groupedTweets = scheduledTweets.reduce(
-  //     (acc, tweet) => {
-  //       const day = tweet.day
-  //       if (!acc[day]) {
-  //         acc[day] = []
-  //       }
-  //       acc[day].push({
-  //         id: tweet.id,
-  //         content: tweet.content,
-  //         mediaIds: tweet.mediaIds,
-  //         scheduledFor: tweet.scheduledFor,
-  //         createdAt: tweet.createdAt,
-  //         updatedAt: tweet.updatedAt,
-  //       })
-  //       return acc
-  //     },
-  //     {} as Record<string, any[]>,
-  //   )
-
-  //   // Sort groups by farthest date in the future first
-
-  //   return c.superjson({ tweets: sortedGroupedTweets })
-  // }),
-
-  // Modify the getScheduledAndPublished function to include media URLs
   getScheduledAndPublished: privateProcedure.get(async ({ c, ctx }) => {
     const { user } = ctx
 
@@ -691,7 +669,7 @@ export const tweetRouter = j.router({
       }),
     )
 
-    return c.superjson({ tweets: tweetsWithMedia })
+    return c.superjson({ tweets: tweetsWithMedia, accountId: account.id })
   }),
 
   getNextQueueSlot: privateProcedure
@@ -748,14 +726,6 @@ export const tweetRouter = j.router({
           if (!isSlotTaken) {
             return c.json({
               scheduledUnix: Math.floor(slotTime.getTime() / 1000),
-              displayTime: slotTime.toLocaleString('en-US', {
-                weekday: 'long',
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-              }),
             })
           }
         }
@@ -764,6 +734,285 @@ export const tweetRouter = j.router({
       throw new HTTPException(400, {
         message: 'No available queue slots found in the next year',
       })
+    }),
+
+  enqueue_tweet: privateProcedure
+    .input(
+      z.object({
+        userNow: z.date(),
+        timezone: z.string(),
+        content: z.string().min(1).max(4000),
+        media: z.array(
+          z.object({
+            media_id: z.string(),
+            s3Key: z.string(),
+          }),
+        ),
+      }),
+    )
+    .mutation(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { userNow, timezone, content, media } = input
+
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
+      }
+
+      const dbAccount = await db.query.account.findFirst({
+        where: and(eq(accountSchema.userId, user.id), eq(accountSchema.id, account.id)),
+      })
+
+      if (!dbAccount || !dbAccount.accessToken) {
+        throw new HTTPException(400, {
+          message: 'Twitter account not connected or access token missing',
+        })
+      }
+
+      const scheduledTweets = await db.query.tweets.findMany({
+        where: and(eq(tweets.accountId, account.id), eq(tweets.isScheduled, true)),
+        columns: { scheduledUnix: true },
+      })
+
+      function isSpotEmpty(unix: number) {
+        return !Boolean(scheduledTweets.some((t) => t.scheduledUnix === unix))
+      }
+
+      function getNextAvailableSlot({
+        userNow,
+        timezone,
+        maxDaysAhead,
+      }: {
+        userNow: Date
+        timezone: string
+        maxDaysAhead: number
+      }) {
+        const slots = [10, 12, 14] // hours of the day
+        const userTimestamp = fromZonedTime(userNow, timezone).getTime()
+
+        for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset++) {
+          const checkDate = new Date(userNow)
+          checkDate.setDate(checkDate.getDate() + dayOffset)
+
+          for (const hour of slots) {
+            // Create a local date like "2025-07-10T08:00:00" in user's tz
+            const localSlot = new Date(
+              checkDate.getFullYear(),
+              checkDate.getMonth(),
+              checkDate.getDate(),
+              hour,
+              0,
+              0,
+            )
+
+            // Convert to actual UTC moment
+            const utcSlot = fromZonedTime(localSlot, timezone)
+            const slotTimestamp = utcSlot.getTime()
+
+            if (slotTimestamp > userTimestamp && isSpotEmpty(slotTimestamp)) {
+              return new Date(slotTimestamp)
+            }
+          }
+        }
+
+        return null // no slot found in next N days
+      }
+
+      const nextSlot = getNextAvailableSlot({ userNow, timezone, maxDaysAhead: 90 })
+
+      if (!nextSlot) {
+        throw new HTTPException(409, {
+          message: 'Queue for the next 3 months is already full!',
+        })
+      }
+
+      const zoned = toZonedTime(nextSlot, timezone)
+      const scheduledUnix = zoned.getTime()
+
+      const tweetId = crypto.randomUUID()
+
+      const baseUrl =
+        process.env.NODE_ENV === 'development'
+          ? 'https://sponge-relaxing-separately.ngrok-free.app'
+          : getBaseUrl()
+
+      const { messageId } = await qstash.publishJSON({
+        url: baseUrl + '/api/tweet/post',
+        body: { tweetId, userId: user.id, accountId: dbAccount.id, scheduledUnix },
+        notBefore: scheduledUnix / 1000, // needs to be in seconds
+      })
+
+      try {
+        const [tweet] = await db
+          .insert(tweets)
+          .values({
+            id: tweetId,
+            accountId: account.id,
+            userId: user.id,
+            content,
+            isScheduled: true,
+            scheduledFor: new Date(scheduledUnix),
+            scheduledUnix: scheduledUnix,
+            media,
+            qstashId: messageId,
+          })
+          .returning()
+      } catch (err) {
+        const messages = qstash.messages
+
+        try {
+          await messages.delete(messageId)
+        } catch (err) {
+          // fail silently
+        }
+
+        throw new HTTPException(500, { message: 'Problem with database' })
+      }
+
+      return c.json({
+        success: true,
+        tweetId,
+        scheduledUnix,
+        accountId: account.id,
+        accountName: account.name,
+      })
+    }),
+
+  get_queue: privateProcedure
+    .input(
+      z.object({
+        userNow: z.date(),
+        timezone: z.string(),
+      }),
+    )
+    .query(async ({ c, input, ctx }) => {
+      const { user } = ctx
+      const { timezone, userNow } = input
+      const slots = [10, 12, 14] // hours of the day
+
+      const today = startOfDay(userNow)
+
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
+      }
+
+      const _scheduledTweets = await db.query.tweets.findMany({
+        where: and(eq(tweets.accountId, account.id), eq(tweets.isScheduled, true)),
+        columns: {
+          content: true,
+          media: true,
+          id: true,
+          scheduledUnix: true,
+          isPublished: true,
+        },
+      })
+
+      const scheduledTweets = await Promise.all(
+        _scheduledTweets.map(async (tweet) => {
+          const enrichedMedia = await fetchMediaFromS3(tweet.media || [])
+          return {
+            ...tweet,
+            media: enrichedMedia,
+          }
+        }),
+      )
+
+      console.log('🥶 scheduledTweets', scheduledTweets)
+
+      const getSlotTweet = (unix: number) => {
+        const slotTweet = scheduledTweets.find((t) => t.scheduledUnix === unix)
+
+        if (slotTweet) {
+          return slotTweet
+        }
+
+        return null
+      }
+
+      const all: Array<Record<number, Array<number>>> = []
+
+      for (let i = 0; i < 7; i++) {
+        const currentDay = addDays(today, i)
+
+        const unixTimestamps = slots.map((hour) => {
+          const localDate = setHours(currentDay, hour)
+          const utcDate = fromZonedTime(localDate, timezone)
+          return utcDate.getTime()
+        })
+
+        all.push({ [currentDay.getTime()]: unixTimestamps })
+      }
+
+      const results: Array<
+        Record<
+          number,
+          Array<{
+            unix: number
+            tweet: ReturnType<typeof getSlotTweet>
+            isQueued: boolean
+          }>
+        >
+      > = []
+
+      all.forEach((day) => {
+        const [dayUnix, timestamps] = Object.entries(day)[0]!
+
+        const tweetsForThisDay = scheduledTweets.filter((t) =>
+          isSameDay(t.scheduledUnix!, Number(dayUnix)),
+        )
+
+        const manualForThisDay = tweetsForThisDay.filter(
+          (t) => !Boolean(timestamps.includes(t.scheduledUnix!)),
+        )
+
+        results.push({
+          [dayUnix]: [
+            ...timestamps.map((timestamp) => ({
+              unix: timestamp,
+              tweet: getSlotTweet(timestamp),
+              isQueued: true,
+            })),
+            ...manualForThisDay.map((tweet) => ({
+              unix: tweet.scheduledUnix!,
+              tweet,
+              isQueued: false,
+            })),
+          ].sort((a, b) => a.unix - b.unix),
+        })
+      })
+
+      // day (unix) -> times (unix)
+
+      // for (let i = 0; i < 7; i++) {
+      //   const currentDay = addDays(today, i)
+
+      //   const unixTimestamps = slots.map((hour) => {
+      //     const localDate = setHours(currentDay, hour)
+      //     const utcDate = fromZonedTime(localDate, timezone)
+      //     return utcDate.getTime()
+      //   })
+
+      //   results.push({
+      //     [currentDay.getTime()]: unixTimestamps.map((unix) => ({
+      //       unix,
+      //       tweet: getSlotTweet(unix),
+      //       isQueued: true,
+      //     })),
+      //   })
+      // }
+
+      return c.superjson({ results })
     }),
 
   getQueueSlots: privateProcedure
@@ -804,7 +1053,7 @@ export const tweetRouter = j.router({
       )
 
       // Generate all queue slots for the date range
-      const queueTimes = [8, 12, 14] // 8am, 12pm, 2pm
+      const queueTimes = [10, 12, 14] // 8am, 12pm, 2pm
       const slots: Array<{
         date: string
         time: string

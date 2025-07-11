@@ -73,7 +73,6 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
       const response = res.clone()
       registerStreamHooks(response, {
         onThreeDrafts: async (data: ThreeDrafts) => {
-          console.log('drafts are here', data)
           const currentContent = shadowEditor.read(() => $getRoot().getTextContent())
           draftCheckpoint.current = currentContent
           setDrafts(data)

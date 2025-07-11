@@ -46,6 +46,7 @@ import { useRouter } from 'next/navigation'
 import { InferOutput } from '@/server'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 function InitialContentPlugin({ content }: { content: string }) {
   const [editor] = useLexicalComposerContext()
@@ -85,7 +86,7 @@ export default function TweetList({
   const { account } = useAccount()
   const router = useRouter()
 
-  const { data: tweets, isLoading } = useQuery({
+  const { data: tweetData, isLoading } = useQuery({
     queryKey: ['posted-tweets', account?.username],
     queryFn: async () => {
       const res = await client.tweet.getPosted.$get()
@@ -117,7 +118,7 @@ export default function TweetList({
     deleteTweet({ tweetId: id })
   }
 
-  const groupedTweets = (tweets || []).reduce(
+  const groupedTweets = (tweetData || []).reduce(
     (groups, tweet) => {
       let date: string
 
@@ -203,7 +204,7 @@ export default function TweetList({
   const getLastScheduledDate = () => {
     if (mode === 'posted') return null
 
-    const scheduled = (tweets || [])
+    const scheduled = (tweetData || [])
       .filter((tweet) => !tweet.isPublished && tweet.scheduledFor)
       .sort(
         (a, b) =>
@@ -217,7 +218,9 @@ export default function TweetList({
   }
 
   const scheduledCount =
-    mode === 'scheduled' ? (tweets || []).filter((tweet) => !tweet.isPublished).length : 0
+    mode === 'scheduled'
+      ? (tweetData || []).filter((tweet) => !tweet.isPublished).length
+      : 0
 
   if (isLoading) {
     return (
@@ -346,28 +349,48 @@ export default function TweetList({
                         </div>
 
                         <div className="flex items-center">
-                          <DuolingoButton
+                          <Link
+                            className={cn(
+                              buttonVariants({
+                                variant: 'outline',
+                                size: 'icon',
+                                className: 'size-8'
+                              }),
+                              {
+                                'opacity-50 cursor-disabled pointer-events-none':
+                                  !tweet.twitterId || !account?.username
+                              }
+                            )}
+                            href={`https://x.com/${account?.username}/status/${tweet.twitterId}`}
+                            target="_blank"
+                          >
+                            <Eye className="size-4" />
+                            <span className="sr-only">View on Twitter</span>
+                          </Link>
+                          {/* <DuolingoButton
                             variant="secondary"
                             size="icon"
                             className="h-8 w-8"
                             onClick={() => {
-                              const username = account?.username || 'username'
-                              const tweetDate = format(
-                                new Date(tweet.updatedAt || tweet.createdAt),
-                                'yyyy-MM-dd',
-                              )
-                              const searchQuery = encodeURIComponent(
-                                tweet.content.slice(0, 50),
-                              )
-                              window.open(
-                                `https://twitter.com/search?q=from%3A${username}%20${searchQuery}%20until%3A${tweetDate}&src=typed_query&f=live`,
-                                '_blank',
-                              )
+                              const url = `https://x.com/${account?.username}/status/${tweet.twitterId}`
+                              window.open(url, '_blank')
+                              // const username = account?.username || 'username'
+                              // const tweetDate = format(
+                              //   new Date(tweet.updatedAt || tweet.createdAt),
+                              //   'yyyy-MM-dd',
+                              // )
+                              // const searchQuery = encodeURIComponent(
+                              //   tweet.content.slice(0, 50),
+                              // )
+                              // window.open(
+                              //   `https://twitter.com/search?q=from%3A${username}%20${searchQuery}%20until%3A${tweetDate}&src=typed_query&f=live`,
+                              //   '_blank',
+                              // )
                             }}
                           >
                             <Eye className="size-4" />
                             <span className="sr-only">View on Twitter</span>
-                          </DuolingoButton>
+                          </DuolingoButton> */}
                         </div>
                       </Fragment>
                     ))}

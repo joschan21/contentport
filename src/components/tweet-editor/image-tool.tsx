@@ -13,6 +13,7 @@ import { toast } from 'react-hot-toast'
 import { EnhancedSlider } from '../ui/enhanced-slider'
 import { Separator } from '../ui/separator'
 import { authClient } from '@/lib/auth-client'
+import { Icons } from '../icons'
 
 interface ImageBeautifierProps {
   onClose?: () => void
@@ -250,6 +251,7 @@ export function ImageTool({
   )
   const [userResized, setUserResized] = useState(!!initialEditorState?.canvasWidth)
   const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const preset = localStorage.getItem('options')
@@ -602,6 +604,11 @@ export function ImageTool({
             setIsDragging(false)
             onPaste(e)
           }}
+          onClick={(e) => {
+            if (!blob.src && fileInputRef.current) {
+              fileInputRef.current.click()
+            }
+          }}
         >
           {blob?.src ? (
             <div
@@ -782,15 +789,13 @@ export function ImageTool({
                 {data?.user?.plan !== 'pro' && (
                   <div
                     className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none"
-                    style={{ 
-                      textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+                    style={{
                       backdropFilter: 'blur(2px)',
                     }}
                   >
-                    <div className="bg-gray-700/25 backdrop-blur-sm rounded-md px-3 py-0">
-                      <span className="text-white text-sm/6">
-                        contentport.io
-                      </span>
+                    <div className="bg-white/50 flex items-center gap-1.5 backdrop-blur-sm rounded-md px-1.5 py-0.5">
+                      <Icons.logoBg className="size-[18px] shrink-0 rounded-[4px]" />
+                      <span className="text-black/60 text-sm/6">contentport.io</span>
                     </div>
                   </div>
                 )}
@@ -832,6 +837,7 @@ export function ImageTool({
               className={cn(
                 'flex flex-col items-center justify-center p-12 border bg-white border-stone-200 rounded-xl cursor-pointer hover:border-stone-300 transition-all duration-300 backdrop-blur-sm',
               )}
+              onClick={(e) => e.stopPropagation()}
             >
               <label htmlFor="screenshot-upload" className="cursor-pointer w-full">
                 <div className="flex flex-col items-center text-center space-y-3">
@@ -867,6 +873,7 @@ export function ImageTool({
                   </div>
                 </div>
                 <input
+                  ref={fileInputRef}
                   id="screenshot-upload"
                   type="file"
                   accept="image/*"

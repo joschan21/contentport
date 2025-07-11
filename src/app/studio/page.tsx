@@ -50,7 +50,7 @@ const Page = () => {
         />
       ) : null}
       <div className="max-w-xl w-full mx-auto">
-        <TweetEditor editMode={false} editTweetId={null} />
+        <TweetEditor editMode={isEditMode} editTweetId={editTweetId} />
       </div>
     </>
   )

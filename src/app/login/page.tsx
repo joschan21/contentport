@@ -2,10 +2,17 @@
 
 import { authClient } from '@/lib/auth-client'
 import { useEffect } from 'react'
+import toast from 'react-hot-toast'
 
 const LoginPage = () => {
   const handleAccess = async () => {
-    await authClient.signIn.social({ provider: 'google' })
+    const { data, error } = await authClient.signIn.social({ provider: 'google' })
+
+    if (error) {
+      toast.error(
+        error.message ?? 'An error occurred, please DM @joshtriedcoding on twitter!',
+      )
+    }
   }
 
   useEffect(() => {
