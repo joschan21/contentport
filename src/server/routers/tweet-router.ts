@@ -30,6 +30,8 @@ const receiver = new Receiver({
   nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY as string,
 })
 
+const SLOTS = [10, 12, 14]
+
 // Function to fetch media URLs from S3 keys using S3Client
 async function fetchMediaFromS3(media: { s3Key: string; media_id: string }[]) {
   const mediaData = await Promise.all(
@@ -792,30 +794,23 @@ export const tweetRouter = j.router({
         timezone: string
         maxDaysAhead: number
       }) {
-        const slots = [10, 12, 14] // hours of the day
-        const userTimestamp = fromZonedTime(userNow, timezone).getTime()
+        // hours of the day
+        // const userTimestamp = fromZonedTime(userNow, timezone).getTime()
+        const userTimestamp = userNow.getTime()
 
         for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset++) {
-          const checkDate = new Date(userNow)
-          checkDate.setDate(checkDate.getDate() + dayOffset)
+          const userDate = toZonedTime(userNow, timezone)
+          const checkDate = addDays(userDate, dayOffset)
 
-          for (const hour of slots) {
-            // Create a local date like "2025-07-10T08:00:00" in user's tz
-            const localSlot = new Date(
-              checkDate.getFullYear(),
-              checkDate.getMonth(),
-              checkDate.getDate(),
-              hour,
-              0,
-              0,
-            )
+          for (const hour of SLOTS) {
+            const localSlot = setHours(startOfDay(checkDate), hour)
 
             // Convert to actual UTC moment
             const utcSlot = fromZonedTime(localSlot, timezone)
             const slotTimestamp = utcSlot.getTime()
 
             if (slotTimestamp > userTimestamp && isSpotEmpty(slotTimestamp)) {
-              return new Date(slotTimestamp)
+              return utcSlot
             }
           }
         }
@@ -858,6 +853,7 @@ export const tweetRouter = j.router({
             isScheduled: true,
             scheduledFor: new Date(scheduledUnix),
             scheduledUnix: scheduledUnix,
+            isQueued: true,
             media,
             qstashId: messageId,
           })
@@ -893,7 +889,6 @@ export const tweetRouter = j.router({
     .query(async ({ c, input, ctx }) => {
       const { user } = ctx
       const { timezone, userNow } = input
-      const slots = [10, 12, 14] // hours of the day
 
       const today = startOfDay(userNow)
 
@@ -915,6 +910,7 @@ export const tweetRouter = j.router({
           id: true,
           scheduledUnix: true,
           isPublished: true,
+          isQueued: true,
         },
       })
 
@@ -927,8 +923,6 @@ export const tweetRouter = j.router({
           }
         }),
       )
-
-      console.log('🥶 scheduledTweets', scheduledTweets)
 
       const getSlotTweet = (unix: number) => {
         const slotTweet = scheduledTweets.find((t) => t.scheduledUnix === unix)
@@ -945,7 +939,7 @@ export const tweetRouter = j.router({
       for (let i = 0; i < 7; i++) {
         const currentDay = addDays(today, i)
 
-        const unixTimestamps = slots.map((hour) => {
+        const unixTimestamps = SLOTS.map((hour) => {
           const localDate = setHours(currentDay, hour)
           const utcDate = fromZonedTime(localDate, timezone)
           return utcDate.getTime()
@@ -972,9 +966,14 @@ export const tweetRouter = j.router({
           isSameDay(t.scheduledUnix!, Number(dayUnix)),
         )
 
-        const manualForThisDay = tweetsForThisDay.filter(
-          (t) => !Boolean(timestamps.includes(t.scheduledUnix!)),
-        )
+        const manualForThisDay = tweetsForThisDay.filter((t) => !Boolean(t.isQueued))
+
+        const timezoneChanged = tweetsForThisDay.filter((t) => {
+          return (
+            !Boolean(timestamps.includes(t.scheduledUnix!)) &&
+            !manualForThisDay.some((m) => m.id === t.id)
+          )
+        })
 
         results.push({
           [dayUnix]: [
@@ -984,6 +983,11 @@ export const tweetRouter = j.router({
               isQueued: true,
             })),
             ...manualForThisDay.map((tweet) => ({
+              unix: tweet.scheduledUnix!,
+              tweet,
+              isQueued: false,
+            })),
+            ...timezoneChanged.map((tweet) => ({
               unix: tweet.scheduledUnix!,
               tweet,
               isQueued: false,
@@ -1053,7 +1057,6 @@ export const tweetRouter = j.router({
       )
 
       // Generate all queue slots for the date range
-      const queueTimes = [10, 12, 14] // 8am, 12pm, 2pm
       const slots: Array<{
         date: string
         time: string
@@ -1067,7 +1070,7 @@ export const tweetRouter = j.router({
       const end = new Date(endDate)
 
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        for (const hour of queueTimes) {
+        for (const hour of SLOTS) {
           // Create slot time in user's timezone
           const slotTime = new Date(d.toLocaleDateString('en-US', { timeZone: timezone }))
           slotTime.setHours(hour, 0, 0, 0)

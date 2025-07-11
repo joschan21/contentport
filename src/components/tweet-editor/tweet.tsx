@@ -52,7 +52,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { Calendar20 } from './date-picker'
 import { ImageTool } from './image-tool'
 import ContentLengthIndicator from './content-length-indicator'
-import { format, isToday, isTomorrow } from 'date-fns'
+import { format, isToday, isTomorrow, formatDistanceToNow } from 'date-fns'
 
 interface TweetProps {
   onDelete?: () => void
@@ -687,18 +687,24 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
     },
     onSuccess({ scheduledUnix }) {
       const scheduledDate = new Date(scheduledUnix)
-      const formattedTime = format(scheduledDate, 'h:mm a')
-      const formattedDate = isToday(scheduledDate)
-        ? 'today'
-        : isTomorrow(scheduledDate)
+
+      let timeText: string
+      if (isToday(scheduledDate)) {
+        timeText = formatDistanceToNow(scheduledDate, {
+          addSuffix: true,
+          includeSeconds: true,
+        })
+      } else {
+        const formattedTime = format(scheduledDate, 'h:mm a')
+        const formattedDate = isTomorrow(scheduledDate)
           ? 'tomorrow'
           : format(scheduledDate, 'MMM d')
+        timeText = `${formattedTime} ${formattedDate}`
+      }
 
       toast.success(
         <div className="flex gap-1.5 items-center">
-          <p>
-            Queued for {formattedTime} {formattedDate}!
-          </p>
+          <p>Queued {isToday(scheduledDate) ? timeText : `for ${timeText}`}!</p>
           <Link
             href="/studio/scheduled"
             className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
