@@ -783,7 +783,8 @@ export const tweetRouter = j.router({
         columns: { scheduledUnix: true },
       })
 
-      function isSpotEmpty(unix: number) {
+      function isSpotEmpty(localSlotTime: Date) {
+        const unix = fromZonedTime(localSlotTime, timezone).getTime()
         return !Boolean(scheduledTweets.some((t) => t.scheduledUnix === unix))
       }
 
@@ -808,12 +809,12 @@ export const tweetRouter = j.router({
 
           for (const hour of SLOTS) {
             const localSlotTime = startOfHour(setHours(checkDay, hour))
-            
-            const slotUnix = fromZonedTime(localSlotTime, timezone).getTime()
-            const userUnixForComparison = fromZonedTime(userNow, timezone).getTime()
 
-            if (isAfter(slotUnix, userUnixForComparison) && isSpotEmpty(slotUnix)) {
-              return slotUnix
+            // const slotUnix = fromZonedTime(localSlotTime, timezone).getTime()
+            // const userUnixForComparison = fromZonedTime(userNow, timezone).getTime()
+
+            if (isAfter(localSlotTime, userNow) && isSpotEmpty(localSlotTime)) {
+              return localSlotTime
             }
           }
         }
@@ -829,6 +830,8 @@ export const tweetRouter = j.router({
         })
       }
 
+      const scheduledUnix = fromZonedTime(nextSlot, timezone).getTime()
+
       // const zoned = toZonedTime(nextSlot, timezone)
       // const scheduledUnix = zoned.getTime()
 
@@ -841,8 +844,8 @@ export const tweetRouter = j.router({
 
       const { messageId } = await qstash.publishJSON({
         url: baseUrl + '/api/tweet/post',
-        body: { tweetId, userId: user.id, accountId: dbAccount.id, nextSlot },
-        notBefore: nextSlot / 1000, // needs to be in seconds
+        body: { tweetId, userId: user.id, accountId: dbAccount.id, scheduledUnix },
+        notBefore: scheduledUnix / 1000, // needs to be in seconds
       })
 
       try {
@@ -854,8 +857,8 @@ export const tweetRouter = j.router({
             userId: user.id,
             content,
             isScheduled: true,
-            scheduledFor: new Date(nextSlot),
-            scheduledUnix: nextSlot,
+            scheduledFor: new Date(scheduledUnix),
+            scheduledUnix: scheduledUnix,
             isQueued: true,
             media,
             qstashId: messageId,
@@ -876,7 +879,7 @@ export const tweetRouter = j.router({
       return c.json({
         success: true,
         tweetId,
-        scheduledUnix: nextSlot,
+        scheduledUnix: scheduledUnix,
         accountId: account.id,
         accountName: account.name,
       })
