@@ -826,8 +826,8 @@ export const tweetRouter = j.router({
         })
       }
 
-      const zoned = toZonedTime(nextSlot, timezone)
-      const scheduledUnix = zoned.getTime()
+      // const zoned = toZonedTime(nextSlot, timezone)
+      // const scheduledUnix = zoned.getTime()
 
       const tweetId = crypto.randomUUID()
 
@@ -838,8 +838,8 @@ export const tweetRouter = j.router({
 
       const { messageId } = await qstash.publishJSON({
         url: baseUrl + '/api/tweet/post',
-        body: { tweetId, userId: user.id, accountId: dbAccount.id, scheduledUnix },
-        notBefore: scheduledUnix / 1000, // needs to be in seconds
+        body: { tweetId, userId: user.id, accountId: dbAccount.id, nextSlot },
+        notBefore: nextSlot / 1000, // needs to be in seconds
       })
 
       try {
@@ -851,8 +851,8 @@ export const tweetRouter = j.router({
             userId: user.id,
             content,
             isScheduled: true,
-            scheduledFor: new Date(scheduledUnix),
-            scheduledUnix: scheduledUnix,
+            scheduledFor: new Date(nextSlot),
+            scheduledUnix: nextSlot,
             isQueued: true,
             media,
             qstashId: messageId,
@@ -873,7 +873,7 @@ export const tweetRouter = j.router({
       return c.json({
         success: true,
         tweetId,
-        scheduledUnix,
+        scheduledUnix: nextSlot,
         accountId: account.id,
         accountName: account.name,
       })
