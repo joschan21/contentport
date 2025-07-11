@@ -20,8 +20,10 @@ import {
   isAfter,
   isBefore,
   isSameDay,
+  setDay,
   setHours,
   startOfDay,
+  startOfHour,
 } from 'date-fns'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 
@@ -795,22 +797,21 @@ export const tweetRouter = j.router({
         maxDaysAhead: number
       }) {
         // hours of the day
-        // const userTimestamp = fromZonedTime(userNow, timezone).getTime()
-        const userTimestamp = userNow.getTime()
+        const utcUserTimestamp = fromZonedTime(userNow, timezone).getTime()
 
         for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset++) {
-          const userDate = toZonedTime(userNow, timezone)
-          const checkDate = addDays(userDate, dayOffset)
+          let checkDay: Date | undefined = undefined
+
+          if (dayOffset === 0) checkDay = new Date(utcUserTimestamp)
+          else checkDay = startOfDay(addDays(utcUserTimestamp, dayOffset))
 
           for (const hour of SLOTS) {
-            const localSlot = setHours(startOfDay(checkDate), hour)
+            const utcSlotTime = startOfHour(setHours(checkDay, hour))
+            // const utcSlot = fromZonedTime(localSlot, timezone)
+            const utcSlotTimestamp = utcSlotTime.getTime()
 
-            // Convert to actual UTC moment
-            const utcSlot = fromZonedTime(localSlot, timezone)
-            const slotTimestamp = utcSlot.getTime()
-
-            if (slotTimestamp > userTimestamp && isSpotEmpty(slotTimestamp)) {
-              return utcSlot
+            if (isAfter(utcSlotTime, utcUserTimestamp) && isSpotEmpty(utcSlotTimestamp)) {
+              return utcSlotTimestamp
             }
           }
         }
