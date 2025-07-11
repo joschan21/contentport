@@ -483,10 +483,10 @@ export const tweetRouter = j.router({
       }
 
       // Add media if present
-      if (tweet.mediaIds && tweet.mediaIds.length > 0) {
+      if (tweet.media && tweet.media.length > 0) {
         tweetPayload.media = {
           // @ts-expect-error tuple type vs. string[]
-          media_ids: tweet.mediaIds,
+          media_ids: tweet.media.map((media) => media.media_id),
         }
       }
 
@@ -952,7 +952,7 @@ export const tweetRouter = j.router({
         const currentDay = addDays(today, i)
 
         const unixTimestamps = SLOTS.map((hour) => {
-          const localDate = setHours(currentDay, hour)
+          const localDate = startOfHour(setHours(currentDay, hour))
           const utcDate = fromZonedTime(localDate, timezone)
           return utcDate.getTime()
         })
@@ -1008,151 +1008,7 @@ export const tweetRouter = j.router({
         })
       })
 
-      // day (unix) -> times (unix)
-
-      // for (let i = 0; i < 7; i++) {
-      //   const currentDay = addDays(today, i)
-
-      //   const unixTimestamps = slots.map((hour) => {
-      //     const localDate = setHours(currentDay, hour)
-      //     const utcDate = fromZonedTime(localDate, timezone)
-      //     return utcDate.getTime()
-      //   })
-
-      //   results.push({
-      //     [currentDay.getTime()]: unixTimestamps.map((unix) => ({
-      //       unix,
-      //       tweet: getSlotTweet(unix),
-      //       isQueued: true,
-      //     })),
-      //   })
-      // }
-
       return c.superjson({ results })
-    }),
-
-  getQueueSlots: privateProcedure
-    .input(
-      z.object({
-        timezone: z.string(),
-        startDate: z.string(), // ISO date string
-        endDate: z.string(), // ISO date string
-      }),
-    )
-    .get(async ({ c, ctx, input }) => {
-      const { user } = ctx
-      const { timezone, startDate, endDate } = input
-
-      const account = await getAccount({
-        email: user.email,
-      })
-
-      if (!account?.id) {
-        throw new HTTPException(400, {
-          message: 'Please connect your Twitter account',
-        })
-      }
-
-      // Get all scheduled tweets in the date range
-      const scheduledTweets = await db.query.tweets.findMany({
-        where: and(eq(tweets.accountId, account.id), eq(tweets.isScheduled, true)),
-      })
-
-      const tweetsWithMedia = await Promise.all(
-        scheduledTweets.map(async (tweet) => {
-          const enrichedMedia = await fetchMediaFromS3(tweet.media || [])
-          return {
-            ...tweet,
-            media: enrichedMedia,
-          }
-        }),
-      )
-
-      // Generate all queue slots for the date range
-      const slots: Array<{
-        date: string
-        time: string
-        scheduledUnix: number
-        displayTime: string
-        tweet: (typeof tweetsWithMedia)[number] | undefined | null
-        isQueueSlot: boolean
-      }> = []
-
-      const start = new Date(startDate)
-      const end = new Date(endDate)
-
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        for (const hour of SLOTS) {
-          // Create slot time in user's timezone
-          const slotTime = new Date(d.toLocaleDateString('en-US', { timeZone: timezone }))
-          slotTime.setHours(hour, 0, 0, 0)
-
-          // Find tweet scheduled for this slot
-          const tweet = tweetsWithMedia.find((t) => {
-            if (!t.scheduledFor) return false
-            const tweetTime = new Date(t.scheduledFor)
-            const timeDiff = Math.abs(tweetTime.getTime() - slotTime.getTime())
-            return timeDiff < 60000 // Within 1 minute = same slot
-          })
-
-          slots.push({
-            date: d.toISOString().split('T')[0]!,
-            time: `${hour.toString().padStart(2, '0')}:00`,
-            scheduledUnix: Math.floor(slotTime.getTime() / 1000),
-            displayTime: slotTime.toLocaleString('en-US', {
-              timeZone: timezone,
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            }),
-            tweet: tweet || null,
-            isQueueSlot: true,
-          })
-        }
-      }
-
-      // Add all other scheduled tweets (manual scheduling)
-      tweetsWithMedia.forEach((tweet) => {
-        if (!tweet.scheduledFor) return
-
-        const tweetTime = new Date(tweet.scheduledFor)
-        const tweetDate = tweetTime.toISOString().split('T')[0]
-
-        // Check if it's already in a queue slot
-        const isInQueueSlot = slots.some((slot) => {
-          if (!tweet.scheduledFor) return false
-          const timeDiff = Math.abs(
-            new Date(tweet.scheduledFor).getTime() - slot.scheduledUnix * 1000,
-          )
-          return timeDiff < 60000
-        })
-
-        if (
-          !isInQueueSlot &&
-          tweetDate &&
-          tweetDate >= startDate &&
-          tweetDate <= endDate
-        ) {
-          slots.push({
-            date: tweetDate,
-            time: tweetTime.toTimeString().slice(0, 5),
-            scheduledUnix: Math.floor(tweetTime.getTime() / 1000),
-            displayTime: tweetTime.toLocaleString('en-US', {
-              timeZone: timezone,
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            }),
-            tweet,
-            isQueueSlot: false,
-          })
-        }
-      })
-
-      // Sort by date and time
-      slots.sort((a, b) => a.scheduledUnix - b.scheduledUnix)
-
-      return c.json({ slots })
     }),
 
   getHandles: privateProcedure
