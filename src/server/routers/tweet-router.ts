@@ -797,8 +797,8 @@ export const tweetRouter = j.router({
         maxDaysAhead: number
       }) {
         // hours of the day
-        // const userUnix = fromZonedTime(userNow, timezone).getTime()
-        const userUnix = userNow.getTime()
+        const userUnix = fromZonedTime(userNow, timezone).getTime()
+        // const userUnix = userNow.getTime()
 
         for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset++) {
           let checkDay: Date | undefined = undefined
