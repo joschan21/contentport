@@ -797,19 +797,22 @@ export const tweetRouter = j.router({
         maxDaysAhead: number
       }) {
         // hours of the day
-        const userUnix = fromZonedTime(userNow, timezone).getTime()
+        // const userUnix = fromZonedTime(userNow, timezone).getTime()
         // const userUnix = userNow.getTime()
 
         for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset++) {
           let checkDay: Date | undefined = undefined
 
-          if (dayOffset === 0) checkDay = startOfDay(userUnix)
-          else checkDay = startOfDay(addDays(userUnix, dayOffset))
+          if (dayOffset === 0) checkDay = startOfDay(userNow)
+          else checkDay = startOfDay(addDays(userNow, dayOffset))
 
           for (const hour of SLOTS) {
-            const slotUnix = startOfHour(setHours(checkDay, hour)).getTime()
+            const localSlotTime = startOfHour(setHours(checkDay, hour))
+            
+            const slotUnix = fromZonedTime(localSlotTime, timezone).getTime()
+            const userUnixForComparison = fromZonedTime(userNow, timezone).getTime()
 
-            if (isAfter(slotUnix, userUnix) && isSpotEmpty(slotUnix)) {
+            if (isAfter(slotUnix, userUnixForComparison) && isSpotEmpty(slotUnix)) {
               return slotUnix
             }
           }
