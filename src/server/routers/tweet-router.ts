@@ -783,8 +783,8 @@ export const tweetRouter = j.router({
         columns: { scheduledUnix: true },
       })
 
-      function isSpotEmpty(localSlotTime: Date) {
-        const unix = fromZonedTime(localSlotTime, timezone).getTime()
+      function isSpotEmpty(time: Date) {
+        const unix = time.getTime()
         return !Boolean(scheduledTweets.some((t) => t.scheduledUnix === unix))
       }
 
@@ -799,6 +799,7 @@ export const tweetRouter = j.router({
       }) {
         // hours of the day
         // const userUnix = fromZonedTime(userNow, timezone).getTime()
+        // const toServerTz = toZonedTime(userUnix, process.env.TZ)
         // const userUnix = userNow.getTime()
 
         for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset++) {
@@ -808,13 +809,16 @@ export const tweetRouter = j.router({
           else checkDay = startOfDay(addDays(userNow, dayOffset))
 
           for (const hour of SLOTS) {
+            console.log('HOUR IS:', hour)
             const localSlotTime = startOfHour(setHours(checkDay, hour))
+            const slotTime = fromZonedTime(localSlotTime, timezone)
+            console.log({ slotTime })
 
             // const slotUnix = fromZonedTime(localSlotTime, timezone).getTime()
             // const userUnixForComparison = fromZonedTime(userNow, timezone).getTime()
 
-            if (isAfter(localSlotTime, userNow) && isSpotEmpty(localSlotTime)) {
-              return localSlotTime
+            if (isAfter(slotTime, userNow) && isSpotEmpty(slotTime)) {
+              return slotTime
             }
           }
         }
@@ -824,13 +828,15 @@ export const tweetRouter = j.router({
 
       const nextSlot = getNextAvailableSlot({ userNow, timezone, maxDaysAhead: 90 })
 
+      console.log({ nextSlot })
+
       if (!nextSlot) {
         throw new HTTPException(409, {
           message: 'Queue for the next 3 months is already full!',
         })
       }
 
-      const scheduledUnix = fromZonedTime(nextSlot, timezone).getTime()
+      const scheduledUnix = nextSlot.getTime()
 
       // const zoned = toZonedTime(nextSlot, timezone)
       // const scheduledUnix = zoned.getTime()
