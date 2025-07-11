@@ -19,6 +19,7 @@ import {
   addHours,
   isAfter,
   isBefore,
+  isFuture,
   isSameDay,
   setDay,
   setHours,
@@ -1004,7 +1005,9 @@ export const tweetRouter = j.router({
               tweet,
               isQueued: false,
             })),
-          ].sort((a, b) => a.unix - b.unix),
+          ]
+            .sort((a, b) => a.unix - b.unix)
+            .filter((entry) => isFuture(entry.unix)),
         })
       })
 
