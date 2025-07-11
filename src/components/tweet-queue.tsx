@@ -7,7 +7,6 @@ import { format, isThisWeek, isToday, isTomorrow } from 'date-fns'
 import { Clock, Edit, MoreHorizontal, Trash2 } from 'lucide-react'
 
 import { useTweets } from '@/hooks/use-tweets'
-import { InferOutput } from '@/server'
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
 import { useRouter } from 'next/navigation'
 import { Fragment } from 'react'
@@ -97,6 +96,8 @@ export default function TweetQueue() {
     <div className="space-y-2">
       {data?.results.map((result) => {
         const [day, tweets] = Object.entries(result)[0]!
+
+        if (tweets.length === 0) return null
 
         return (
           <Card key={day} className={cn('overflow-hidden')}>
