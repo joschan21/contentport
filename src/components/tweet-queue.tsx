@@ -2,23 +2,16 @@
 
 import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Calendar, Clock, Edit, MoreHorizontal, Trash2 } from 'lucide-react'
-import Link from 'next/link'
-import {
-  format,
-  addDays,
-  startOfDay,
-  isAfter,
-  isBefore,
-  startOfToday,
-  isToday,
-  isTomorrow,
-  addHours,
-  isThisWeek,
-} from 'date-fns'
-import DuolingoButton from './ui/duolingo-button'
-import { Badge } from './ui/badge'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { format, isThisWeek, isToday, isTomorrow } from 'date-fns'
+import { Clock, Edit, MoreHorizontal, Trash2 } from 'lucide-react'
+
+import { useTweets } from '@/hooks/use-tweets'
+import { InferOutput } from '@/server'
+import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import { useRouter } from 'next/navigation'
+import { Fragment } from 'react'
+import toast from 'react-hot-toast'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import {
   DropdownMenu,
@@ -27,25 +20,8 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 import DuolingoBadge from './ui/duolingo-badge'
-import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
-import { InferOutput } from '@/server'
-import { useTweets } from '@/hooks/use-tweets'
-import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
-import { useRouter } from 'next/navigation'
-import { Fragment } from 'react'
-import toast from 'react-hot-toast'
+import DuolingoButton from './ui/duolingo-button'
 import { Loader } from './ui/loader'
-
-// interface QueueSlot {
-//   date: string
-//   time: string
-//   scheduledUnix: number
-//   displayTime: string
-//   tweet: any | null
-//   isQueueSlot: boolean
-// }
-
-type QueueSlot = InferOutput['tweet']['getQueueSlots']['slots'][number]
 
 export default function TweetQueue() {
   const queryClient = useQueryClient()
@@ -64,7 +40,7 @@ export default function TweetQueue() {
     },
   })
 
-  const {mutate: deleteTweet} = useMutation({
+  const { mutate: deleteTweet } = useMutation({
     mutationFn: async (tweetId: string) => {
       const res = await client.tweet.delete.$post({ id: tweetId })
       return await res.json()
@@ -75,8 +51,6 @@ export default function TweetQueue() {
       queryClient.invalidateQueries({ queryKey: ['scheduled-and-published-tweets'] })
     },
   })
-
-
 
   if (isPending) {
     return (
@@ -173,7 +147,7 @@ export default function TweetQueue() {
                     >
                       {tweet ? (
                         <div className="space-y-2">
-                          <p className="text-stone-900 text-sm leading-relaxed">
+                          <p className="text-stone-900 whitespace-pre-line text-sm leading-relaxed">
                             {tweet.content || 'No content'}
                           </p>
                           {tweet.media && tweet.media.length > 0 && (
