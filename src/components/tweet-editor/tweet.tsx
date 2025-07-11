@@ -1299,7 +1299,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                                 </DuolingoButton>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Add to next queue slot</p>
+                                <p>Add to next queue slot - <Link href="/studio/scheduled" className='underline decoration-2 underline-offset-2'>what is this?</Link></p>
                               </TooltipContent>
                             </Tooltip>
 
