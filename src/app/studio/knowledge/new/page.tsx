@@ -30,6 +30,18 @@ export default function NewKnowledgePage() {
   const [isDragging, setIsDragging] = useState(false)
   const [uploadState, setUploadState] = useState<UploadState | null>(null)
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (getDisabled()) return
+
+    if (type === 'upload') {
+      if (data) processFile({ ...data, title })
+    }
+    if (type === 'url') {
+      if (url) importUrl(url)
+    }
+  }
+
   const { mutate: importUrl, isPending: isImporting } = useMutation({
     mutationFn: async (url: string) => {
       const res = await client.knowledge.importUrl.$post({ url })
@@ -310,7 +322,7 @@ export default function NewKnowledgePage() {
   }
 
   const renderUploadView = () => (
-    <div className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
         {uploadState ? (
           renderFilePreview()
@@ -358,17 +370,22 @@ export default function NewKnowledgePage() {
       <div className="space-y-1">
         <Label>Title</Label>
         <DuolingoInput
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleSubmit(e)
+            }
+          }}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           fullWidth
           placeholder="My document title"
         />
       </div>
-    </div>
+    </form>
   )
 
   const renderUrlView = () => (
-    <div className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-1">
         <Label>Link to website</Label>
         <DuolingoInput
@@ -385,6 +402,11 @@ export default function NewKnowledgePage() {
       <div className="space-y-1">
         <Label>Title</Label>
         <DuolingoInput
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleSubmit(e)
+            }
+          }}
           disabled={isImporting}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -392,7 +414,7 @@ export default function NewKnowledgePage() {
           placeholder="My document title"
         />
       </div>
-    </div>
+    </form>
   )
 
   const getDisabled = () => {
@@ -428,14 +450,7 @@ export default function NewKnowledgePage() {
 
           <DuolingoButton
             loading={isProcessing || isImporting}
-            onClick={() => {
-              if (type === 'upload') {
-                if (data) processFile({ ...data, title })
-              }
-              if (type === 'url') {
-                if (url) importUrl(url)
-              }
-            }}
+            onClick={handleSubmit}
             disabled={getDisabled()}
           >
             Add Knowledge

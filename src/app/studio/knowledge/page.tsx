@@ -1,5 +1,6 @@
 'use client'
 
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,7 @@ import {
   List,
   Plus,
   Search,
+  User,
   X,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -54,6 +56,40 @@ const categoryIcons = {
   url: '🔗',
   file: '📄',
   manual: '📝',
+}
+
+interface TweetMetadata {
+  isTweet: true
+  author: {
+    name: string
+    username: string
+    profileImageUrl: string
+  }
+  tweet: {
+    id: string
+    text: string
+    createdAt: string
+  }
+}
+
+const TweetListing = ({ tweetMetadata }: { tweetMetadata: TweetMetadata }) => {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5">
+        <Avatar>
+          <AvatarImage src={tweetMetadata.author.profileImageUrl} />
+          <AvatarFallback>
+            <User className="size-4" />
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex flex-col">
+          <p className="text-sm font-medium leading-none">{tweetMetadata.author.name}</p>
+          <p className="text-xs text-gray-500 leading-none">@{tweetMetadata.author.username}</p>
+        </div>
+      </div>
+      <p className="mt-3 text-sm text-gray-500 leading-relaxed">{tweetMetadata.tweet.text}</p>
+    </div>
+  )
 }
 
 const Page = () => {
@@ -315,7 +351,11 @@ const Page = () => {
                         )}
                       >
                         <DuolingoBadge className="px-2" variant="achievement">
-                          {doc.type === 'url' ? 'website' : doc.type}
+                          {doc.type === 'url'
+                            ? doc.metadata && 'isTweet' in doc.metadata && doc.metadata.isTweet
+                              ? 'tweet'
+                              : 'website'
+                            : doc.type}
                         </DuolingoBadge>
                         {doc.isExample && (
                           <DuolingoBadge className="px-2" variant="streak">
@@ -326,20 +366,26 @@ const Page = () => {
                       </div>
 
                       <div className={cn(viewMode === 'list' ? 'flex-1 min-w-0' : '')}>
-                        <h3
-                          className={cn(
-                            'font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors',
-                            viewMode === 'list'
-                              ? 'text-lg mb-1 line-clamp-1'
-                              : 'text-xl mb-3 line-clamp-2',
-                          )}
-                        >
-                          {doc.title}
-                        </h3>
+                        {doc.metadata && 'isTweet' in doc.metadata && doc.metadata.isTweet ? (
+                          <TweetListing tweetMetadata={doc.metadata as TweetMetadata} />
+                        ) : (
+                          <>
+                            <h3
+                              className={cn(
+                                'font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors',
+                                viewMode === 'list'
+                                  ? 'text-lg mb-1 line-clamp-1'
+                                  : 'text-xl mb-3 line-clamp-2',
+                              )}
+                            >
+                              {doc.title}
+                            </h3>
 
-                        <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
-                          {doc.description}
-                        </p>
+                            <p className="text-sm text-gray-500 line-clamp-4 leading-relaxed">
+                              {doc.description}
+                            </p>
+                          </>
+                        )}
 
                         {doc.type === 'image' ? (
                           <img

@@ -9,6 +9,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { user } from './auth'
 import { InferEnum, InferSelectModel } from 'drizzle-orm'
+import { TweetMetadata } from '@/server/routers/knowledge-router'
 
 export const knowledgeTypeEnum = pgEnum('knowledge_type', [
   'url',
@@ -37,7 +38,7 @@ export const knowledgeDocument = pgTable('knowledge_document', {
   editorState: json('editor_state').default(null),
   isStarred: boolean('is_starred').notNull().default(false),
   sizeBytes: integer('size_bytes'),
-  metadata: json().default({}),
+  metadata: json().$type<TweetMetadata | {}>().default({}),
   sourceUrl: text('source_url'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

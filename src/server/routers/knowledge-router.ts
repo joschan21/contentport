@@ -8,6 +8,18 @@ import { and, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
+import { TwitterApi } from 'twitter-api-v2'
+
+const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
+
+const isTwitterUrl = (url: string): boolean => {
+  return /^https?:\/\/(twitter\.com|x\.com)\/\w+\/status\/\d+/.test(url)
+}
+
+const extractTweetId = (url: string): string | null => {
+  const match = url.match(/\/status\/(\d+)/)
+  return match?.[1] ? match[1] : null
+}
 
 const index = new Index({
   url: 'https://nearby-oriole-27178-eu1-vector.upstash.io',
@@ -20,6 +32,20 @@ const textSplitter = new RecursiveCharacterTextSplitter({
   chunkOverlap: 200,
   separators: ['\n\n', '\n', '.', '!', '?', ';', ',', ' '],
 })
+
+export type TweetMetadata = {
+  isTweet: true
+  author: {
+    name: string
+    username: string
+    profileImageUrl: string
+  }
+  tweet: {
+    id: string
+    text: string
+    createdAt: string
+  }
+}
 
 export const knowledgeRouter = j.router({
   getDocument: privateProcedure
@@ -101,6 +127,71 @@ export const knowledgeRouter = j.router({
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ c, ctx, input }) => {
       const { user } = ctx
+
+      if (isTwitterUrl(input.url)) {
+        const tweetId = extractTweetId(input.url)
+
+        if (!tweetId) {
+          throw new HTTPException(400, {
+            message: 'Could not extract tweet ID from URL',
+          })
+        }
+
+        try {
+          const res = await client.v2.tweets(tweetId, {
+            'tweet.fields': ['id', 'text', 'created_at', 'author_id', 'note_tweet'],
+            'user.fields': ['username', 'profile_image_url', 'name'],
+            expansions: ['author_id', 'referenced_tweets.id'],
+          })
+
+          const [tweet] = res.data
+          const includes = res.includes
+          const author = includes?.users?.[0]
+
+          const [document] = await db
+            .insert(knowledgeDocument)
+            .values({
+              fileName: '',
+              s3Key: '',
+              type: 'url',
+              userId: user.id,
+              description: tweet?.text,
+              title: `Tweet by @${author?.username}`,
+              sourceUrl: input.url,
+              metadata: {
+                isTweet: true,
+                author: {
+                  name: author?.name,
+                  username: author?.username,
+                  profileImageUrl: author?.profile_image_url,
+                },
+                tweet: {
+                  id: tweet?.id,
+                  text: tweet?.text,
+                  createdAt: tweet?.created_at,
+                },
+              },
+            })
+            .returning()
+
+          if (!document) {
+            throw new HTTPException(500, {
+              message: 'Failed to create document',
+            })
+          }
+
+          return c.json({
+            success: true,
+            documentId: document.id,
+            title: document.title,
+            url: input.url,
+          })
+        } catch (error) {
+          throw new HTTPException(400, {
+            message: 'Failed to fetch tweet',
+          })
+        }
+      }
 
       const result = await firecrawl.scrapeUrl(input.url)
 
