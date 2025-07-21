@@ -603,7 +603,8 @@ export const tweetRouter = j.router({
           success: true,
           tweetId: res.data.id,
           accountId: account.id,
-          accountName: account.name,
+          accountName: account.name, // Display name of the twitter (x) user, do not use for tweet urls
+          accountUsername: account.username, // Username of the twitter (x) user, use for correct tweet urls
         })
       } catch (error) {
         console.error('Failed to post tweet:', error)

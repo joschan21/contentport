@@ -222,7 +222,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           fileName: file.name,
           fileType: file.type,
         },
-        { init: { signal: controller.signal } },
+        { init: { signal: controller.signal } }
       )
 
       const { url, fields, fileKey } = await res.json()
@@ -269,7 +269,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           s3Key,
           mediaType,
         },
-        { init: { signal: controller.signal } },
+        { init: { signal: controller.signal } }
       )
 
       return await res.json()
@@ -308,12 +308,12 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           <Link
             target="_blank"
             rel="noreferrer"
-            href={`https://x.com/${data.accountName}/status/${data.tweetId}`}
+            href={`https://x.com/${data.accountUsername}/status/${data.tweetId}`}
             className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
           >
             See tweet
           </Link>
-        </div>,
+        </div>
       )
 
       posthog.capture('tweet_posted', {
@@ -337,7 +337,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           root.clear()
           root.append($createParagraphNode())
         },
-        { tag: 'force-sync' },
+        { tag: 'force-sync' }
       )
     },
     onError: (error) => {
@@ -477,7 +477,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
   })
 
   const validateFile = (
-    file: File,
+    file: File
   ): { valid: boolean; type?: 'image' | 'gif' | 'video'; error?: string } => {
     // Check file type
     let mediaType: 'image' | 'gif' | 'video'
@@ -575,8 +575,8 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                   media_key: twitterResult.media_key,
                   s3Key: s3Result.fileKey,
                 }
-              : mf,
-          ),
+              : mf
+          )
         )
 
         posthog.capture('tweet_media_uploaded', {
@@ -590,8 +590,8 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
       } catch (error) {
         setMediaFiles((prev) =>
           prev.map((mf) =>
-            mf.url === url ? { ...mf, uploading: false, error: 'Upload failed' } : mf,
-          ),
+            mf.url === url ? { ...mf, uploading: false, error: 'Upload failed' } : mf
+          )
         )
       }
     }
@@ -711,7 +711,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           >
             See queue
           </Link>
-        </div>,
+        </div>
       )
     },
   })
@@ -870,7 +870,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
 
     if (editTweetData?.tweet?.scheduledFor) {
       scheduledUnix = Math.floor(
-        new Date(editTweetData.tweet.scheduledFor).getTime() / 1000,
+        new Date(editTweetData.tweet.scheduledFor).getTime() / 1000
       )
     }
 
@@ -913,7 +913,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
         root.clear()
         root.append($createParagraphNode())
       },
-      { tag: 'force-sync' },
+      { tag: 'force-sync' }
     )
 
     setMediaFiles([])
@@ -962,7 +962,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           <div
             className={cn(
               'relative bg-white p-6 rounded-2xl w-full border border-gray-900 border-opacity-10 bg-clip-padding shadow transition-colors',
-              isDragging && 'border-indigo-600 border-dashed',
+              isDragging && 'border-indigo-600 border-dashed'
             )}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -983,7 +983,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                       <ContentEditable
                         spellCheck={false}
                         className={cn(
-                          'w-full !min-h-16 resize-none text-base/7 leading-relaxed text-stone-800 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+                          'w-full !min-h-16 resize-none text-base/7 leading-relaxed text-stone-800 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none'
                         )}
                       />
                     }
@@ -1121,7 +1121,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                 <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
                   <div
                     className={cn(
-                      'flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg',
+                      'flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg'
                     )}
                   >
                     <TooltipProvider>
@@ -1134,7 +1134,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                             type="button"
                             onClick={() => {
                               const input = document.getElementById(
-                                'media-upload',
+                                'media-upload'
                               ) as HTMLInputElement
                               input?.click()
                             }}
@@ -1299,7 +1299,15 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                                 </DuolingoButton>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Add to next queue slot - <Link href="/studio/scheduled" className='underline decoration-2 underline-offset-2'>what is this?</Link></p>
+                                <p>
+                                  Add to next queue slot -{' '}
+                                  <Link
+                                    href="/studio/scheduled"
+                                    className="underline decoration-2 underline-offset-2"
+                                  >
+                                    what is this?
+                                  </Link>
+                                </p>
                               </TooltipContent>
                             </Tooltip>
 
