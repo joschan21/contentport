@@ -183,15 +183,17 @@ function ChatInput() {
         })}
       </div>
 
-      <ChatInputInner onSubmit={onSubmit} />
+      <ChatInputInner onSubmit={onSubmit} onFilesAdded={handleFilesAdded} />
     </FileUpload>
   )
 }
 
 function ChatInputInner({
   onSubmit,
+  onFilesAdded,
 }: {
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+  onFilesAdded: (files: File[]) => void
 }) {
   const editor = useEditor('app-sidebar')
   const context = useContext(FileUploadContext)
@@ -213,6 +215,26 @@ function ChatInputInner({
   const handleTutorialComplete = () => {
     localStorage.setItem('chat-input-tutorial-seen', 'true')
     setShowTutorial(false)
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+
+    const files: File[] = []
+    Array.from(items).forEach((item) => {
+      if (item.kind === 'file') {
+        const file = item.getAsFile()
+        if (file) {
+          files.push(file)
+        }
+      }
+    })
+
+    if (files.length > 0) {
+      e.preventDefault()
+      onFilesAdded(files)
+    }
   }
 
   useEffect(() => {
@@ -272,6 +294,7 @@ function ChatInputInner({
                         style={{ minHeight: '4.5rem' }}
                         onClick={handleTutorialComplete}
                         onFocus={handleTutorialComplete}
+                        onPaste={handlePaste}
                       />
                     }
                     ErrorBoundary={LexicalErrorBoundary}
