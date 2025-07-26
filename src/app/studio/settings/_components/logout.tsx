@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
 import { useRouter } from 'next/navigation'
 import React, { useTransition } from 'react'
+import toast from 'react-hot-toast'
 
 export function LogoutButton() {
   const router = useRouter()
@@ -12,14 +13,20 @@ export function LogoutButton() {
 
   const handleSignout = async () => {
     setLoading(true)
-    await authClient.signOut({
-      fetchOptions: {
-        onSuccess: () => {
-          setLoading(false)
-          startTransition(() => router.push('/'))
+    try {
+      await authClient.signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            setLoading(false)
+            startTransition(() => router.push('/'))
+          },
         },
-      },
-    })
+      })
+    } catch (error) {
+      console.error('Logout failed:', error)
+      setLoading(false)
+      toast.error('Logout failed!')
+    }
   }
 
   const renderText = () => {

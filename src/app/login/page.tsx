@@ -26,7 +26,7 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (!errorMsg) handleAccess()
-  }, [])
+  }, [errorMsg])
 
   const renderChildren = () => {
     if (errorMsg) {

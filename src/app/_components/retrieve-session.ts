@@ -6,12 +6,17 @@ import { headers } from 'next/headers'
 
 export const retrieveUserSession = cache(
   async (): Promise<{ isAuthenticated: boolean }> => {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    })
+    try {
+      const session = await auth.api.getSession({
+        headers: await headers(),
+      })
 
-    const isAuthenticated = session ? true : false
+      const isAuthenticated = session ? true : false
 
-    return { isAuthenticated }
+      return { isAuthenticated }
+    } catch (error) {
+      console.error('Failed to retrieve user session:', error)
+      return { isAuthenticated: false }
+    }
   },
 )
