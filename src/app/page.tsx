@@ -1,22 +1,11 @@
-'use client'
-
 import { Icons } from '@/components/icons'
-import DuolingoButton, {
-  baseStyles,
-  sizeStyles,
-  variantStyles,
-} from '@/components/ui/duolingo-button'
 import GitHubStarButton from '@/components/ui/github-star-button'
 import { cn } from '@/lib/utils'
 import MuxPlayer from '@mux/mux-player-react'
 import { Menu } from 'lucide-react'
-import dynamic from 'next/dynamic'
 import Link from 'next/link'
-
-const Testimonials = dynamic(
-  () => import('@/app/testimonials').then((mod) => ({ default: mod.Testimonials })),
-  { ssr: false },
-)
+import { Testimonials } from './_components/testimonials-lazy'
+import { DuolingoAuthButtonServer } from './_components/duolingo-auth-button-server'
 
 const Page = () => {
   return (
@@ -49,12 +38,13 @@ const Page = () => {
                     className="whitespace-nowrap"
                     repo="joschan21/contentport"
                   />
-                  <Link
-                    className={cn(baseStyles, variantStyles.primary, sizeStyles.sm)}
-                    href="/login"
-                  >
-                    Get Started
-                  </Link>
+
+                  <DuolingoAuthButtonServer
+                    childrenVariants={{
+                      authenticated: 'Open Studio',
+                      fallback: 'Get Started',
+                    }}
+                  />
                 </div>
               </div>
             </nav>
@@ -79,7 +69,7 @@ const Page = () => {
               <div className="max-w-4xl mx-auto text-center">
                 <div className="flex flex-col justify-center items-center">
                   <div className="flex items-center justify-center gap-2 text-sm/6 mb-4 py-1 px-4 rounded-full bg-gray-200/50 text-gray-800">
-                  🎉 now open to everyone! 🎉
+                    🎉 now open to everyone! 🎉
                   </div>
                   <h1 className="text-5xl font-semibold tracking-tight text-balance text-gray-900 sm:text-6xl">
                     The <span className="text-indigo-600">content engine </span> for
@@ -118,11 +108,12 @@ const Page = () => {
                     </div>
 
                     <div className="flex mt-4 flex-col gap-2 max-w-sm w-full">
-                      <Link href="/login">
-                        <DuolingoButton className="w-full h-12 sm:px-8">
-                          Start Posting More →
-                        </DuolingoButton>
-                      </Link>
+                      <DuolingoAuthButtonServer
+                        className="w-full h-12 sm:px-8"
+                        childrenVariants={{
+                          fallback: 'Start Posting More →',
+                        }}
+                      />
                     </div>
 
                     <div className="mt-2 flex items-center justify-center gap-4">
