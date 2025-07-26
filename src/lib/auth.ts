@@ -48,12 +48,12 @@ export const auth = betterAuth({
   database,
   socialProviders: {
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
     twitter: {
-      clientId: process.env.TWITTER_CLIENT_ID as string,
-      clientSecret: process.env.TWITTER_CLIENT_SECRET as string,
+      clientId: process.env.TWITTER_CLIENT_ID!,
+      clientSecret: process.env.TWITTER_CLIENT_SECRET!,
       scope: [
         'tweet.read',
         'tweet.write',
@@ -72,7 +72,9 @@ export const auth = betterAuth({
       if (session) {
         ctx.redirect('/studio')
       } else {
-        ctx.redirect('/')
+        const msg =
+          'Authentication failed for an unknown reason. If this keeps happening, please contact @joshtriedcoding on X.'
+        ctx.redirect(`/login?errorMsg=${msg}`)
       }
     }),
   },

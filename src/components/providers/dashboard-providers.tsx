@@ -7,7 +7,6 @@ import { EditorProvider } from '@/hooks/use-editors'
 import { TweetProvider } from '@/hooks/use-tweets'
 import { authClient } from '@/lib/auth-client'
 import dynamic from 'next/dynamic'
-import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import { posthog } from 'posthog-js'
 import { ReactNode, useEffect, useRef } from 'react'
 
@@ -42,17 +41,15 @@ export function DashboardProviders({ children }: ProvidersProps) {
 
   return (
     <ConfettiProvider>
-      <NuqsAdapter>
-        <AccountProvider>
-          <EditorProvider>
-            <TweetProvider>
-              <AttachmentsProvider>
-                <ChatProvider>{children}</ChatProvider>
-              </AttachmentsProvider>
-            </TweetProvider>
-          </EditorProvider>
-        </AccountProvider>
-      </NuqsAdapter>
+      <AccountProvider>
+        <EditorProvider>
+          <TweetProvider>
+            <AttachmentsProvider>
+              <ChatProvider>{children}</ChatProvider>
+            </AttachmentsProvider>
+          </TweetProvider>
+        </EditorProvider>
+      </AccountProvider>
     </ConfettiProvider>
   )
 }
