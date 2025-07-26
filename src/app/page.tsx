@@ -8,15 +8,109 @@ import DuolingoButton, {
 } from '@/components/ui/duolingo-button'
 import GitHubStarButton from '@/components/ui/github-star-button'
 import { cn } from '@/lib/utils'
+import { authClient } from '@/lib/auth-client'
 import MuxPlayer from '@mux/mux-player-react'
 import { Menu } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 
 const Testimonials = dynamic(
   () => import('@/app/testimonials').then((mod) => ({ default: mod.Testimonials })),
   { ssr: false },
 )
+
+// Smart Get Started Button Component for Header
+const HeaderGetStartedButton = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const session = await authClient.getSession()
+        setIsAuthenticated(!!session.data?.user)
+      } catch (error) {
+        setIsAuthenticated(false)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    checkAuthStatus()
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className={cn(baseStyles, variantStyles.primary, sizeStyles.sm, 'opacity-50 cursor-not-allowed')}>
+        Loading...
+      </div>
+    )
+  }
+
+  const href = isAuthenticated ? '/dashboard' : '/login'
+  const text = isAuthenticated ? 'Dashboard' : 'Get Started'
+
+  return (
+    <Link
+      className={cn(baseStyles, variantStyles.primary, sizeStyles.sm)}
+      href={href}
+    >
+      {text}
+    </Link>
+  )
+}
+
+// Smart Main CTA Button Component
+const MainCTAButton = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        // Add a timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 3000)
+        )
+        
+        const sessionPromise = authClient.getSession()
+        
+        const session = await Promise.race([sessionPromise, timeoutPromise])
+        setIsAuthenticated(!!session.data?.user)
+      } catch (error) {
+        console.log('Auth check failed or timed out:', error)
+        setIsAuthenticated(false)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    checkAuthStatus()
+  }, [])
+
+  // Default to showing "Start Posting More" if loading takes too long
+  if (isLoading) {
+    return (
+      <Link href="/login">
+        <DuolingoButton className="w-full h-12 sm:px-8">
+          Start Posting More →
+        </DuolingoButton>
+      </Link>
+    )
+  }
+
+  const href = isAuthenticated ? '/dashboard' : '/login'
+  const buttonText = isAuthenticated ? 'Go to Dashboard →' : 'Start Posting More →'
+
+  return (
+    <Link href={href}>
+      <DuolingoButton className="w-full h-12 sm:px-8">
+        {buttonText}
+      </DuolingoButton>
+    </Link>
+  )
+}
 
 const Page = () => {
   return (
@@ -49,12 +143,7 @@ const Page = () => {
                     className="whitespace-nowrap"
                     repo="joschan21/contentport"
                   />
-                  <Link
-                    className={cn(baseStyles, variantStyles.primary, sizeStyles.sm)}
-                    href="/login"
-                  >
-                    Get Started
-                  </Link>
+                  <HeaderGetStartedButton />
                 </div>
               </div>
             </nav>
@@ -118,11 +207,7 @@ const Page = () => {
                     </div>
 
                     <div className="flex mt-4 flex-col gap-2 max-w-sm w-full">
-                      <Link href="/login">
-                        <DuolingoButton className="w-full h-12 sm:px-8">
-                          Start Posting More →
-                        </DuolingoButton>
-                      </Link>
+                      <MainCTAButton />
                     </div>
 
                     <div className="mt-2 flex items-center justify-center gap-4">
@@ -224,110 +309,6 @@ const Page = () => {
           </div>
         </div>
       </section>
-
-      {/* <section className="bg-white py-24 sm:py-32">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
-              Everything you need to
-              <br />
-              <span className="text-indigo-600">dominate Twitter</span>
-            </h2>
-            <p className="mt-6 text-lg leading-8 text-gray-600 max-w-xl mx-auto">
-              Contentport helps you create authentic content that grows your audience
-              while saving time and improving engagement.
-            </p>
-          </div>
-
-          <div className="mx-auto mt-16 max-w-6xl">
-            <div className="grid grid-cols-1 gap-12 lg:grid-cols-3 lg:gap-8">
-              <div className="text-center">
-                <div className="mx-auto mb-8 flex h-48 w-full max-w-sm items-center justify-center rounded-2xl bg-white border border-gray-200 shadow-sm">
-                  <div className="flex flex-col items-center space-y-4 p-8">
-                    <div className="flex items-center space-x-2">
-                      <div className="h-8 w-8 rounded-lg bg-blue-500"></div>
-                      <div className="text-xl font-bold">AI</div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="h-6 w-6 rounded-full bg-red-500"></div>
-                      <div className="h-6 w-6 rounded-full bg-yellow-500"></div>
-                      <div className="h-6 w-6 rounded-full bg-green-500"></div>
-                    </div>
-                    <div className="text-sm text-gray-500">Voice Recognition</div>
-                  </div>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                  Voice-powered writing
-                </h3>
-                <p className="text-gray-600 text-sm leading-relaxed max-w-xs mx-auto">
-                  Speak naturally and watch your ideas transform into polished content
-                  with advanced voice recognition.
-                </p>
-              </div>
-
-              <div className="text-center">
-                <div className="mx-auto mb-8 flex h-48 w-full max-w-sm items-center justify-center rounded-2xl bg-white border border-gray-200 shadow-sm">
-                  <div className="flex flex-col items-center space-y-4 p-8">
-                    <div className="rounded-lg bg-gray-900 px-4 py-2 text-white text-sm font-medium">
-                      Create content
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                      <div className="text-xs text-gray-500">Reply with AI</div>
-                    </div>
-                    <div className="flex space-x-1">
-                      <div className="h-8 w-8 rounded bg-gray-200"></div>
-                      <div className="h-8 w-8 rounded bg-gray-200"></div>
-                      <div className="h-8 w-8 rounded bg-gray-200"></div>
-                    </div>
-                  </div>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                  Designed for simplicity
-                </h3>
-                <p className="text-gray-600 text-sm leading-relaxed max-w-xs mx-auto">
-                  Create, manage, and refine content easily, even without technical
-                  skills.
-                </p>
-              </div>
-
-              <div className="text-center">
-                <div className="mx-auto mb-8 flex h-48 w-full max-w-sm items-center justify-center rounded-2xl bg-white border border-gray-200 shadow-sm">
-                  <div className="flex flex-col items-center space-y-4 p-8">
-                    <div className="relative">
-                      <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
-                        <svg
-                          className="h-8 w-8 text-white"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="flex space-x-1">
-                      {[...Array(8)].map((_, i) => (
-                        <div key={i} className="h-1 w-1 rounded-full bg-gray-400"></div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                  Engineered for security
-                </h3>
-                <p className="text-gray-600 text-sm leading-relaxed max-w-xs mx-auto">
-                  Enjoy peace of mind with robust encryption and strict compliance
-                  standards.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section> */}
     </>
   )
 }
