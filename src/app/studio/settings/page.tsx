@@ -14,6 +14,7 @@ import { format, isToday, isTomorrow } from 'date-fns'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect } from 'react'
 import toast from 'react-hot-toast'
+import { LogoutButton } from './_components/logout'
 
 const Page = () => {
   const router = useRouter()
@@ -97,7 +98,7 @@ const Page = () => {
     })
 
   return (
-    <div className="relative w-full max-w-md mx-auto mt-12">
+    <div className="relative w-full max-w-md mx-auto space-y-5 mt-12">
       <div className="relative w-full flex  flex-col gap-6 bg-white/90 shadow-xl rounded-2xl z-10 py-10 px-6 md:px-12">
         <div className="flex flex-col items-center w-full gap-6 bg-light-gray rounded-lg p-5">
           {/* user card */}
@@ -164,6 +165,9 @@ const Page = () => {
             </div>
           </div>
         </div>
+      </div>
+      <div className="flex justify-end">
+        <LogoutButton />
       </div>
     </div>
   )
