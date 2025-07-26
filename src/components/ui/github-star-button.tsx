@@ -1,6 +1,7 @@
+'use client'
 import { cn } from '@/lib/utils'
 import { Heart, Star } from 'lucide-react'
-import { baseStyles, sizeStyles, variantStyles } from './duolingo-button'
+import { baseStyles, sizeStyles, variantStyles } from './duolingo-styles'
 
 interface GitHubStarButtonProps {
   repo: string
