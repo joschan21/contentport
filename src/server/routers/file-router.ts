@@ -3,14 +3,13 @@ import { HTTPException } from 'hono/http-exception'
 import { nanoid } from 'nanoid'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 import { z } from 'zod'
-import { FILE_TYPE_MAP, s3Client } from '@/lib/s3'
+import { FILE_TYPE_MAP, s3Client, s3UrlGenerator } from '@/lib/s3'
 import { HeadObjectCommand, HeadObjectCommandOutput } from '@aws-sdk/client-s3'
 import { db } from '@/db'
 import { knowledgeDocument } from '@/db/schema'
 import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const BUCKET_NAME = process.env.NEXT_PUBLIC_S3_BUCKET_NAME as string
 
 const ALLOWED_DOCUMENT_TYPES = [
@@ -174,50 +173,57 @@ export const fileRouter = j.router({
 
       const type = FILE_TYPE_MAP[res.ContentType as keyof typeof FILE_TYPE_MAP]
 
-      let description: string | undefined = undefined
+      let description: string | undefined
 
-      if (type === 'pdf') {
-        const response = await fetch(
-          `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
-        )
-        const buffer = await response.arrayBuffer()
-        const { info, text } = await pdfParse(Buffer.from(buffer))
+      switch (type) {
+        case 'pdf': {
+          const response = await fetch(s3UrlGenerator(fileKey))
+          const buffer = await response.arrayBuffer()
+          const { info, text } = await pdfParse(Buffer.from(buffer))
 
-        let metadataDescription = ''
-        if (info?.Title) {
-          metadataDescription += info.Title
+          let metadataDescription = ''
+          if (info?.Title) {
+            metadataDescription += info.Title
+          }
+          if (info?.Subject && info.Subject !== info?.Title) {
+            metadataDescription += metadataDescription
+              ? ` - ${info.Subject}`
+              : info.Subject
+          }
+          if (info?.Author) {
+            metadataDescription += metadataDescription
+              ? ` by ${info.Author}`
+              : `by ${info.Author}`
+          }
+
+          description = (metadataDescription.trim() + ' ' + text.slice(0, 100)).slice(
+            0,
+            100,
+          )
+          break
         }
-        if (info?.Subject && info.Subject !== info?.Title) {
-          metadataDescription += metadataDescription ? ` - ${info.Subject}` : info.Subject
+        case 'docx': {
+          const response = await fetch(
+            `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
+          )
+          const buffer = await response.arrayBuffer()
+          const { value } = await mammoth.extractRawText({
+            buffer: Buffer.from(buffer),
+          })
+          description = value.slice(0, 100)
+          break
         }
-        if (info?.Author) {
-          metadataDescription += metadataDescription
-            ? ` by ${info.Author}`
-            : `by ${info.Author}`
+        case 'txt': {
+          const response = await fetch(
+            `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
+          )
+          const text = await response.text()
+          description = text.slice(0, 100)
+          break
         }
-
-        description = (metadataDescription.trim() + ' ' + text.slice(0, 100)).slice(
-          0,
-          100,
-        )
-      } else if (type === 'docx') {
-        const response = await fetch(
-          `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
-        )
-        const buffer = await response.arrayBuffer()
-        const { value } = await mammoth.extractRawText({
-          buffer: Buffer.from(buffer),
-        })
-
-        description = value.slice(0, 100)
-      } else if (type === 'txt') {
-        const response = await fetch(
-          `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
-        )
-        const text = await response.text()
-        description = text.slice(0, 100)
-      } else if (type !== 'image') {
-        description = 'No preview available'
+        default:
+          if (type !== 'image') description = 'No preview available'
+          break
       }
 
       await db.insert(knowledgeDocument).values({
