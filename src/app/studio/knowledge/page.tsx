@@ -10,6 +10,7 @@ import {
 import DuolingoBadge from '@/components/ui/duolingo-badge'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { client } from '@/lib/client'
+import { s3UrlGenerator } from '@/lib/s3/modules/utils'
 import { cn } from '@/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
@@ -84,10 +85,14 @@ const TweetListing = ({ tweetMetadata }: { tweetMetadata: TweetMetadata }) => {
         </Avatar>
         <div className="flex flex-col">
           <p className="text-sm font-medium leading-none">{tweetMetadata.author.name}</p>
-          <p className="text-xs text-gray-500 leading-none">@{tweetMetadata.author.username}</p>
+          <p className="text-xs text-gray-500 leading-none">
+            @{tweetMetadata.author.username}
+          </p>
         </div>
       </div>
-      <p className="mt-3 text-sm text-gray-500 leading-relaxed">{tweetMetadata.tweet.text}</p>
+      <p className="mt-3 text-sm text-gray-500 leading-relaxed">
+        {tweetMetadata.tweet.text}
+      </p>
     </div>
   )
 }
@@ -330,7 +335,7 @@ const Page = () => {
                     href={
                       doc.type === 'url' && doc.sourceUrl
                         ? doc.sourceUrl
-                        : `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`
+                        : s3UrlGenerator(doc.s3Key)
                     }
                     target="_blank"
                     rel="noopener noreferrer"
@@ -352,7 +357,9 @@ const Page = () => {
                       >
                         <DuolingoBadge className="px-2" variant="achievement">
                           {doc.type === 'url'
-                            ? doc.metadata && 'isTweet' in doc.metadata && doc.metadata.isTweet
+                            ? doc.metadata &&
+                              'isTweet' in doc.metadata &&
+                              doc.metadata.isTweet
                               ? 'tweet'
                               : 'website'
                             : doc.type}
@@ -366,7 +373,9 @@ const Page = () => {
                       </div>
 
                       <div className={cn(viewMode === 'list' ? 'flex-1 min-w-0' : '')}>
-                        {doc.metadata && 'isTweet' in doc.metadata && doc.metadata.isTweet ? (
+                        {doc.metadata &&
+                        'isTweet' in doc.metadata &&
+                        doc.metadata.isTweet ? (
                           <TweetListing tweetMetadata={doc.metadata as TweetMetadata} />
                         ) : (
                           <>
@@ -390,7 +399,7 @@ const Page = () => {
                         {doc.type === 'image' ? (
                           <img
                             className="w-full bg-[size:10px_10px] border border-gray-200 bg-fixed bg-[image:repeating-linear-gradient(315deg,rgba(209,213,219,0.4)_0,rgba(209,213,219,0.4)_1px,_transparent_0,_transparent_50%)] max-h-40 object-contain rounded-md"
-                            src={`https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`}
+                            src={s3UrlGenerator(doc.s3Key)}
                           />
                         ) : null}
                       </div>

@@ -14,6 +14,7 @@ import { LocalAttachment, useAttachments } from '@/hooks/use-attachments'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '@/lib/client'
 import Link from 'next/link'
+import { s3 } from '@/lib/s3/s3'
 
 interface AttachmentItemProps {
   attachment: Attachment | LocalAttachment
@@ -140,7 +141,7 @@ function ImageAttachment({ attachment, onRemove, className }: ImageReferenceProp
     queryFn: async () => {
       const res = await client.knowledge.getDocument.$get({ id: attachment.id })
       const { document } = await res.json()
-      const url = `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${document.s3Key}`
+      const url = s3.utils.urlGenerator(document.s3Key)
 
       return { url }
     },

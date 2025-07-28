@@ -3,7 +3,7 @@ import { HTTPException } from 'hono/http-exception'
 import { nanoid } from 'nanoid'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 import { z } from 'zod'
-import { s3 } from '@/lib/s3'
+import { s3 } from '@/lib/s3/s3'
 import { HeadObjectCommand, HeadObjectCommandOutput } from '@aws-sdk/client-s3'
 import { db } from '@/db'
 import { knowledgeDocument } from '@/db/schema'
@@ -189,9 +189,7 @@ export const fileRouter = j.router({
           break
         }
         case 'docx': {
-          const response = await fetch(
-            `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
-          )
+          const response = await fetch(s3.utils.urlGenerator(fileKey))
           const buffer = await response.arrayBuffer()
           const { value } = await mammoth.extractRawText({
             buffer: Buffer.from(buffer),
@@ -200,9 +198,7 @@ export const fileRouter = j.router({
           break
         }
         case 'txt': {
-          const response = await fetch(
-            `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
-          )
+          const response = await fetch(s3.utils.urlGenerator(fileKey))
           const text = await response.text()
           description = text.slice(0, 100)
           break

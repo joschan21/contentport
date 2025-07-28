@@ -1,6 +1,6 @@
 import { HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import { Attachment } from './chat-router'
-import { s3 } from '@/lib/s3'
+import { s3 } from '@/lib/s3/s3'
 import mammoth from 'mammoth'
 import { FilePart, ImagePart, TextPart } from 'ai'
 import { db } from '@/db'
@@ -89,7 +89,8 @@ export const parseAttachments = async ({
       const contentType = data.ContentType as keyof typeof FILE_TYPE_MAP
 
       const type = FILE_TYPE_MAP[contentType as keyof typeof FILE_TYPE_MAP]
-      const url = `https://${BUCKET_NAME}.s3.amazonaws.com/${attachment.fileKey}`
+
+      const url = s3.utils.urlGenerator(attachment.fileKey ?? '')
 
       if (type === 'image') {
         return { type: 'image' as const, image: url } as ImagePart
