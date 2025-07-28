@@ -5,7 +5,8 @@ config()
 // Import and set up stripe
 import { Stripe } from 'stripe'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-05-28.basil',
+  // apiVersion: '2025-05-28.basil',
+  apiVersion: '2025-06-30.basil',
   typescript: true,
 })
 
@@ -29,7 +30,7 @@ function persistData(data: StripeSubscriptionData) {
 export const STRIPE_SUBSCRIPTION_DATA: StripeSubscriptionData = ${JSON.stringify(
     data,
     null,
-    2
+    2,
   )};`
   writeFileSync(stripeSubFile, content)
 }
@@ -104,7 +105,7 @@ const checkExisting = async () => {
     stripeSubData.priceId = priceId || (product.default_price as Stripe.Price).id
     persistData(stripeSubData)
     console.log(
-      `Final JSON update: product ID ${product.id}, price ID ${stripeSubData.priceId}`
+      `Final JSON update: product ID ${product.id}, price ID ${stripeSubData.priceId}`,
     )
   }
 

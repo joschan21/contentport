@@ -1,17 +1,19 @@
 import { HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import { Attachment } from './chat-router'
-import { BUCKET_NAME, FILE_TYPE_MAP, s3Client } from '@/lib/s3'
+import { s3 } from '@/lib/s3'
 import mammoth from 'mammoth'
 import { FilePart, ImagePart, TextPart } from 'ai'
 import { db } from '@/db'
 import { knowledgeDocument } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 
+const { BUCKET_NAME, FILE_TYPE_MAP } = s3.constants
+
 // Helper function to fetch video transcript with polling
 const fetchVideoTranscript = async (
   s3Key: string,
   maxAttempts: number = 10,
-  delayMs: number = 2000
+  delayMs: number = 2000,
 ): Promise<string | null> => {
   const transcriptKey = s3Key.replace(/\.[^/.]+$/, '.json') // Replace file extension with .json
 
@@ -22,7 +24,7 @@ const fetchVideoTranscript = async (
         Key: `transcriptions/${transcriptKey}`,
       })
 
-      const response = await s3Client.send(command)
+      const response = await s3.client().send(command)
 
       if (response.Body) {
         const bodyContents = await response.Body.transformToString()
@@ -83,7 +85,7 @@ export const parseAttachments = async ({
         Key: attachment.fileKey,
       })
 
-      const data = await s3Client.send(command)
+      const data = await s3.client().send(command)
       const contentType = data.ContentType as keyof typeof FILE_TYPE_MAP
 
       const type = FILE_TYPE_MAP[contentType as keyof typeof FILE_TYPE_MAP]
@@ -120,7 +122,7 @@ export const parseAttachments = async ({
       } else {
         return { type: 'file' as const, data: url, mimeType: contentType } as FilePart
       }
-    })
+    }),
   )
 
   const images = attachmentContents.filter(Boolean).filter((a) => a.type === 'image')

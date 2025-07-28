@@ -3,29 +3,15 @@ import { HTTPException } from 'hono/http-exception'
 import { nanoid } from 'nanoid'
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 import { z } from 'zod'
-import { FILE_TYPE_MAP, s3Client, s3UrlGenerator } from '@/lib/s3'
+import { s3 } from '@/lib/s3'
 import { HeadObjectCommand, HeadObjectCommandOutput } from '@aws-sdk/client-s3'
 import { db } from '@/db'
 import { knowledgeDocument } from '@/db/schema'
 import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 
-const BUCKET_NAME = process.env.NEXT_PUBLIC_S3_BUCKET_NAME as string
-
-const ALLOWED_DOCUMENT_TYPES = [
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'text/plain',
-  'text/markdown',
-]
-
-const ALLOWED_IMAGE_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'image/svg+xml',
-]
+const { ALLOWED_DOCUMENT_TYPES, ALLOWED_IMAGE_TYPES, FILE_TYPE_MAP, BUCKET_NAME } =
+  s3.constants
 
 // Twitter-compliant media types and size limits
 const TWITTER_MEDIA_TYPES = {
@@ -69,7 +55,7 @@ export const fileRouter = j.router({
       const fileExtension = input.fileName.split('.').pop() || ''
       const fileKey = `${input.source ?? 'chat'}/${user.id}/${nanoid()}.${fileExtension}`
 
-      const { url, fields } = await createPresignedPost(s3Client, {
+      const { url, fields } = await createPresignedPost(s3.client(), {
         Bucket: BUCKET_NAME,
         Key: fileKey,
         Conditions: [
@@ -123,7 +109,7 @@ export const fileRouter = j.router({
       const fileExtension = input.fileName.split('.').pop() || ''
       const fileKey = `tweet-media/${user.id}/${nanoid()}.${fileExtension}`
 
-      const { url, fields } = await createPresignedPost(s3Client, {
+      const { url, fields } = await createPresignedPost(s3.client(), {
         Bucket: BUCKET_NAME,
         Key: fileKey,
         Conditions: [
@@ -166,7 +152,7 @@ export const fileRouter = j.router({
       let res: HeadObjectCommandOutput | undefined = undefined
 
       try {
-        res = await s3Client.send(command)
+        res = await s3.client().send(command)
       } catch (err) {
         throw new HTTPException(404, { message: 'File not found' })
       }
@@ -177,7 +163,7 @@ export const fileRouter = j.router({
 
       switch (type) {
         case 'pdf': {
-          const response = await fetch(s3UrlGenerator(fileKey))
+          const response = await fetch(s3.utils.urlGenerator(fileKey))
           const buffer = await response.arrayBuffer()
           const { info, text } = await pdfParse(Buffer.from(buffer))
 

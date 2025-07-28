@@ -13,21 +13,21 @@ if (!endpoint) throw new Error('Missing AWS endpoint')
 if (!bucketName) throw new Error('Missing S3 bucket name (S3_BUCKET_NAME)')
 if (!region) throw new Error('Missing AWS region')
 
-export const s3Client = new S3Client({
+const s3Client = new S3Client({
   region,
   credentials: {
-    accessKeyId: process.env.AWS_GENERAL_ACCESS_KEY!,
-    secretAccessKey: process.env.AWS_GENERAL_SECRET_KEY!,
+    accessKeyId,
+    secretAccessKey,
   },
   endpoint,
   forcePathStyle: isLocalS3,
 })
 
-export const BUCKET_NAME = process.env.NEXT_PUBLIC_S3_BUCKET_NAME
+const BUCKET_NAME = bucketName
 
-export const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
-export const s3UrlGenerator = (fileKey: string): string => {
+const urlGenerator = (fileKey: string): string => {
   if (isLocalS3) {
     return `http://localhost:4566/sample-bucket/knowledge/7nclw9kBCjj0uhjqKLRhAJUwOiY0nycA/82mP6RZJK8j4DiAQ8vQhc.pdf`
   }
@@ -35,14 +35,14 @@ export const s3UrlGenerator = (fileKey: string): string => {
   return `https://${bucketName}.s3.amazonaws.com/${fileKey}`
 }
 
-export const ALLOWED_DOCUMENT_TYPES = [
+const ALLOWED_DOCUMENT_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain',
   'text/markdown',
 ] as const
 
-export const ALLOWED_IMAGE_TYPES = [
+const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
   'image/png',
   'image/gif',
@@ -50,7 +50,7 @@ export const ALLOWED_IMAGE_TYPES = [
   'image/svg+xml',
 ] as const
 
-export const FILE_TYPE_MAP = {
+const FILE_TYPE_MAP = {
   'application/pdf': 'pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'text/plain': 'txt',
@@ -60,9 +60,32 @@ export const FILE_TYPE_MAP = {
   'image/svg+xml': 'image',
 } as const
 
-export class S3Wrapper {
-  public func(): void {}
+/**
+ * A wrapper class for AWS S3 client configuration and related utilities/constants.
+ * Useful for accessing the configured S3 client and commonly used values like
+ * allowed file types, bucket name, and utilities such as URL generation.
+ */
+class S3Wrapper {
+  /**
+   * Returns the initialized AWS S3 client.
+   *
+   * @returns {S3Client} The configured S3 client instance.
+   */
+  public client(): S3Client {
+    return s3Client
+  }
 
+  /**
+   * Provides constants related to S3 operations.
+   *
+   * @returns {{
+   *   ALLOWED_DOCUMENT_TYPES: readonly string[],
+   *   ALLOWED_IMAGE_TYPES: readonly string[],
+   *   BUCKET_NAME: string,
+   *   MAX_FILE_SIZE: number,
+   *   FILE_TYPE_MAP: Readonly<Record<string, string>>
+   * }} An object containing file type constraints, bucket name, size limits, etc.
+   */
   get constants() {
     return {
       ALLOWED_DOCUMENT_TYPES,
@@ -72,8 +95,21 @@ export class S3Wrapper {
       FILE_TYPE_MAP,
     }
   }
+
+  /**
+   * Provides utility functions related to S3.
+   *
+   * @returns {{
+   *   urlGenerator: (fileKey: string) => string
+   * }} An object containing utility functions for working with S3.
+   */
+  get utils() {
+    return {
+      urlGenerator,
+    }
+  }
 }
 
-const s3Helper = new S3Wrapper()
+const s3 = new S3Wrapper()
 
-export { s3Helper }
+export { s3 }
