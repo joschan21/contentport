@@ -45,6 +45,120 @@ Contentport uses the [OpenRouter](https://github.com/OpenRouterTeam/ai-sdk-provi
 OPENROUTER_API_KEY=<YOUR_API_KEY>
 ```
 
+### AWS Setup
+
+You have two options for S3 integration:
+
+#### Option 1: Real AWS S3 Bucket
+
+To use a real AWS S3 bucket, follow these steps:
+
+- Create an S3 bucket in your AWS account.
+- Set up an IAM user with access to that bucket.
+- Add the following environment variables to your .env file:
+  ```bash
+  AWS_GENERAL_ACCESS_KEY=<YOUR_ACCESS_KEY>
+  AWS_GENERAL_SECRET_KEY=<YOUR_SECRET_KEY>
+  AWS_REGION=<YOUR_REGION>
+  NEXT_PUBLIC_S3_BUCKET_NAME=<YOUR_BUCKET_NAME>
+  NEXT_PUBLIC_AWS_USE_LOCAL_BOOL=false
+  AWS_S3_ENDPOINT= # leave this empty
+  ```
+
+#### 🐳 Option 2: Local Docker S3
+
+If you prefer not to use a real AWS account, you can emulate S3 locally using [localstack](https://www.localstack.cloud/).
+
+In order to setup the bucket, first you need to make sure:
+
+1. Install Required Tools
+   - Ensure Docker is installed and running on your machine. LocalStack runs in a Docker container.
+   - Install the LocalStack CLI to manage the LocalStack environment.
+     ```bash
+     brew install localstack
+     ```
+   - Install AWS CLI and the awslocal wrapper for simplified interaction with LocalStack.
+     ```bash
+     brew install awscli-local
+     ```
+
+2. Start LocalStack.
+
+   ```bash
+   localstack start
+   ```
+
+3. Verify LocalStack is running.
+
+   ```bash
+   localstack status services
+   ```
+
+   Look for s3 with status ✔ available or ✔ running.
+
+4. Configure AWS CLI for LocalStack
+
+   ```bash
+   aws configure --profile localstack
+   ```
+
+   Use these dummy values:
+   - **AWS Access Key ID**: test
+   - **AWS Secret Access Key**: test
+   - **Default region name**: us-east-1
+   - **Default output format**: json
+
+5. Create a Bucket
+
+   ```bash
+   awslocal s3api create-bucket --bucket sample-bucket
+   ```
+
+6. Verify Bucket Exists
+
+   ```bash
+   awslocal s3api list-buckets
+   ```
+
+7. Set Up CORS
+
+   ```json
+   {
+     "CORSRules": [
+       {
+         "AllowedHeaders": ["*"],
+         "AllowedMethods": ["GET", "PUT", "POST"],
+         "AllowedOrigins": ["*"],
+         "MaxAgeSeconds": 3000
+       }
+     ]
+   }
+   ```
+
+   Apply the CORS configuration:
+
+   ```bash
+   awslocal s3api put-bucket-cors --bucket sample-bucket --cors-configuration file://cors-config.json
+   ```
+
+   Verify the CORS settings:
+
+   ```
+   awslocal s3api get-bucket-cors --bucket sample-bucket
+   ```
+
+   You can now delete cors-config.json.
+
+- Update Your .env.local
+  ```bash
+  AWS_ACCESS_KEY_ID=test
+  AWS_SECRET_ACCESS_KEY=test
+  AWS_REGION=us-east-1
+  AWS_S3_ENDPOINT=http://localhost:4566
+  NEXT_PUBLIC_S3_BUCKET_NAME=sample-bucket
+  AWS_USE_LOCAL_BOOL=true
+  ```
+
 ### Redis
 
 - Visit [Upstash](https://upstash.com) and sign up for an account (or log in if you already have one)
