@@ -1,10 +1,14 @@
 import { S3Client } from '@aws-sdk/client-s3'
 import { s3UrlGenerator } from '@/lib/s3/modules/utils'
 
-const isLocalS3 = process.env.NEXT_PUBLIC_AWS_USE_LOCAL_BOOL ? true : false
+const isLocalS3 = process.env.NEXT_PUBLIC_AWS_USE_LOCAL_BOOL === 'true'
 const bucketName = process.env.NEXT_PUBLIC_S3_BUCKET_NAME
 
 if (!bucketName) throw new Error('Missing S3 bucket name (NEXT_PUBLIC_S3_BUCKET_NAME)')
+if (!process.env.AWS_GENERAL_ACCESS_KEY)
+  throw new Error('Missing AWS access key (AWS_GENERAL_ACCESS_KEY)')
+if (!process.env.AWS_GENERAL_SECRET_KEY)
+  throw new Error('Missing AWS secret key (AWS_GENERAL_SECRET_KEY)')
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || 'us-east-1',
