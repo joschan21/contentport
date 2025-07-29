@@ -45,7 +45,7 @@ async function fetchMediaFromS3(media: { s3Key: string; media_id: string }[]) {
   const mediaData = await Promise.all(
     media.map(async (m) => {
       try {
-        const headResponse = await s3.client().send(
+        const headResponse = await s3.client.send(
           new HeadObjectCommand({
             Bucket: BUCKET_NAME,
             Key: m.s3Key,

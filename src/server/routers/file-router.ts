@@ -55,7 +55,7 @@ export const fileRouter = j.router({
       const fileExtension = input.fileName.split('.').pop() || ''
       const fileKey = `${input.source ?? 'chat'}/${user.id}/${nanoid()}.${fileExtension}`
 
-      const { url, fields } = await createPresignedPost(s3.client(), {
+      const { url, fields } = await createPresignedPost(s3.client, {
         Bucket: BUCKET_NAME,
         Key: fileKey,
         Conditions: [
@@ -109,7 +109,7 @@ export const fileRouter = j.router({
       const fileExtension = input.fileName.split('.').pop() || ''
       const fileKey = `tweet-media/${user.id}/${nanoid()}.${fileExtension}`
 
-      const { url, fields } = await createPresignedPost(s3.client(), {
+      const { url, fields } = await createPresignedPost(s3.client, {
         Bucket: BUCKET_NAME,
         Key: fileKey,
         Conditions: [
@@ -152,7 +152,7 @@ export const fileRouter = j.router({
       let res: HeadObjectCommandOutput | undefined = undefined
 
       try {
-        res = await s3.client().send(command)
+        res = await s3.client.send(command)
       } catch (err) {
         throw new HTTPException(404, { message: 'File not found' })
       }

@@ -55,7 +55,7 @@ class S3Wrapper {
    *
    * @returns {S3Client} The configured S3 client instance.
    */
-  public client(): S3Client {
+  get client(): S3Client {
     return s3Client
   }
 

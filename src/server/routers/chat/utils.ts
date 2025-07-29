@@ -24,7 +24,7 @@ const fetchVideoTranscript = async (
         Key: `transcriptions/${transcriptKey}`,
       })
 
-      const response = await s3.client().send(command)
+      const response = await s3.client.send(command)
 
       if (response.Body) {
         const bodyContents = await response.Body.transformToString()
@@ -85,7 +85,7 @@ export const parseAttachments = async ({
         Key: attachment.fileKey,
       })
 
-      const data = await s3.client().send(command)
+      const data = await s3.client.send(command)
       const contentType = data.ContentType as keyof typeof FILE_TYPE_MAP
 
       const type = FILE_TYPE_MAP[contentType as keyof typeof FILE_TYPE_MAP]
