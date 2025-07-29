@@ -69,8 +69,6 @@ To use a real AWS S3 bucket, follow these steps:
 
 If you prefer not to use a real AWS account, you can emulate S3 locally using [localstack](https://www.localstack.cloud/).
 
-In order to setup the bucket, first you need to make sure:
-
 1. Install Required Tools
    - Ensure Docker is installed and running on your machine. LocalStack runs in a Docker container.
    - Install the LocalStack CLI to manage the LocalStack environment.
@@ -123,6 +121,7 @@ In order to setup the bucket, first you need to make sure:
 7. Set Up CORS
 
    ```json
+   // 📁 ./cors-config.json
    {
      "CORSRules": [
        {
