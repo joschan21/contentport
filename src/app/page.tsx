@@ -1,11 +1,9 @@
-import { Icons } from '@/components/icons'
-import GitHubStarButton from '@/components/ui/github-star-button'
-import { cn } from '@/lib/utils'
-import MuxPlayer from '@mux/mux-player-react'
-import { Menu } from 'lucide-react'
-import Link from 'next/link'
 import { Testimonials } from './_components/testimonials-lazy'
 import { DuolingoAuthButtonServer } from './_components/duolingo-auth-button-server'
+import MuxPlayer from '@mux/mux-player-react'
+import { NavbarMobile } from './_components/navbar-mobile'
+import { NavbarDesktop } from './_components/navbar-desktop'
+import { Icons } from '@/components/icons'
 
 const Page = () => {
   return (
@@ -23,29 +21,12 @@ const Page = () => {
                   <span className="font-medium">contentport</span>
                 </a>
               </div>
-              <div className="flex lg:hidden">
-                <button
-                  type="button"
-                  className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
-                >
-                  <span className="sr-only">Open main menu</span>
-                  <Menu aria-hidden="true" className="size-6" />
-                </button>
-              </div>
-              <div className="hidden lg:flex gap-4 lg:flex-1 lg:justify-end">
-                <div className="flex gap-2 items-center">
-                  <GitHubStarButton
-                    className="whitespace-nowrap"
-                    repo="joschan21/contentport"
-                  />
 
-                  <DuolingoAuthButtonServer
-                    childrenVariants={{
-                      authenticated: 'Open Studio',
-                      fallback: 'Get Started',
-                    }}
-                  />
-                </div>
+              <div className="hidden md:flex">
+                <NavbarDesktop />
+              </div>
+              <div className="md:hidden">
+                <NavbarMobile />
               </div>
             </nav>
           </header>

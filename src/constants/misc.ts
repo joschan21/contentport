@@ -1,0 +1,1 @@
+export const GITHUB_REPO = 'joschan21/contentport'
