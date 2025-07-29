@@ -1,17 +1,10 @@
 'use client'
 
-import { Icons } from '@/components/icons'
-import DuolingoButton, {
-  baseStyles,
-  sizeStyles,
-  variantStyles,
-} from '@/components/ui/duolingo-button'
-import GitHubStarButton from '@/components/ui/github-star-button'
-import { cn } from '@/lib/utils'
 import MuxPlayer from '@mux/mux-player-react'
-import { Menu } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import Navbar from '@/components/navbar'
+import DuolingoButton from '@/components/ui/duolingo-button'
 
 const Testimonials = dynamic(
   () => import('@/app/testimonials').then((mod) => ({ default: mod.Testimonials })),
@@ -23,42 +16,7 @@ const Page = () => {
     <>
       <section className="bg-gray-100">
         <div className="relative max-w-7xl mx-auto">
-          <header className="absolute inset-x-0 top-0 z-50">
-            <nav
-              aria-label="Global"
-              className="flex items-center justify-between p-6 lg:px-8"
-            >
-              <div className="flex lg:flex-1">
-                <a href="#" className="-m-1.5 p-1.5 flex items-center gap-1.5">
-                  <Icons.logo className="size-5" />
-                  <span className="font-medium">contentport</span>
-                </a>
-              </div>
-              <div className="flex lg:hidden">
-                <button
-                  type="button"
-                  className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
-                >
-                  <span className="sr-only">Open main menu</span>
-                  <Menu aria-hidden="true" className="size-6" />
-                </button>
-              </div>
-              <div className="hidden lg:flex gap-4 lg:flex-1 lg:justify-end">
-                <div className="flex gap-2 items-center">
-                  <GitHubStarButton
-                    className="whitespace-nowrap"
-                    repo="joschan21/contentport"
-                  />
-                  <Link
-                    className={cn(baseStyles, variantStyles.primary, sizeStyles.sm)}
-                    href="/login"
-                  >
-                    Get Started
-                  </Link>
-                </div>
-              </div>
-            </nav>
-          </header>
+          <Navbar />
         </div>
 
         <div className="relative isolate pt-14">
