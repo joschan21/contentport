@@ -4,6 +4,7 @@ import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-qu
 import { HTTPException } from 'hono/http-exception'
 import { ReactNode, useState } from 'react'
 import toast from 'react-hot-toast'
+import { NuqsAdapter } from 'nuqs/adapters/next/app'
 
 interface ProvidersProps {
   children: ReactNode
@@ -40,5 +41,9 @@ export function Providers({ children }: ProvidersProps) {
       }),
   )
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={queryClient}>
+      <NuqsAdapter>{children}</NuqsAdapter>
+    </QueryClientProvider>
+  )
 }
