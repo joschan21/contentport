@@ -9,6 +9,7 @@ import {
 import DuolingoBadge from '@/components/ui/duolingo-badge'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { client } from '@/lib/client'
+import { s3UrlGenerator } from '@/lib/s3/modules/utils'
 import { cn } from '@/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
@@ -280,104 +281,106 @@ export default function KnowledgePage() {
                 : 'flex flex-col space-y-4',
             )}
           >
-            {documents.filter((d) => !d.isDeleted).map((doc) => (
-              <div
-                key={doc.id}
-                className={cn(
-                  'group relative h-full',
-                  viewMode === 'list' ? 'w-full' : '',
-                )}
-              >
-                <a
-                  href={
-                    doc.type === 'url' && doc.sourceUrl
-                      ? doc.sourceUrl
-                      : `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn('block h-full', viewMode === 'list' ? 'w-full' : '')}
+            {documents
+              .filter((d) => !d.isDeleted)
+              .map((doc) => (
+                <div
+                  key={doc.id}
+                  className={cn(
+                    'group relative h-full',
+                    viewMode === 'list' ? 'w-full' : '',
+                  )}
                 >
-                  <div
-                    className={cn(
-                      'bg-white rounded-2xl border-2 border-gray-200 hover:border-indigo-300 transition-all duration-200 hover:shadow-lg hover:-translate-y-1 p-6',
-                      viewMode === 'list'
-                        ? 'flex items-center gap-6'
-                        : 'h-full flex flex-col justify-between',
-                    )}
+                  <a
+                    href={
+                      doc.type === 'url' && doc.sourceUrl
+                        ? doc.sourceUrl
+                        : s3UrlGenerator(doc.s3Key)
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn('block h-full', viewMode === 'list' ? 'w-full' : '')}
                   >
                     <div
                       className={cn(
-                        'flex flex-wrap items-center gap-2 mb-4',
-                        viewMode === 'list' ? 'mb-0 flex-shrink-0' : '',
+                        'bg-white rounded-2xl border-2 border-gray-200 hover:border-indigo-300 transition-all duration-200 hover:shadow-lg hover:-translate-y-1 p-6',
+                        viewMode === 'list'
+                          ? 'flex items-center gap-6'
+                          : 'h-full flex flex-col justify-between',
                       )}
                     >
-                      <DuolingoBadge className="px-2" variant="achievement">
-                        {doc.type === 'url' ? 'website' : doc.type}
-                      </DuolingoBadge>
-                      {doc.isExample && (
-                        <DuolingoBadge className="px-2" variant="streak">
-                          example
-                        </DuolingoBadge>
-                      )}
-                      {doc.isStarred && <div className="text-yellow-500 ">⭐</div>}
-                    </div>
-
-                    <div className={cn(viewMode === 'list' ? 'flex-1 min-w-0' : '')}>
-                      <h3
+                      <div
                         className={cn(
-                          'font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors',
-                          viewMode === 'list'
-                            ? 'text-lg mb-1 line-clamp-1'
-                            : 'text-xl mb-3 line-clamp-2',
+                          'flex flex-wrap items-center gap-2 mb-4',
+                          viewMode === 'list' ? 'mb-0 flex-shrink-0' : '',
                         )}
                       >
-                        {doc.title}
-                      </h3>
-
-                      <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
-                        {doc.description}
-                      </p>
-
-                      {doc.type === 'image' ? (
-                        <img
-                          className="w-full bg-[size:10px_10px] border border-gray-200 bg-fixed bg-[image:repeating-linear-gradient(315deg,rgba(209,213,219,0.4)_0,rgba(209,213,219,0.4)_1px,_transparent_0,_transparent_50%)] max-h-40 object-contain rounded-md"
-                          src={`https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`}
-                        />
-                      ) : null}
-                    </div>
-
-                    <div
-                      className={cn(
-                        'flex items-center gap-5 text-sm text-gray-500',
-                        viewMode === 'list'
-                          ? 'flex-shrink-0 flex-col items-end gap-1'
-                          : 'mt-auto pt-4',
-                      )}
-                    >
-                      <div className="flex items-center gap-2 text-xs">
-                        <span>{format(doc.createdAt, 'MMM dd')}</span>
-                        {doc.type !== 'url' && doc.sizeBytes && (
-                          <span>・ {formatBytes(doc.sizeBytes)}</span>
+                        <DuolingoBadge className="px-2" variant="achievement">
+                          {doc.type === 'url' ? 'website' : doc.type}
+                        </DuolingoBadge>
+                        {doc.isExample && (
+                          <DuolingoBadge className="px-2" variant="streak">
+                            example
+                          </DuolingoBadge>
                         )}
+                        {doc.isStarred && <div className="text-yellow-500 ">⭐</div>}
+                      </div>
+
+                      <div className={cn(viewMode === 'list' ? 'flex-1 min-w-0' : '')}>
+                        <h3
+                          className={cn(
+                            'font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors',
+                            viewMode === 'list'
+                              ? 'text-lg mb-1 line-clamp-1'
+                              : 'text-xl mb-3 line-clamp-2',
+                          )}
+                        >
+                          {doc.title}
+                        </h3>
+
+                        <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                          {doc.description}
+                        </p>
+
+                        {doc.type === 'image' ? (
+                          <img
+                            className="w-full bg-[size:10px_10px] border border-gray-200 bg-fixed bg-[image:repeating-linear-gradient(315deg,rgba(209,213,219,0.4)_0,rgba(209,213,219,0.4)_1px,_transparent_0,_transparent_50%)] max-h-40 object-contain rounded-md"
+                            src={s3UrlGenerator(doc.s3Key)}
+                          />
+                        ) : null}
+                      </div>
+
+                      <div
+                        className={cn(
+                          'flex items-center gap-5 text-sm text-gray-500',
+                          viewMode === 'list'
+                            ? 'flex-shrink-0 flex-col items-end gap-1'
+                            : 'mt-auto pt-4',
+                        )}
+                      >
+                        <div className="flex items-center gap-2 text-xs">
+                          <span>{format(doc.createdAt, 'MMM dd')}</span>
+                          {doc.type !== 'url' && doc.sizeBytes && (
+                            <span>・ {formatBytes(doc.sizeBytes)}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </a>
-                <DuolingoButton
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-4 right-4 size-8 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    deleteDocument(doc.id)
-                  }}
-                >
-                  <X className="size-4" />
-                </DuolingoButton>
-              </div>
-            ))}
+                  </a>
+                  <DuolingoButton
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-4 right-4 size-8 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      deleteDocument(doc.id)
+                    }}
+                  >
+                    <X className="size-4" />
+                  </DuolingoButton>
+                </div>
+              ))}
           </div>
         )}
       </div>

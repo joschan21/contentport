@@ -3,7 +3,7 @@ import { db } from '@/db'
 import { account as accountSchema, tweets } from '@/db/schema'
 import { qstash } from '@/lib/qstash'
 import { redis } from '@/lib/redis'
-import { BUCKET_NAME, s3Client } from '@/lib/s3'
+import { s3 } from '@/lib/s3/s3'
 import { HeadObjectCommand } from '@aws-sdk/client-s3'
 import { Receiver } from '@upstash/qstash'
 import { Ratelimit } from '@upstash/ratelimit'
@@ -28,6 +28,8 @@ import {
 } from 'date-fns'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 
+const { BUCKET_NAME } = s3.constants
+
 const receiver = new Receiver({
   currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY as string,
   nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY as string,
@@ -43,14 +45,14 @@ async function fetchMediaFromS3(media: { s3Key: string; media_id: string }[]) {
   const mediaData = await Promise.all(
     media.map(async (m) => {
       try {
-        const headResponse = await s3Client.send(
+        const headResponse = await s3.client.send(
           new HeadObjectCommand({
             Bucket: BUCKET_NAME,
             Key: m.s3Key,
           }),
         )
 
-        const url = `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${m.s3Key}`
+        const url = s3.utils.urlGenerator(m.s3Key)
         const contentType = headResponse.ContentType || ''
 
         // Determine media type from content-type or file extension
@@ -247,8 +249,7 @@ export const tweetRouter = j.router({
         accessSecret: account.accessSecret as string,
       })
 
-      const mediaUrl = `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${s3Key}`
-      const response = await fetch(mediaUrl)
+      const response = await fetch(s3.utils.urlGenerator(s3Key))
 
       if (!response.ok) {
         throw new HTTPException(400, { message: 'Failed to fetch media from S3' })

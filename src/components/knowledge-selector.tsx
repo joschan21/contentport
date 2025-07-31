@@ -19,6 +19,7 @@ import DuolingoButton from '@/components/ui/duolingo-button'
 import { KnowledgeDocument } from '@/db/schema'
 import { InferOutput } from '@/server'
 import { Icons } from './icons'
+import { s3UrlGenerator } from '@/lib/s3/modules/utils'
 
 interface KnowledgeSelectorProps {
   onSelectDocument: (doc: SelectedKnowledgeDocument) => void
@@ -143,7 +144,7 @@ export function KnowledgeSelector({ onSelectDocument }: KnowledgeSelectorProps) 
                           <div className="flex items-center justify-center size-10 rounded-lg bg-stone-200 transition-colors">
                             {doc.type === 'image' ? (
                               <img
-                                src={`https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`}
+                                src={s3UrlGenerator(doc.s3Key)}
                                 alt={doc.title ?? 'document preview'}
                                 className="w-full h-full object-cover rounded-lg"
                               />
@@ -154,7 +155,7 @@ export function KnowledgeSelector({ onSelectDocument }: KnowledgeSelectorProps) 
                             ) : doc.type === 'txt' ? (
                               <Icons.txt className="size-7 -ml-[1px]" />
                             ) : doc.type === 'url' ? (
-                              <span className='text-xl'>🔗</span>
+                              <span className="text-xl">🔗</span>
                             ) : null}
                           </div>
                           <div className="flex-1 min-w-0">

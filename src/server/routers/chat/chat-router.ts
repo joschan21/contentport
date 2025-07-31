@@ -2,7 +2,6 @@ import { assistantPrompt } from '@/lib/prompt-utils'
 import { DiffWithReplacement } from '@/lib/utils'
 import { tweet as tweetSchema } from '@/lib/validators'
 import { TestUIMessage } from '@/types/message'
-import { openai } from '@ai-sdk/openai'
 import {
   appendResponseMessages,
   CoreMessage,
@@ -101,7 +100,7 @@ function filterVisibleMessages(messages: UIMessage[]): UIMessage[] {
     (msg) =>
       !msg.id.startsWith(MESSAGE_ID_PREFIXES.document) &&
       !msg.id.startsWith(MESSAGE_ID_PREFIXES.meta) &&
-      !msg.id.startsWith(MESSAGE_ID_PREFIXES.system)
+      !msg.id.startsWith(MESSAGE_ID_PREFIXES.system),
   )
 }
 
@@ -125,7 +124,7 @@ export const chatRouter = j.router({
       }
 
       const chat = await redis.json.get<{ messages: UIMessage[] }>(
-        `chat:${user.email}:${chatId}`
+        `chat:${user.email}:${chatId}`,
       )
 
       const visibleMessages = chat ? filterVisibleMessages(chat.messages) : []
@@ -142,7 +141,7 @@ export const chatRouter = j.router({
       z.object({
         message: chatMessageSchema,
         tweet: tweetSchema,
-      })
+      }),
     )
     .post(async ({ input, ctx }) => {
       const { user } = ctx
@@ -179,7 +178,7 @@ export const chatRouter = j.router({
       }
 
       const existingChat = await redis.json.get<{ messages: TestUIMessage[] }>(
-        `chat:${user.email}:${chatId}`
+        `chat:${user.email}:${chatId}`,
       )
 
       const { files, images, links } = await parseAttachments({ attachments })
@@ -197,13 +196,13 @@ export const chatRouter = j.router({
 
       const editorState = new PromptBuilder()
         .add(
-          `<important_info>This is a system attachment to the user request. The purpose of this attachment is to keep you informed about the user's latest tweet editor state at all times. It might be empty or already contain text.</important_info>`
+          `<important_info>This is a system attachment to the user request. The purpose of this attachment is to keep you informed about the user's latest tweet editor state at all times. It might be empty or already contain text.</important_info>`,
         )
         .add(`<current_tweet>${tweet.content}</current_tweet>`)
 
       if (isConversationEmpty) {
         editorState.add(
-          `This is the first message in your conversation. Therefore, only for the first message, create three drafts. The user can choose the draft they like most.`
+          `This is the first message in your conversation. Therefore, only for the first message, create three drafts. The user can choose the draft they like most.`,
         )
       }
 
@@ -327,8 +326,8 @@ export const chatRouter = j.router({
                 (msg) =>
                   Array.isArray(msg.content) &&
                   msg.content.some(
-                    (obj) => obj.type === 'tool-call' && obj.toolName === 'edit_tweet'
-                  )
+                    (obj) => obj.type === 'tool-call' && obj.toolName === 'edit_tweet',
+                  ),
               )
 
               if (!hasCalledEditTweet) {
