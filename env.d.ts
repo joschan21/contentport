@@ -1,5 +1,11 @@
 declare module "bun" {
   interface Env {
+    NODE_ENV: 'development' | 'production' | 'test'
+
+    OPENAI_API_KEY: string
+    ANTHROPIC_API_KEY: string
+    GOOGLE_GENERATIVE_AI_API_KEY: string
+    XAI_API_KEY: string
     OPENROUTER_API_KEY: string;
 
     UPSTASH_REDIS_REST_URL: string;
@@ -27,6 +33,7 @@ declare module "bun" {
     DATABASE_URL: string;
 
     FIRECRAWL_API_KEY: string;
+    RESEND_API_KEY: string;
 
     AWS_GENERAL_ACCESS_KEY: string;
     AWS_GENERAL_SECRET_KEY: string;
