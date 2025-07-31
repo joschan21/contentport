@@ -14,7 +14,7 @@ import { getBaseUrl } from '@/constants/base-url'
 
 import { PostHog } from 'posthog-node'
 
-const posthog = new PostHog(Bun.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+const posthog = new PostHog(Bun.env.NEXT_PUBLIC_POSTHOG_KEY, {
   host: 'https://eu.i.posthog.com',
 })
 
@@ -23,14 +23,14 @@ const nanoid = customAlphabet(
   32,
 )
 
-const consumerKey = Bun.env.TWITTER_CONSUMER_KEY as string
-const consumerSecret = Bun.env.TWITTER_CONSUMER_SECRET as string
+const consumerKey = Bun.env.TWITTER_CONSUMER_KEY
+const consumerSecret = Bun.env.TWITTER_CONSUMER_SECRET
 
 const client = new TwitterApi({ appKey: consumerKey, appSecret: consumerSecret })
 
 type AuthAction = 'onboarding' | 'invite' | 'add-account'
 
-const clientV2 = new TwitterApi(Bun.env.TWITTER_BEARER_TOKEN!).readOnly
+const clientV2 = new TwitterApi(Bun.env.TWITTER_BEARER_TOKEN).readOnly
 
 export const authRouter = j.router({
 

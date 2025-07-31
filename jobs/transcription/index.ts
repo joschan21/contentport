@@ -8,7 +8,7 @@ import { basename, extname } from 'path'
 const VIDEO_EXTENSIONS = ['.mp4', '.mov']
 const s3 = new S3()
 const openai = new OpenAI({
-  apiKey: Bun.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY,
 })
 
 export const handler: S3Handler = async (event: S3Event) => {

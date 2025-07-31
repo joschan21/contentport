@@ -33,12 +33,12 @@ export type Style = {
 }
 
 // const client = new TwitterApi({
-//   appKey: Bun.env.TWITTER_API_KEY as string,
-//   appSecret: Bun.env.TWITTER_API_SECRET as string,
-//   accessToken: Bun.env.TWITTER_ACCESS_TOKEN as string,
-//   accessSecret: Bun.env.TWITTER_ACCESS_TOKEN_SECRET as string,
+//   appKey: Bun.env.TWITTER_API_KEY,
+//   appSecret: Bun.env.TWITTER_API_SECRET,
+//   accessToken: Bun.env.TWITTER_ACCESS_TOKEN,
+//   accessSecret: Bun.env.TWITTER_ACCESS_TOKEN_SECRET,
 // }).readOnly
-const client = new TwitterApi(Bun.env.TWITTER_BEARER_TOKEN!).readOnly
+const client = new TwitterApi(Bun.env.TWITTER_BEARER_TOKEN).readOnly
 
 type UserData = Awaited<ReturnType<typeof client.v2.userByUsername>>['data']
 

@@ -17,7 +17,7 @@ import { createAnthropic } from "@ai-sdk/anthropic"
 
 const anthropic = createAnthropic()
 
-const translator = new deepl.Translator(Bun.env.DEEPL_API_KEY || "")
+const translator = new deepl.Translator(Bun.env.DEEPL_API_KEY)
 const writingStyle = deepl.WritingStyle
 const writingTone = deepl.WritingTone
 

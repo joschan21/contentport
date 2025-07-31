@@ -3,8 +3,8 @@ import { S3Client } from '@aws-sdk/client-s3'
 export const s3Client = new S3Client({
   region: Bun.env.AWS_REGION || 'us-east-1',
   credentials: {
-    accessKeyId: Bun.env.AWS_GENERAL_ACCESS_KEY!,
-    secretAccessKey: Bun.env.AWS_GENERAL_SECRET_KEY!,
+    accessKeyId: Bun.env.AWS_GENERAL_ACCESS_KEY,
+    secretAccessKey: Bun.env.AWS_GENERAL_SECRET_KEY,
   },
 })
 

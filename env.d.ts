@@ -42,5 +42,6 @@ declare module "bun" {
     POSTHOG_API_KEY: string;
     POSTHOG_ENV_ID: string;
 
+    DEEPL_API_KEY: string;
   }
 }

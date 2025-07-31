@@ -29,12 +29,12 @@ import {
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 
 const receiver = new Receiver({
-  currentSigningKey: Bun.env.QSTASH_CURRENT_SIGNING_KEY as string,
-  nextSigningKey: Bun.env.QSTASH_NEXT_SIGNING_KEY as string,
+  currentSigningKey: Bun.env.QSTASH_CURRENT_SIGNING_KEY,
+  nextSigningKey: Bun.env.QSTASH_NEXT_SIGNING_KEY,
 })
 
-const consumerKey = Bun.env.TWITTER_CONSUMER_KEY as string
-const consumerSecret = Bun.env.TWITTER_CONSUMER_SECRET as string
+const consumerKey = Bun.env.TWITTER_CONSUMER_KEY
+const consumerSecret = Bun.env.TWITTER_CONSUMER_SECRET
 
 const SLOTS = [10, 12, 14]
 

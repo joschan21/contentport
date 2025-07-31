@@ -11,7 +11,7 @@ import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-const BUCKET_NAME = Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME as string
+const BUCKET_NAME = Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME
 
 const ALLOWED_DOCUMENT_TYPES = [
   'application/pdf',

@@ -2,8 +2,8 @@ import { TwitterApi } from 'twitter-api-v2'
 import 'dotenv/config'
 import * as fs from 'fs'
 
-const consumerKey = Bun.env.TWITTER_CONSUMER_KEY as string
-const consumerSecret = Bun.env.TWITTER_CONSUMER_SECRET as string
+const consumerKey = Bun.env.TWITTER_CONSUMER_KEY
+const consumerSecret = Bun.env.TWITTER_CONSUMER_SECRET
 
 const client = new TwitterApi({
   appKey: consumerKey,

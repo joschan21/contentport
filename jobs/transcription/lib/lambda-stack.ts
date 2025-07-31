@@ -18,7 +18,7 @@ export class TranscriptionStack extends cdk.Stack {
       memorySize: 2048,
       ephemeralStorageSize: cdk.Size.gibibytes(2),
       environment: {
-        OPENAI_API_KEY: Bun.env.OPENAI_API_KEY || '',
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
       },
     })
 

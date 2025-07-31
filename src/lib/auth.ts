@@ -4,7 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { createAuthMiddleware } from 'better-auth/api'
 import { PostHog } from 'posthog-node'
 
-const client = new PostHog(Bun.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+const client = new PostHog(Bun.env.NEXT_PUBLIC_POSTHOG_KEY, {
   host: 'https://eu.i.posthog.com',
 })
 
@@ -48,12 +48,12 @@ export const auth = betterAuth({
   database,
   socialProviders: {
     google: {
-      clientId: Bun.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: Bun.env.GOOGLE_CLIENT_SECRET as string,
+      clientId: Bun.env.GOOGLE_CLIENT_ID,
+      clientSecret: Bun.env.GOOGLE_CLIENT_SECRET,
     },
     twitter: {
-      clientId: Bun.env.TWITTER_CLIENT_ID as string,
-      clientSecret: Bun.env.TWITTER_CLIENT_SECRET as string,
+      clientId: Bun.env.TWITTER_CLIENT_ID,
+      clientSecret: Bun.env.TWITTER_CLIENT_SECRET,
       scope: [
         'tweet.read',
         'tweet.write',
