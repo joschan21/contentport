@@ -1,86 +1,69 @@
-## contentport
+# contentport
 
-MVP
+Contentport is an open-source AI-powered content creation and publishing platform built on JStack (Next.js, TypeScript, Tailwind CSS, Drizzle ORM, and Bun).
 
-- [x] Style dropdown and config
-- [x] Make assistant list improvements
-- [x] No refresh needed after new context doc
-- [ ] Remove save/history
+## Features
 
-style tab:
+- AI-assisted tweet composition with context-aware suggestions
+- Real-time content editing and history management
+- Integrated image and media handling
+- Stripe-based subscription and payment management
+- Plugin architecture for custom extensions
 
-- [ ] Add new style
-- [ ] Import tweets
-- [ ] Custom prompt
+## Tech Stack
 
-edit tool should just know about:
+- Next.js 14 with App Router
+- TypeScript
+- Tailwind CSS for styling
+- Drizzle ORM for database interactions
+- Bun for runtime and package management
+- Qstash for background jobs and webhooks
 
-- [ ] Current message
-- [ ] Previous suggestions
-- [ ] Current tweet state
+## Getting Started
 
-CURRENT
+### Prerequisites
 
-- [ ] Remove "al tweets" - just show all for simplicity
+- Node.js 20+ or Bun
+- pnpm (recommended) or npm/yarn
+- PostgreSQL or Redis instance (as configured in your environment)
+- Stripe account for subscription features
 
-BUGS
+### Installation
 
-- [ ] Safari image editor doesnt work
-- [ ] Chrome edit image doesnt work
-- [ ] After some time most recent tweets are not shown in sidebar, only after reloading
+```bash
+# Clone the repository
+git clone https://github.com/joschan21/contentport.git
+cd contentport
 
-NEED TO DO BEFORE NEXT SHIP:
+# Install dependencies
+pnpm install
 
-BUG FIXES
+# Copy environment variables template and configure
+cp .env.example .env
 
-- [ ] When clicking "new tweet", start a new chat
+# Run database migrations and seed data
+bun prisma migrate dev --name init
 
-PRIORITY
+# Seed Stripe products
+bun run seed-stripe
 
-- [ ] One tweet can override another in recents HARD
-- [ ] Implement back rate-limiting EASY
-- [ ] Allow navigation while chatting to asisstant (ideally just like openai desktop) HARD
-      HOTFIX: force nav to studio if not already there
-- [ ] Refresh knowledge base after onboarding and after inserting new document EASY
-      LET IN BATCH - 50
-- [ ] Drafts (3 to choose from)
-- [ ] Offer option to save as knowledge doc EASY
-      LET IN BATCH
-- [ ] Image editor fixes HARD
-- [ ] Image tool doesnt work anymore
-      LET IN BATCH
+# Start development server
+pnpm dev
+```
 
-FEATURE IDEAS
+### Deployment
 
-- [ ] Show related documents to user query in chat (e.g. typed in ...about contentport) -> suggest docs related to contentport above certain threshold (0.9)
+Contentport can be deployed on Vercel, Cloudflare Pages, or any Next.js-compatible platform:
 
-### Before pushing to prod
+```bash
+pnpm build
+pnpm start
+```
 
-- Set the stripe secret and public keys to prod values
-- Check that the values in `src/constants/stripe-prodcuts.ts` have the values you want for the production product
-- Reset values of `src/constants/stripe-subscription.ts` to `null` so that seeding will populate the constant used in the code to production product values
-- Run the seed-stripe command
-- Commit the seeded product json file
-- Push to prod
+## Contributing
 
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines and setup instructions.
 
+## License
 
-
-- q: how do I upload videos? dragging not too intuitive
-
-
-
-UX problems
-- pages not integrated well with each other
-- no visual option to add images / videos directly
-- no realistic twitter preview
-- you cannot @people
-
-
-
-TO BECOME OPEN
-- queueing tweet then editing -> duplicate in queue (X)
-- rejecting doesnt work well?
-- do something with posted tweets
-- allow deleting uploading (in progress) images in chat
-- make uploading image not un-focus editor
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
