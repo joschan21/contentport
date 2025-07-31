@@ -15,7 +15,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { Account } from '../settings-router'
 
 const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
+  apiKey: Bun.env.OPENROUTER_API_KEY,
 })
 
 interface CreateEditTweetArgs {

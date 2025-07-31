@@ -11,7 +11,7 @@ import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-const BUCKET_NAME = process.env.NEXT_PUBLIC_S3_BUCKET_NAME as string
+const BUCKET_NAME = Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME as string
 
 const ALLOWED_DOCUMENT_TYPES = [
   'application/pdf',
@@ -178,7 +178,7 @@ export const fileRouter = j.router({
 
       if (type === 'pdf') {
         const response = await fetch(
-          `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
+          `https://${Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
         )
         const buffer = await response.arrayBuffer()
         const { info, text } = await pdfParse(Buffer.from(buffer))
@@ -202,7 +202,7 @@ export const fileRouter = j.router({
         )
       } else if (type === 'docx') {
         const response = await fetch(
-          `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
+          `https://${Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
         )
         const buffer = await response.arrayBuffer()
         const { value } = await mammoth.extractRawText({
@@ -212,7 +212,7 @@ export const fileRouter = j.router({
         description = value.slice(0, 100)
       } else if (type === 'txt') {
         const response = await fetch(
-          `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
+          `https://${Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${fileKey}`,
         )
         const text = await response.text()
         description = text.slice(0, 100)

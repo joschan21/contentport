@@ -4,7 +4,7 @@ import { tool } from 'ai'
 import { TwitterApi } from 'twitter-api-v2'
 import { z } from 'zod'
 
-const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
+const client = new TwitterApi(Bun.env.TWITTER_BEARER_TOKEN!).readOnly
 
 const isTwitterUrl = (url: string): boolean => {
   return /^https?:\/\/(twitter\.com|x\.com)\/\w+\/status\/\d+/.test(url)

@@ -17,7 +17,7 @@ import { createAnthropic } from "@ai-sdk/anthropic"
 
 const anthropic = createAnthropic()
 
-const translator = new deepl.Translator(process.env.DEEPL_API_KEY || "")
+const translator = new deepl.Translator(Bun.env.DEEPL_API_KEY || "")
 const writingStyle = deepl.WritingStyle
 const writingTone = deepl.WritingTone
 
@@ -126,7 +126,7 @@ export const voiceRouter = j.router({
       //                 {
       //                   method: "POST",
       //                   headers: {
-      //                     Authorization: `DeepL-Auth-Key ${process.env.DEEPL_API_KEY}`,
+      //                     Authorization: `DeepL-Auth-Key ${Bun.env.DEEPL_API_KEY}`,
       //                     "Content-Type": "application/json",
       //                   },
       //                   body: JSON.stringify({

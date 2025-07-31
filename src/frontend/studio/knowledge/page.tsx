@@ -292,7 +292,7 @@ export default function KnowledgePage() {
                   href={
                     doc.type === 'url' && doc.sourceUrl
                       ? doc.sourceUrl
-                      : `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`
+                      : `https://${Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`
                   }
                   target="_blank"
                   rel="noopener noreferrer"
@@ -342,7 +342,7 @@ export default function KnowledgePage() {
                       {doc.type === 'image' ? (
                         <img
                           className="w-full bg-[size:10px_10px] border border-gray-200 bg-fixed bg-[image:repeating-linear-gradient(315deg,rgba(209,213,219,0.4)_0,rgba(209,213,219,0.4)_1px,_transparent_0,_transparent_50%)] max-h-40 object-contain rounded-md"
-                          src={`https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`}
+                          src={`https://${Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`}
                         />
                       ) : null}
                     </div>

@@ -18,7 +18,7 @@ export type Account = {
   verified: boolean
 }
 
-const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
+const client = new TwitterApi(Bun.env.TWITTER_BEARER_TOKEN!).readOnly
 
 interface Settings {
   user: {

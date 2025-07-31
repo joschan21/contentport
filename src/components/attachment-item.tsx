@@ -140,7 +140,7 @@ function ImageAttachment({ attachment, onRemove, className }: ImageReferenceProp
     queryFn: async () => {
       const res = await client.knowledge.getDocument.$get({ id: attachment.id })
       const { document } = await res.json()
-      const url = `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${document.s3Key}`
+      const url = `https://${Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${document.s3Key}`
 
       return { url }
     },

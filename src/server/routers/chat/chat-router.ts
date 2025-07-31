@@ -28,7 +28,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { getAccount } from '../utils/get-account'
 
 const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
+  apiKey: Bun.env.OPENROUTER_API_KEY,
 })
 
 // ==================== Types ====================
@@ -162,7 +162,7 @@ export const chatRouter = j.router({
         throw new HTTPException(412, { message: 'No connected account' })
       }
 
-      if (process.env.NODE_ENV === 'production') {
+      if (Bun.env.NODE_ENV === 'production') {
         const { success } = await limiter.limit(user.email)
 
         if (!success) {

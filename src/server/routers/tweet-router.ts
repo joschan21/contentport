@@ -29,12 +29,12 @@ import {
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 
 const receiver = new Receiver({
-  currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY as string,
-  nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY as string,
+  currentSigningKey: Bun.env.QSTASH_CURRENT_SIGNING_KEY as string,
+  nextSigningKey: Bun.env.QSTASH_NEXT_SIGNING_KEY as string,
 })
 
-const consumerKey = process.env.TWITTER_CONSUMER_KEY as string
-const consumerSecret = process.env.TWITTER_CONSUMER_SECRET as string
+const consumerKey = Bun.env.TWITTER_CONSUMER_KEY as string
+const consumerSecret = Bun.env.TWITTER_CONSUMER_SECRET as string
 
 const SLOTS = [10, 12, 14]
 
@@ -50,7 +50,7 @@ async function fetchMediaFromS3(media: { s3Key: string; media_id: string }[]) {
           }),
         )
 
-        const url = `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${m.s3Key}`
+        const url = `https://${Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${m.s3Key}`
         const contentType = headResponse.ContentType || ''
 
         // Determine media type from content-type or file extension
@@ -247,7 +247,7 @@ export const tweetRouter = j.router({
         accessSecret: account.accessSecret as string,
       })
 
-      const mediaUrl = `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${s3Key}`
+      const mediaUrl = `https://${Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${s3Key}`
       const response = await fetch(mediaUrl)
 
       if (!response.ok) {
@@ -383,7 +383,7 @@ export const tweetRouter = j.router({
       }
 
       const baseUrl =
-        process.env.NODE_ENV === 'development'
+        Bun.env.NODE_ENV === 'development'
           ? 'https://sponge-relaxing-separately.ngrok-free.app'
           : getBaseUrl()
 
@@ -483,7 +483,7 @@ export const tweetRouter = j.router({
       const tweetId = crypto.randomUUID()
 
       const baseUrl =
-        process.env.NODE_ENV === 'development'
+        Bun.env.NODE_ENV === 'development'
           ? 'https://sponge-relaxing-separately.ngrok-free.app'
           : getBaseUrl()
 
@@ -904,7 +904,7 @@ export const tweetRouter = j.router({
       }) {
         // hours of the day
         // const userUnix = fromZonedTime(userNow, timezone).getTime()
-        // const toServerTz = toZonedTime(userUnix, process.env.TZ)
+        // const toServerTz = toZonedTime(userUnix, Bun.env.TZ)
         // const userUnix = userNow.getTime()
 
         for (let dayOffset = 0; dayOffset <= maxDaysAhead; dayOffset++) {
@@ -949,7 +949,7 @@ export const tweetRouter = j.router({
       const tweetId = crypto.randomUUID()
 
       const baseUrl =
-        process.env.NODE_ENV === 'development'
+        Bun.env.NODE_ENV === 'development'
           ? 'https://sponge-relaxing-separately.ngrok-free.app'
           : getBaseUrl()
 

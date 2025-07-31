@@ -143,7 +143,7 @@ export function KnowledgeSelector({ onSelectDocument }: KnowledgeSelectorProps) 
                           <div className="flex items-center justify-center size-10 rounded-lg bg-stone-200 transition-colors">
                             {doc.type === 'image' ? (
                               <img
-                                src={`https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`}
+                                src={`https://${Bun.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${doc.s3Key}`}
                                 alt={doc.title ?? 'document preview'}
                                 className="w-full h-full object-cover rounded-lg"
                               />

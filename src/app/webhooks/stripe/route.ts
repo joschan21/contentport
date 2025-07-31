@@ -12,7 +12,7 @@ import { STRIPE_SUBSCRIPTION_DATA } from '@/constants/stripe-subscription'
  * @returns {{ event: Stripe.Event | null }} The verified Stripe event, or null if verification failed or secret missing.
  */
 const validateWebhook = async ({ body, signature }: { body: any; signature: string }) => {
-  const { STRIPE_WEBHOOK_SECRET } = process.env
+  const { STRIPE_WEBHOOK_SECRET } = Bun.env
 
   if (!STRIPE_WEBHOOK_SECRET) return { event: null }
 
