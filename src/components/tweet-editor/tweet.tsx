@@ -646,6 +646,26 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
     }
   }
 
+  const handlePaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+
+    const files: File[] = []
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (!item) continue
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) files.push(file)
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault()
+      await handleFiles(files)
+    }
+  }
+
   const removeMediaFile = (url: string) => {
     // Get and abort the single controller
     const controller = abortControllersRef.current.get(url)
