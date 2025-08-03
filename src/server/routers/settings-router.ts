@@ -215,9 +215,9 @@ export const settingsRouter = j.router({
           profile_image_url: userProfile.profile_image_url_https,
         })
       } catch (error) {
-        console.error('Failed to refresh profile picture:', error)
+        console.error('Failed to refresh profile data:', error)
         throw new HTTPException(500, {
-          message: 'Failed to refresh profile picture from Twitter',
+          message: 'Failed to refresh profile data from Twitter',
         })
       }
     }),

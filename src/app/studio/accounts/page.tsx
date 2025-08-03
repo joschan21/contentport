@@ -220,7 +220,7 @@ export default function AccountsPage() {
   })
 
   const {
-    mutate: refreshProfilePicture,
+    mutate: refreshProfileData,
     isPending: isRefreshingProfile,
     variables: refreshProfileVariables,
   } = useMutation({
@@ -482,7 +482,7 @@ export default function AccountsPage() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <DuolingoButton
-                                  onClick={() => refreshProfilePicture({ accountId: acc.id })}
+                                  onClick={() => refreshProfileData({ accountId: acc.id })}
                                   variant="secondary"
                                   size="icon"
                                   className="h-6 w-6 p-1"
