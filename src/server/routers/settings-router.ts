@@ -160,4 +160,65 @@ export const settingsRouter = j.router({
 
       return c.json({ success: true, account })
     }),
+
+  refresh_profile_data: privateProcedure
+    .input(z.object({ accountId: z.string() }))
+    .mutation(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { accountId } = input
+
+      const account = await redis.json.get<Account>(`account:${user.email}:${accountId}`)
+
+      if (!account) {
+        throw new HTTPException(404, { message: `Account "${accountId}" not found` })
+      }
+
+      const dbAccount = await db.query.account.findFirst({
+        where: and(eq(accountSchema.userId, user.id), eq(accountSchema.id, accountId)),
+      })
+
+      if (!dbAccount || !dbAccount.accessToken) {
+        throw new HTTPException(400, {
+          message: 'Twitter account not connected or access tokens missing',
+        })
+      }
+
+      try {
+        const twitterClient = new TwitterApi({
+          appKey: process.env.TWITTER_CONSUMER_KEY as string,
+          appSecret: process.env.TWITTER_CONSUMER_SECRET as string,
+          accessToken: dbAccount.accessToken as string,
+          accessSecret: dbAccount.accessSecret as string,
+        })
+
+        const userProfile = await twitterClient.currentUser()
+
+        const updatedAccount = {
+          ...account,
+          profile_image_url: userProfile.profile_image_url_https,
+          name: userProfile.name,
+          username: userProfile.screen_name,
+        }
+
+        await redis.json.set(`account:${user.email}:${accountId}`, '$', updatedAccount)
+
+        const activeAccount = await redis.json.get<Account>(
+          `active-account:${user.email}`,
+        )
+        if (activeAccount?.id === accountId) {
+          await redis.json.set(`active-account:${user.email}`, '$', updatedAccount)
+        }
+
+        return c.json({
+          success: true,
+          account: updatedAccount,
+          profile_image_url: userProfile.profile_image_url_https,
+        })
+      } catch (error) {
+        console.error('Failed to refresh profile picture:', error)
+        throw new HTTPException(500, {
+          message: 'Failed to refresh profile picture from Twitter',
+        })
+      }
+    }),
 })
