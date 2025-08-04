@@ -712,7 +712,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
 
   const { mutate: enqueueTweet, isPending: isQueueing } = useMutation({
     mutationFn: async ({ content, media }: EnqueuePostArgs) => {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const timezone = localStorage.getItem("userTimezone") || Intl.DateTimeFormat().resolvedOptions().timeZone
       const userNow = new Date()
 
       const res = await client.tweet.enqueue_tweet.$post({
