@@ -162,7 +162,7 @@ export const chatRouter = j.router({
 
       const limiter =
         user.plan === 'pro'
-          ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(40, '4h') })
+          ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(80, '4h') })
           : new Ratelimit({ redis, limiter: Ratelimit.fixedWindow(5, '1d') })
 
       const [account, history, parsedAttachments, limitResult] = await Promise.all([
