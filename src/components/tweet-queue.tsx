@@ -47,7 +47,7 @@ export default function TweetQueue() {
   const router = useRouter()
 
   const userNow = new Date()
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const timezone = localStorage.getItem("userTimezone") || Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const [skipPostConfirmation, setSkipPostConfirmation] = useState(false)
   const [didTogglePostConfirmation, setDidTogglePostConfirmation] = useState(false)
