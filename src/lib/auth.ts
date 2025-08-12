@@ -23,7 +23,21 @@ function getBaseUrl() {
   return `https://contentport.io`
 }
 
+const getTrustedOrigins = () => {
+  const origins: string[] = []
+
+  if (process.env.VERCEL_BRANCH_URL) origins.push(process.env.VERCEL_BRANCH_URL)
+  if (process.env.VERCEL_URL) origins.push(process.env.VERCEL_URL)
+  if (process.env.BETTER_AUTH_URL) origins.push(process.env.BETTER_AUTH_URL)
+
+  origins.push('https://contentport.io')
+  origins.push('http://localhost:3000')
+
+  return origins
+}
+
 export const auth = betterAuth({
+  trustedOrigins: getTrustedOrigins(),
   plugins: [
     oAuthProxy({
       productionURL: 'https://contentport.io',
