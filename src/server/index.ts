@@ -13,18 +13,21 @@ const api = j
   .basePath('/api')
   .use(
     cors({
-      origin: '*',
+      origin: (origin) => origin,
       allowHeaders: [
-        'x-is-superjson',
         'Content-Type',
+        'Authorization',
+        'x-is-superjson',
         'content-type',
         'authorization',
         'x-requested-with',
       ],
-      exposeHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
+      allowMethods: ['POST', 'GET', 'OPTIONS'],
+      exposeHeaders: ['x-is-superjson', 'Content-Type', 'content-type', 'Content-Length'],
       credentials: true,
     }),
   )
+  .onError(j.defaults.errorHandler)
 
 /**
  * This is the main router for your server.
