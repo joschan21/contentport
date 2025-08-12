@@ -27,6 +27,7 @@ export const auth = betterAuth({
   plugins: [
     oAuthProxy({
       productionURL: 'https://contentport.io',
+      currentURL: `https://${process.env.VERCEL_BRANCH_URL}`,
     }),
   ],
   databaseHooks: {
