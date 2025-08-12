@@ -11,7 +11,20 @@ const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
 
 const database = drizzleAdapter(db, { provider: 'pg' })
 
+function getBaseUrl() {
+  if (typeof window !== 'undefined') return window.location.origin
+
+  if (process.env.NODE_ENV === 'development') return 'http://localhost:3000'
+
+  if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL
+  if (process.env.VERCEL_BRANCH_URL) return `https://${process.env.VERCEL_URL}`
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+
+  return `https://contentport.io`
+}
+
 export const auth = betterAuth({
+  baseURL: getBaseUrl(),
   plugins: [
     oAuthProxy({
       productionURL: 'https://contentport.io',
