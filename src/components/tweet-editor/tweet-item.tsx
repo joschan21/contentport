@@ -3,12 +3,18 @@
 import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
 import { MediaFile, MemoryTweet, useTweetsV2 } from '@/hooks/use-tweets-v2'
 import { client } from '@/lib/client'
+import { LinkPreviewPlugin } from '@/lib/lexical-plugins/link-preview-plugin'
 import MentionsPlugin from '@/lib/lexical-plugins/mention-plugin'
 import { MentionTooltipPlugin } from '@/lib/lexical-plugins/mention-tooltip-plugin'
 import { ShadowEditorSyncPlugin } from '@/lib/lexical-plugins/sync-plugin'
 import { MentionNode, MentionNode2 } from '@/lib/nodes'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
 import { cn } from '@/lib/utils'
+import { AutoLinkNode } from '@lexical/link'
+import {
+  AutoLinkPlugin,
+  createLinkMatcherWithRegExp,
+} from '@lexical/react/LexicalAutoLinkPlugin'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
@@ -39,6 +45,13 @@ const TWITTER_MEDIA_TYPES = {
   video: ['video/mp4', 'video/quicktime', 'video/x-msvideo'],
 } as const
 
+const URL_REGEX =
+  /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/g
+
+const MATCHERS = createLinkMatcherWithRegExp(URL_REGEX, (text) => {
+  return text.startsWith('http') ? text : `https://${text}`
+})
+
 const TWITTER_SIZE_LIMITS = {
   image: 5 * 1024 * 1024, // 5MB
   gif: 15 * 1024 * 1024, // 15MB
@@ -64,7 +77,7 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
     onError: (error: Error) => {
       console.error('[Tweet Editor Error]', error)
     },
-    nodes: [MentionNode, MentionNode2],
+    nodes: [MentionNode, MentionNode2, AutoLinkNode],
   }
 
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map())
@@ -141,10 +154,10 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
       return await res.json()
     },
     onSuccess: ({ media_id }) => {
-      //   setCurrentTweet((prev) => ({
-      //     ...prev,
-      //     mediaIds: [...prev.mediaIds, media_id],
-      //   }))
+      // setCurrentTweet((prev) => ({
+      //   ...prev,
+      //   mediaIds: [...prev.mediaIds, media_id],
+      // }))
     },
     onSettled: (data, error, variables) => {
       // Clean up controller after both uploads complete
@@ -316,6 +329,7 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
                 <PlainTextPlugin
                   contentEditable={
                     <ContentEditable
+                      id="editor"
                       spellCheck={false}
                       onPaste={handlePaste}
                       className={cn(
@@ -329,6 +343,8 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
                 <HistoryPlugin />
                 <MentionsPlugin />
                 <MentionTooltipPlugin />
+                <AutoLinkPlugin matchers={[MATCHERS]} />
+                <LinkPreviewPlugin tweetId={tweet.id} />
                 <ShadowEditorSyncPlugin tweetId={tweet.id} />
               </LexicalComposer>
             </div>
@@ -453,7 +469,6 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
 
                 <ContentLengthIndicator tweetId={tweet.id} />
               </div>
-              <div className="flex items-center gap-2"></div>
             </div>
           </div>
         </div>

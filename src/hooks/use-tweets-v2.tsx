@@ -1,5 +1,6 @@
 import { MentionNode, MentionNode2 } from '@/lib/nodes'
 import { TweetWithMedia } from '@/server/routers/tweet/fetch-media-from-s3'
+import { AutoLinkNode } from '@lexical/link'
 import {
   $createParagraphNode,
   $createTextNode,
@@ -8,12 +9,7 @@ import {
   LexicalEditor,
 } from 'lexical'
 import { nanoid } from 'nanoid'
-import {
-  createContext,
-  useContext,
-  useRef,
-  useState
-} from 'react'
+import { createContext, useContext, useRef, useState } from 'react'
 
 export const initialConfig = {
   namespace: `tweet-editor`,
@@ -27,7 +23,7 @@ export const initialConfig = {
   onError: (error: Error) => {
     console.error('[Tweet Editor Error]', error)
   },
-  nodes: [MentionNode, MentionNode2],
+  nodes: [MentionNode, MentionNode2, AutoLinkNode],
 }
 
 export interface MediaFile {
@@ -64,6 +60,15 @@ type TweetContextType = {
   removeMediaFile: (tweetId: string, mediaId: string) => void
   clearMediaFiles: (tweetId: string) => void
 
+  // preview links
+  setPreviewLinks: (
+    tweetId: string,
+    changes: {
+      url: string
+      dismissed: boolean
+    }[],
+  ) => void
+
   // utils
   downloadMediaFile: (mediaFile: MediaFile) => void
   toPayloadTweet: (tweet: MemoryTweet) => PayloadTweet
@@ -74,10 +79,16 @@ type TweetContextType = {
 
 const TweetContext = createContext<TweetContextType | null>(null)
 
+export interface LinkPreview {
+  url: string
+  dismissed: boolean
+}
+
 export type MemoryTweet = {
   id: string
   mediaFiles: MediaFile[]
   editor: LexicalEditor | undefined
+  previewLinks: LinkPreview[]
 }
 
 export type PayloadTweet = {
@@ -110,6 +121,7 @@ export const TweetV2Provider = ({ children }: { children: React.ReactNode }) => 
       id: initialTweetId.current,
       mediaFiles: [],
       editor: shadowEditors.current[initialTweetId.current],
+      previewLinks: [],
     },
   ])
 
@@ -166,6 +178,7 @@ export const TweetV2Provider = ({ children }: { children: React.ReactNode }) => 
         id: newTweetId,
         mediaFiles: [],
         editor: shadowEditors.current[newTweetId],
+        previewLinks: [],
       },
     ])
   }
@@ -233,6 +246,58 @@ export const TweetV2Provider = ({ children }: { children: React.ReactNode }) => 
   }
 
   /**
+   * PREVIEW LINKS
+   */
+  const setPreviewLinks = (
+    tweetId: string,
+    changes: { url: string; dismissed: boolean }[],
+  ) => {
+    // const previewLinks = changes.map(({ url, action }) => {
+    //   // const dismissed = Boolean(
+    //   //   tweets.find((t) =>
+    //   //     t.previewLinks.some((l) => l.url === previousUrl && !l.dismissed),
+    //   //   ),
+    //   // )
+
+    //   return { url, dismissed: false }
+    // })
+
+    setTweets((prev) =>
+      prev.map((tweet) =>
+        tweet.id === tweetId
+          ? {
+              ...tweet,
+              previewLinks: changes,
+            }
+          : tweet,
+      ),
+    )
+  }
+
+  const dismissPreviewLink = (tweetId: string, url: string) => {
+    setTweets((prev) =>
+      prev.map((tweet) =>
+        tweet.id === tweetId
+          ? {
+              ...tweet,
+              previewLinks: tweet.previewLinks.map((link) =>
+                link.url === url ? { ...link, dismissed: true } : link,
+              ),
+            }
+          : tweet,
+      ),
+    )
+  }
+
+  const clearPreviewLinks = (tweetId: string) => {
+    setTweets((prev) =>
+      prev.map((tweet) =>
+        tweet.id === tweetId ? { ...tweet, previewLinks: [] } : tweet,
+      ),
+    )
+  }
+
+  /**
    * UTILS
    */
 
@@ -293,6 +358,7 @@ export const TweetV2Provider = ({ children }: { children: React.ReactNode }) => 
         id: baseId,
         mediaFiles: [],
         editor: shadowEditors.current[baseId],
+        previewLinks: [],
       },
     ])
   }
@@ -333,6 +399,7 @@ export const TweetV2Provider = ({ children }: { children: React.ReactNode }) => 
         id: tweet.id,
         mediaFiles,
         editor: shadowEditors.current[tweet.id],
+        previewLinks: [],
       })
     }
 
@@ -353,6 +420,8 @@ export const TweetV2Provider = ({ children }: { children: React.ReactNode }) => 
         updateMediaFile,
         removeMediaFile,
         clearMediaFiles,
+        // preview links
+        setPreviewLinks,
         // utils
         downloadMediaFile,
         toPayloadTweet,

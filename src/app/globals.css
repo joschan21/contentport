@@ -183,6 +183,10 @@ body {
   @apply inline;
 }
 
+#editor a {
+  @apply text-blue-600
+}
+
 /* node styles */
 .mention-text {
   @apply text-indigo-800 bg-indigo-100 rounded-sm px-1 py-0.5;

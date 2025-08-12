@@ -17,6 +17,7 @@ import { getAccount } from '../utils/get-account'
 import { fetchMediaFromS3 } from './fetch-media-from-s3'
 import { postThreadToTwitter } from './posting-utils'
 import { getNextAvailableQueueSlot } from './queue-utils'
+import { waitUntil } from '@vercel/functions'
 
 const consumerKey = process.env.TWITTER_CONSUMER_KEY as string
 const consumerSecret = process.env.TWITTER_CONSUMER_SECRET as string
@@ -1317,7 +1318,7 @@ export const tweetRouter = j.router({
         userNow,
         timezone,
         maxDaysAhead: 90,
-        isAdmin: Boolean(user.isAdmin)
+        isAdmin: Boolean(user.isAdmin),
       })
 
       if (!nextSlot) {
@@ -1330,5 +1331,129 @@ export const tweetRouter = j.router({
         scheduledUnix: nextSlot.getTime(),
         scheduledDate: nextSlot.toISOString(),
       })
+    }),
+
+  getOpenGraph: privateProcedure
+    .input(
+      z.object({
+        url: z
+          .string()
+          .transform((url) => {
+            if (!/^https?:\/\//i.test(url)) {
+              return `https://${url}`
+            }
+
+            return url.replace(/^http:/i, 'https:')
+          })
+          .pipe(z.string()),
+      }),
+    )
+    .get(async ({ c, ctx, input }) => {
+      const { url } = input
+
+      const cacheKey = `og:${url}`
+      const cached = await redis.get<{
+        image: string | null
+        title: string | null
+        description: string | null
+        siteName: string | null
+      }>(cacheKey)
+
+      if (cached) {
+        return c.json(cached)
+      }
+
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (compatible; ContentportBot/1.0; +https://contentport.io)',
+          },
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        })
+
+        if (!response.ok) {
+          return c.json({ image: null, title: null, description: null, siteName: null })
+        }
+
+        const html = await response.text()
+
+        const getMetaContent = (property: string): string | null => {
+          const propertyMatch =
+            html.match(
+              new RegExp(
+                `<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']+)["']`,
+                'i',
+              ),
+            ) ||
+            html.match(
+              new RegExp(
+                `<meta[^>]*content=["']([^"']+)["'][^>]*property=["']${property}["']`,
+                'i',
+              ),
+            )
+
+          const nameMatch =
+            html.match(
+              new RegExp(
+                `<meta[^>]*name=["']${property}["'][^>]*content=["']([^"']+)["']`,
+                'i',
+              ),
+            ) ||
+            html.match(
+              new RegExp(
+                `<meta[^>]*content=["']([^"']+)["'][^>]*name=["']${property}["']`,
+                'i',
+              ),
+            )
+
+          return propertyMatch?.[1] || nameMatch?.[1] || null
+        }
+
+        let ogImage =
+          getMetaContent('og:image') ||
+          getMetaContent('og:image:url') ||
+          getMetaContent('og:image:secure_url') ||
+          getMetaContent('twitter:image') ||
+          getMetaContent('twitter:image:src')
+
+        if (ogImage && !ogImage.startsWith('http')) {
+          const baseUrl = new URL(url)
+          if (ogImage.startsWith('//')) {
+            ogImage = `${baseUrl.protocol}${ogImage}`
+          } else if (ogImage.startsWith('/')) {
+            ogImage = `${baseUrl.origin}${ogImage}`
+          } else {
+            ogImage = `${baseUrl.origin}/${ogImage}`
+          }
+        }
+
+        const ogTitle =
+          getMetaContent('og:title') ||
+          getMetaContent('twitter:title') ||
+          html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim()
+
+        const ogDescription =
+          getMetaContent('og:description') ||
+          getMetaContent('twitter:description') ||
+          getMetaContent('description')
+
+        const ogSiteName =
+          getMetaContent('og:site_name') || new URL(url).hostname.replace('www.', '')
+
+        const result = {
+          image: ogImage,
+          title: ogTitle,
+          description: ogDescription,
+          siteName: ogSiteName,
+        }
+
+        waitUntil(redis.set(cacheKey, result, { ex: 3600 }))
+
+        return c.json(result)
+      } catch (error) {
+        console.error('Error fetching OG data:', error)
+        return c.json({ image: null, title: null, description: null, siteName: null })
+      }
     }),
 })

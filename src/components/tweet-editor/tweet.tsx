@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { Plus, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { TweetItem } from './tweet-item'
+import { useRef, useState } from 'react'
 
 interface TweetProps {
   editMode?: boolean
