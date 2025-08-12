@@ -19,6 +19,8 @@ const api = j
         'https://www.contentport.io',
         'https://contentport.vercel.app',
         'https://www.contentport.vercel.app',
+        'https://contentport-git-feat-thread-support-joschan21s-projects.vercel.app',
+        'https://www.contentport-git-feat-thread-support-joschan21s-projects.vercel.app',
       ],
       allowHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
       exposeHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
@@ -40,6 +42,7 @@ const appRouter = j.mergeRouters(api, {
   settings: dynamic(() => import('./routers/settings-router')),
   auth_router: dynamic(() => import('./routers/auth-router')),
   stripe: dynamic(() => import('./routers/stripe-router')),
+  processing: dynamic(() => import('./routers/processing-router')),
 })
 
 export type AppRouter = typeof appRouter
