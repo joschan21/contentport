@@ -13,21 +13,26 @@ const api = j
   .basePath('/api')
   .use(
     cors({
-      origin: [
-        'http://localhost:3000',
-        'https://contentport.io',
-        'https://www.contentport.io',
-        'https://contentport.vercel.app',
-        'https://www.contentport.vercel.app',
-        'https://contentport-git-feat-thread-support-joschan21s-projects.vercel.app',
-        'https://www.contentport-git-feat-thread-support-joschan21s-projects.vercel.app',
+      origin: (origin, c) => {
+        if (!origin) return null
+
+        if (origin.includes('localhost')) return origin
+        if (origin.includes('vercel.app')) return origin
+        if (origin.includes('contentport.io')) return origin
+
+        return null
+      },
+      allowHeaders: [
+        'x-is-superjson',
+        'Content-Type',
+        'content-type',
+        'authorization',
+        'x-requested-with',
       ],
-      allowHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
       exposeHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
       credentials: true,
     }),
   )
-  .onError(j.defaults.errorHandler)
 
 /**
  * This is the main router for your server.
