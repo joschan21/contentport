@@ -37,6 +37,7 @@ const getTrustedOrigins = () => {
 }
 
 export const auth = betterAuth({
+  baseURL: getBaseUrl(),
   trustedOrigins: getTrustedOrigins(),
   plugins: [
     oAuthProxy({
