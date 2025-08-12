@@ -104,11 +104,11 @@ export const auth = betterAuth({
     after: createAuthMiddleware(async (ctx) => {
       const session = ctx.context.newSession
 
-      if (session) {
-        ctx.redirect('/studio')
-      } else {
-        ctx.redirect('/')
-      }
+      // if (session) {
+      //   ctx.redirect('/studio')
+      // } else {
+      //   ctx.redirect('/')
+      // }
     }),
   },
 })
