@@ -24,6 +24,7 @@ function getBaseUrl() {
 }
 
 export const auth = betterAuth({
+  trustedOrigins: [getBaseUrl()],
   baseURL: getBaseUrl(),
   plugins: [
     oAuthProxy({
