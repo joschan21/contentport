@@ -3,8 +3,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { createAuthMiddleware } from 'better-auth/api'
 import { PostHog } from 'posthog-node'
-import { oAuthProxy } from "better-auth/plugins"
-
+import { oAuthProxy } from 'better-auth/plugins'
 
 const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   host: 'https://eu.i.posthog.com',
@@ -13,9 +12,11 @@ const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
 const database = drizzleAdapter(db, { provider: 'pg' })
 
 export const auth = betterAuth({
-  plugins: [oAuthProxy({
-    productionURL: "https://contentport.io"
-  })],
+  plugins: [
+    oAuthProxy({
+      productionURL: 'https://contentport.io',
+    }),
+  ],
   databaseHooks: {
     user: {
       create: {
@@ -56,7 +57,7 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      redirectURI: "https://contentport.io/api/auth/callback/google"
+      redirectURI: 'https://contentport.io/api/auth/callback/google',
     },
     twitter: {
       clientId: process.env.TWITTER_CLIENT_ID as string,
