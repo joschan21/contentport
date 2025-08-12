@@ -13,15 +13,7 @@ const api = j
   .basePath('/api')
   .use(
     cors({
-      origin: (origin, c) => {
-        if (!origin) return null
-
-        if (origin.includes('localhost')) return origin
-        if (origin.includes('vercel.app')) return origin
-        if (origin.includes('contentport.io')) return origin
-
-        return null
-      },
+      origin: '*',
       allowHeaders: [
         'x-is-superjson',
         'Content-Type',
