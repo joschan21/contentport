@@ -62,6 +62,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import ContentLengthIndicator from './content-length-indicator'
 import { Calendar20 } from './date-picker'
 import { ImageTool } from './image-tool'
+import LinkPreview from './link-preview'
 import { nanoid } from 'nanoid'
 
 interface TweetProps {
@@ -98,10 +99,90 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
   const [showPostConfirmModal, setShowPostConfirmModal] = useState(false)
   const [skipPostConfirmation, setSkipPostConfirmation] = useState(false)
   const [didTogglePostConfirmation, setDidTogglePostConfirmation] = useState(false)
+  const [linkPreviewUrl, setLinkPreviewUrl] = useState<string | null>(null)
+  const [dismissedUrls, setDismissedUrls] = useState<Record<string, true>>({})
+  const urlCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const previewShowTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const previewHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastCandidateUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
     setSkipPostConfirmation(localStorage.getItem('skipPostConfirmation') === 'true')
   }, [])
+
+  useEffect(() => {
+    const checkForUrls = () => {
+      const content = shadowEditor?.read(() => $getRoot().getTextContent()) || ''
+
+      const urlRegex = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi
+      const urls = content.match(urlRegex)
+
+      const clearShow = () => {
+        if (previewShowTimeoutRef.current) clearTimeout(previewShowTimeoutRef.current)
+        previewShowTimeoutRef.current = null
+      }
+      const clearHide = () => {
+        if (previewHideTimeoutRef.current) clearTimeout(previewHideTimeoutRef.current)
+        previewHideTimeoutRef.current = null
+      }
+
+      if (urls && urls.length > 0) {
+        const candidate = urls[0]
+        try {
+          // eslint-disable-next-line no-new
+          new URL(candidate)
+
+          if (dismissedUrls[candidate] || candidate === linkPreviewUrl) {
+            lastCandidateUrlRef.current = candidate
+            clearShow()
+            clearHide()
+            return
+          }
+
+          lastCandidateUrlRef.current = candidate
+          clearHide()
+          clearShow()
+          previewShowTimeoutRef.current = setTimeout(() => {
+            if (lastCandidateUrlRef.current === candidate && !dismissedUrls[candidate]) {
+              setLinkPreviewUrl(candidate)
+            }
+          }, 800)
+        } catch {
+          lastCandidateUrlRef.current = null
+          clearShow()
+          if (linkPreviewUrl) {
+            clearHide()
+            previewHideTimeoutRef.current = setTimeout(() => {
+              if (!lastCandidateUrlRef.current) setLinkPreviewUrl(null)
+            }, 800)
+          }
+        }
+      } else {
+        lastCandidateUrlRef.current = null
+        if (linkPreviewUrl) {
+          clearShow()
+          clearHide()
+          previewHideTimeoutRef.current = setTimeout(() => {
+            if (!lastCandidateUrlRef.current) setLinkPreviewUrl(null)
+          }, 800)
+        }
+      }
+    }
+
+    const unregister = shadowEditor?.registerUpdateListener(({ tags }) => {
+      if (!tags.has('force-sync') && !tags.has('system-update')) {
+        if (urlCheckTimeoutRef.current) clearTimeout(urlCheckTimeoutRef.current)
+        urlCheckTimeoutRef.current = setTimeout(checkForUrls, 600)
+      }
+    })
+
+    return () => {
+      unregister?.()
+      if (urlCheckTimeoutRef.current) clearTimeout(urlCheckTimeoutRef.current)
+      if (previewShowTimeoutRef.current) clearTimeout(previewShowTimeoutRef.current)
+      if (previewHideTimeoutRef.current) clearTimeout(previewHideTimeoutRef.current)
+    }
+  }, [shadowEditor, linkPreviewUrl, dismissedUrls])
 
   const toggleSkipConfirmation = (checked: boolean) => {
     setSkipPostConfirmation(checked)
@@ -664,18 +745,45 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
     if (!items) return
 
     const files: File[] = []
+    let pastedText = ''
     
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       if (!item) continue
+      
       if (item.kind === 'file' && item.type.startsWith('image/')) {
         const file = item.getAsFile()
         if (file) files.push(file)
       }
+      
+      if (item.kind === 'string' && item.type === 'text/plain') {
+        pastedText = await new Promise<string>((resolve) => {
+          item.getAsString(resolve)
+        })
+      }
     }
+    
     if (files.length > 0) {
       e.preventDefault()
       await handleFiles(files)
+      return
+    }
+    
+    if (pastedText) {
+      const urlRegex = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi
+      const urls = pastedText.match(urlRegex)
+
+      if (urls && urls.length > 0) {
+        const firstUrl = urls[0]
+        try {
+          new URL(firstUrl)
+          if (previewHideTimeoutRef.current) clearTimeout(previewHideTimeoutRef.current)
+          if (firstUrl && !dismissedUrls[firstUrl] && firstUrl !== linkPreviewUrl) {
+            setLinkPreviewUrl(firstUrl)
+          }
+        } catch {
+        }
+      }
     }
   }
 
@@ -978,6 +1086,11 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
     )
 
     setMediaFiles([])
+    setLinkPreviewUrl(null)
+    setDismissedUrls({})
+    if (urlCheckTimeoutRef.current) clearTimeout(urlCheckTimeoutRef.current)
+    if (previewShowTimeoutRef.current) clearTimeout(previewShowTimeoutRef.current)
+    if (previewHideTimeoutRef.current) clearTimeout(previewHideTimeoutRef.current)
   }
 
   const EditModeWrapper = ({ children }: PropsWithChildren) => {
@@ -1170,6 +1283,18 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                       </div>
                     )}
                   </div>
+                )}
+
+                {linkPreviewUrl && !mediaFiles.length && (
+                  <LinkPreview
+                    url={linkPreviewUrl}
+                    onDismiss={() => {
+                      if (linkPreviewUrl) {
+                        setDismissedUrls((prev) => ({ ...prev, [linkPreviewUrl]: true }))
+                      }
+                      setLinkPreviewUrl(null)
+                    }}
+                  />
                 )}
 
                 <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
