@@ -37,7 +37,7 @@ const getTrustedOrigins = () => {
 }
 
 export const auth = betterAuth({
-  baseURL: getBaseUrl(),
+  baseURL: 'https://contentport-git-feat-thread-support-joschan21s-projects.vercel.app',
   trustedOrigins: getTrustedOrigins(),
   plugins: [
     oAuthProxy({
