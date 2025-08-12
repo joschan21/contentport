@@ -6,7 +6,7 @@ export const authClient = createAuthClient({
     process.env.NODE_ENV === 'production'
       ? process.env.BETTER_AUTH_URL
         ? process.env.BETTER_AUTH_URL
-        : `https://${process.env.VERCEL_BRANCH_URL}`
+        : `https://${process.env.VERCEL_URL}`
       : 'http://localhost:3000',
   plugins: [
     inferAdditionalFields({
