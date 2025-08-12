@@ -1,52 +1,21 @@
 'use client'
 
-import { useState, useEffect, Fragment } from 'react'
-import {
-  format,
-  isAfter,
-  isPast,
-  isToday,
-  isTomorrow,
-  isYesterday,
-  isThisWeek,
-  differenceInDays,
-} from 'date-fns'
-import {
-  Calendar,
-  Clock,
-  Trash2,
-  CheckCircle2,
-  AlertCircle,
-  ExternalLink,
-  Eye,
-} from 'lucide-react'
-import DuolingoButton from '@/components/ui/duolingo-button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { client } from '@/lib/client'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
 import MediaDisplay from '@/components/media-display'
-import DuolingoBadge from '@/components/ui/duolingo-badge'
-import {
-  AccountAvatar,
-  AccountName,
-  AccountHandle,
-  useAccount,
-} from '@/hooks/account-ctx'
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
-import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
-import { ContentEditable } from '@lexical/react/LexicalContentEditable'
-import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
-import { initialConfig } from '@/hooks/use-tweets'
-import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { useRouter } from 'next/navigation'
-import { InferOutput } from '@/server'
-import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import DuolingoBadge from '@/components/ui/duolingo-badge'
+import DuolingoButton from '@/components/ui/duolingo-button'
+import { useAccount } from '@/hooks/account-ctx'
+import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useQuery } from '@tanstack/react-query'
+import { format, isThisWeek, isToday, isTomorrow, isYesterday } from 'date-fns'
+import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import { CheckCircle2, Clock, Eye } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Fragment, useEffect } from 'react'
 
 function InitialContentPlugin({ content }: { content: string }) {
   const [editor] = useLexicalComposerContext()
@@ -65,8 +34,6 @@ function InitialContentPlugin({ content }: { content: string }) {
   return null
 }
 
-type TweetType = InferOutput['tweet']['getScheduledAndPublished']['tweets'][number]
-
 interface TweetListProps {
   mode: 'scheduled' | 'posted'
   title: string
@@ -82,7 +49,6 @@ export default function TweetList({
   emptyStateDescription,
   emptyStateIcon,
 }: TweetListProps) {
-  const queryClient = useQueryClient()
   const { account } = useAccount()
   const router = useRouter()
 
@@ -94,29 +60,6 @@ export default function TweetList({
       return tweets
     },
   })
-
-  const {
-    mutate: deleteTweet,
-    isPending: isDeleting,
-    variables,
-  } = useMutation({
-    mutationFn: async ({ tweetId }: { tweetId: string }) => {
-      await client.tweet.delete.$post({ id: tweetId })
-    },
-    onSuccess: () => {
-      toast.success('Post deleted and unscheduled')
-      queryClient.invalidateQueries({
-        queryKey: ['posted-tweets', account?.username],
-      })
-    },
-    onError: () => {
-      toast.error('Failed to delete tweet')
-    },
-  })
-
-  const handleDeleteScheduled = (id: string) => {
-    deleteTweet({ tweetId: id })
-  }
 
   const groupedTweets = (tweetData || []).reduce(
     (groups, tweet) => {
@@ -137,7 +80,7 @@ export default function TweetList({
 
       return groups
     },
-    {} as Record<string, TweetType[]>,
+    {} as Record<string, any[]>,
   )
 
   Object.keys(groupedTweets).forEach((date) => {
@@ -195,11 +138,6 @@ export default function TweetList({
 
     return dateA.getTime() - dateB.getTime()
   })
-
-  const totalTweets = Object.keys(groupedTweets).reduce(
-    (acc, key) => acc + (groupedTweets[key]?.length || 0),
-    0,
-  )
 
   const getLastScheduledDate = () => {
     if (mode === 'posted') return null
@@ -295,7 +233,7 @@ export default function TweetList({
                     className="grid gap-3"
                     style={{ gridTemplateColumns: 'auto 1fr auto' }}
                   >
-                    {tweets.map((tweet: TweetType) => (
+                    {tweets.map((tweet: any) => (
                       <Fragment key={tweet.id}>
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-2 mt-2">
@@ -318,23 +256,13 @@ export default function TweetList({
                         <div className="px-4 py-3 rounded-lg border bg-white border-stone-200 shadow-sm">
                           <div className="space-y-2">
                             <div className="text-stone-900 text-sm leading-relaxed">
-                              <LexicalComposer
-                                initialConfig={{ ...initialConfig, editable: false }}
-                              >
-                                <PlainTextPlugin
-                                  contentEditable={
-                                    <ContentEditable className="w-full resize-none leading-relaxed text-stone-900 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none pointer-events-none" />
-                                  }
-                                  ErrorBoundary={LexicalErrorBoundary}
-                                />
-                                <InitialContentPlugin content={tweet.content} />
-                              </LexicalComposer>
+                              <p className='whitespace-pre-wrap'>{tweet.content}</p>
                             </div>
 
                             {tweet.media.length > 0 && (
                               <div className="mt-2">
                                 <MediaDisplay
-                                  mediaFiles={tweet.media.map((media) => ({
+                                  mediaFiles={tweet.media.map((media: any) => ({
                                     ...media,
                                     uploading: false,
                                     media_id: media.media_id,
@@ -354,12 +282,12 @@ export default function TweetList({
                               buttonVariants({
                                 variant: 'outline',
                                 size: 'icon',
-                                className: 'size-8'
+                                className: 'size-8',
                               }),
                               {
                                 'opacity-50 cursor-disabled pointer-events-none':
-                                  !tweet.twitterId || !account?.username
-                              }
+                                  !tweet.twitterId || !account?.username,
+                              },
                             )}
                             href={`https://x.com/${account?.username}/status/${tweet.twitterId}`}
                             target="_blank"

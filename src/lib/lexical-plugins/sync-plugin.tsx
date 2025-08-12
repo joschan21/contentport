@@ -1,16 +1,18 @@
 import useTweetMetadata from '@/hooks/use-tweet-metdata'
-import { useTweets } from '@/hooks/use-tweets'
+import { useTweetsV2 } from '@/hooks/use-tweets-v2'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $getRoot } from 'lexical'
 import { useEffect, useRef } from 'react'
 
-export function ShadowEditorSyncPlugin() {
+export function ShadowEditorSyncPlugin({ tweetId }: { tweetId: string }) {
   const [composerEditor] = useLexicalComposerContext()
-  const { shadowEditor } = useTweets()
-  const { setCharCount, setContent } = useTweetMetadata()
+  const { tweets } = useTweetsV2()
+  const { setCharCount } = useTweetMetadata()
   const isInitialized = useRef(false)
 
   useEffect(() => {
+    const shadowEditor = tweets.find((t) => t.id === tweetId)?.editor
+
     if (!shadowEditor || !composerEditor) return
 
     if (!isInitialized.current) {
@@ -27,14 +29,7 @@ export function ShadowEditorSyncPlugin() {
     const unregisterComposer = composerEditor.registerUpdateListener(
       ({ editorState, tags }) => {
         if (!tags?.has('sync-from-persistent')) {
-          const content = editorState.read(() => $getRoot().getTextContent())
-          setContent(content)
           setCharCount(editorState.read(() => $getRoot().getTextContent()).length)
-
-          // setCurrentTweet((prev) => ({
-          //   ...prev,
-          //   content: editorState.read(() => $getRoot().getTextContent()),
-          // }))
 
           shadowEditor.setEditorState(editorState)
         }
@@ -62,7 +57,7 @@ export function ShadowEditorSyncPlugin() {
       unregisterComposer()
       unregisterPersistent()
     }
-  }, [shadowEditor, composerEditor])
+  }, [tweets, composerEditor])
 
   return null
 }

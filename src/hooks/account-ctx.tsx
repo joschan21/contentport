@@ -123,10 +123,15 @@ export function AccountName({
   }
 
   return (
-    <span className={cn('font-semibold inline-flex items-center gap-1', className)}>
+    <a 
+      href={`https://x.com/${account.username}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn('font-semibold inline-flex items-center gap-1 hover:underline transition-all', className)}
+    >
       {account.name}
       {account.verified && renderBadge()}
-    </span>
+    </a>
   )
 }
 

@@ -102,7 +102,7 @@ export const StreamingMessage = memo(
 
     if (!animate) return wrap(text)
 
-    return wrap(stream || text || '')
+    return wrap(stream ?? text ?? '')
   },
 )
 

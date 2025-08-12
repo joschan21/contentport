@@ -4,7 +4,7 @@ import { AccountProvider } from '@/hooks/account-ctx'
 import { AttachmentsProvider } from '@/hooks/use-attachments'
 import { ChatProvider } from '@/hooks/use-chat'
 import { EditorProvider } from '@/hooks/use-editors'
-import { TweetProvider } from '@/hooks/use-tweets'
+import { TweetV2Provider } from '@/hooks/use-tweets-v2'
 import { authClient } from '@/lib/auth-client'
 import dynamic from 'next/dynamic'
 import { NuqsAdapter } from 'nuqs/adapters/next/app'
@@ -45,11 +45,11 @@ export function DashboardProviders({ children }: ProvidersProps) {
       <NuqsAdapter>
         <AccountProvider>
           <EditorProvider>
-            <TweetProvider>
+            <TweetV2Provider>
               <AttachmentsProvider>
                 <ChatProvider>{children}</ChatProvider>
               </AttachmentsProvider>
-            </TweetProvider>
+            </TweetV2Provider>
           </EditorProvider>
         </AccountProvider>
       </NuqsAdapter>

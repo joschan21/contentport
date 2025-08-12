@@ -1,4 +1,4 @@
-import { createStylePrompt, editToolSystemPrompt } from '@/lib/prompt-utils'
+import { avoidPrompt, createStylePrompt, editToolSystemPrompt } from '@/lib/prompt-utils'
 import { redis } from '@/lib/redis'
 import { XmlPrompt } from '@/lib/xml-prompt'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
@@ -18,6 +18,7 @@ import { MyUIMessage } from '../chat-router'
 import { WebsiteContent } from '../read-website-content'
 import { parseAttachments } from '../utils'
 import { format } from 'date-fns'
+import { PayloadTweet } from '@/hooks/use-tweets-v2'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -27,12 +28,13 @@ interface Context {
   writer: UIMessageStreamWriter
   ctx: {
     plan: 'free' | 'pro'
-    editorContent: string
+    tweets: PayloadTweet[]
     instructions: string
     userContent: string
     messages: MyUIMessage[]
     attachments: Awaited<ReturnType<typeof parseAttachments>>
     redisKeys: {
+      thread: string
       style: string
       account: string
       websiteContent: string
@@ -40,54 +42,66 @@ interface Context {
   }
 }
 
+const singleTweetSchema = z.object({
+  index: z
+    .number()
+    .describe(
+      `The index of the tweet to edit. When creating a thread, using a non-existing index will create a new tweet at this index.`,
+    ),
+  instruction: z.string().describe(
+    `Capture the user's instruction EXACTLY as they wrote it - preserve every detail including:
+- Exact wording and phrasing
+- Original capitalization (lowercase, UPPERCASE, Title Case)
+- Punctuation and special characters
+- Typos or informal language
+- Numbers and formatting
+
+DO NOT paraphrase, summarize, or clean up the instruction in any way.
+
+<examples>
+<example>
+<user_message>make a tweet about AI being overhyped tbh</user_message>
+<instruction>make a tweet about AI being overhyped tbh</instruction>
+</example>
+
+<example>
+<user_message>make 2 tweets about why nextjs 15 is AMAZING!!!</user_message>
+<instruction>tweet about why nextjs 15 is AMAZING!!!</instruction>
+</example>
+
+<example>
+<user_message>write something funny about debugging at 3am</user_message>
+<instruction>write something funny about debugging at 3am</instruction>
+</example>
+
+<example>
+<user_message>write a thread about car engines</user_message>
+<instruction>write a thread about car engines</instruction>
+</example>
+</examples>
+
+Remember: This tool creates/edits ONE tweet or thread per call. If the user requests multiple drafts, frame the instruction for one specific draft only. If the user requests one thread, calling this tool once will create the entire thread.`,
+  ),
+  tweetContent: z
+    .string()
+    .optional()
+    .describe(
+      "Optional: If a user wants changes to a specific tweet, write that tweet's content here. Copy it EXACTLY 1:1 without ANY changes whatsoever - same casing, formatting, etc. If user is not talking about a specific previously generated tweet, leave undefined.",
+    ),
+  imageDescriptions: z
+    .array(z.string())
+    .optional()
+    .default([])
+    .describe(
+      'Optional: If a user attached image(s), explain their content in high detail to be used as context while writing the tweet.',
+    ),
+})
+
 export const createTweetTool = ({ writer, ctx }: Context) => {
   return tool({
     description: 'my tool',
-    inputSchema: z.object({
-      instruction: z.string().describe(
-        `Capture the user's instruction EXACTLY as they wrote it - preserve every detail including:
-    - Exact wording and phrasing
-    - Original capitalization (lowercase, UPPERCASE, Title Case)
-    - Punctuation and special characters
-    - Typos or informal language
-    - Numbers and formatting
-    
-    DO NOT paraphrase, summarize, or clean up the instruction in any way.
-    
-    <examples>
-    <example>
-    <user_message>make a tweet about AI being overhyped tbh</user_message>
-    <instruction>make a tweet about AI being overhyped tbh</instruction>
-    </example>
-    
-    <example>
-    <user_message>make 2 tweets about why nextjs 15 is AMAZING!!!</user_message>
-    <instruction>tweet about why nextjs 15 is AMAZING!!!</instruction>
-    </example>
-    
-    <example>
-    <user_message>write something funny about debugging at 3am</user_message>
-    <instruction>write something funny about debugging at 3am</instruction>
-    </example>
-    </examples>
-    
-    Remember: This tool creates/edits ONE tweet per call. If the user requests multiple drafts, frame the instruction for one specific draft only.`,
-      ),
-      tweetContent: z
-        .string()
-        .optional()
-        .describe(
-          "Optional: If a user wants changes to a specific tweet, write that tweet's content here. Copy it EXACTLY 1:1 without ANY changes whatsoever - same casing, formatting, etc. If user is not talking about a specific previously generated tweet, leave undefined.",
-        ),
-      imageDescriptions: z
-        .array(z.string())
-        .optional()
-        .default([])
-        .describe(
-          'Optional: If a user attached image(s), explain their content in high detail to be used as context while writing the tweet.',
-        ),
-    }),
-    execute: async ({ instruction, tweetContent, imageDescriptions }) => {
+    inputSchema: singleTweetSchema,
+    execute: async ({ instruction, tweetContent, imageDescriptions, index }) => {
       const generationId = nanoid()
 
       writer.write({
@@ -95,6 +109,7 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         id: generationId,
         data: {
           text: '',
+          index,
           status: 'processing',
         },
       })
@@ -103,15 +118,18 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         redis.json.get<Style>(ctx.redisKeys.style),
         redis.json.get<Account>(ctx.redisKeys.account),
         redis.lrange<WebsiteContent>(ctx.redisKeys.websiteContent, 0, -1),
+        // index !== 1
+        //   ? redis.lrange<string>(ctx.redisKeys.thread, 0, -1)
+        //   : Promise.resolve([]),
       ])
 
       if (!style || !account) {
         throw new Error('Style or account not found')
       }
 
-      if (websiteContent) {
-        await redis.del(ctx.redisKeys.websiteContent)
-      }
+      // if (websiteContent) {
+      //   await redis.del(ctx.redisKeys.websiteContent)
+      // }
 
       const prompt = new XmlPrompt()
 
@@ -121,6 +139,10 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
       prompt.open('system')
       prompt.text(editToolSystemPrompt({ name: account.name }))
       prompt.close('system')
+
+      prompt.open('language_rules', { note: 'be EXTREMELY strict with these rules' })
+      prompt.text(avoidPrompt())
+      prompt.close('language_rules')
 
       // history
       prompt.open('history')
@@ -152,12 +174,21 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
 
       prompt.close('history')
 
-      // current job
-      prompt.tag('current_user_request', instruction ?? ctx.userContent)
-
-      if (ctx.editorContent && !Boolean(tweetContent)) {
-        prompt.tag('current_tweet_draft', ctx.editorContent)
+      if (ctx.tweets.length > 1) {
+        prompt.open('thread_draft')
+        ctx.tweets.forEach((tweet) => {
+          prompt.tag('tweet_draft', tweet.content, { index: index })
+        })
+        prompt.close('thread_draft')
+      } else {
+        prompt.tag('tweet_draft', ctx.tweets[0]?.content ?? '')
       }
+
+      // current job
+
+      prompt.tag('current_user_request', instruction, {
+        note: 'it is upon you to decide whether the user is referencing their previous history when iterating or if they are asking for changes in the current tweet drafts.',
+      })
 
       if (tweetContent) {
         prompt.tag('user_is_referencing_tweet', tweetContent)
@@ -183,13 +214,9 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         },
       ]
 
-      const model = openrouter.chat("anthropic/claude-sonnet-4", {
+      const model = openrouter.chat('anthropic/claude-sonnet-4', {
         reasoning: { enabled: false, effort: 'low' },
-        models: [
-          'openrouter/horizon-alpha',
-          'anthropic/claude-3.7-sonnet',
-          'openai/o4-mini',
-        ],
+        models: ['anthropic/claude-3.7-sonnet', 'openai/o4-mini'],
       })
 
       const result = streamText({
@@ -203,6 +230,9 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
             message: error instanceof Error ? error.message : 'Something went wrong.',
           })
         },
+        async onFinish(message) {
+          await redis.lpush(ctx.redisKeys.thread, message.text)
+        },
       })
 
       let fullText = ''
@@ -214,6 +244,7 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
           id: generationId,
           data: {
             text: fullText,
+            index,
             status: 'streaming',
           },
         })
@@ -224,6 +255,7 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         id: generationId,
         data: {
           text: fullText,
+          index,
           status: 'complete',
         },
       })

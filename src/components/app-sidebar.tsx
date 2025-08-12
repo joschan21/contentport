@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/sidebar'
 import { useAttachments } from '@/hooks/use-attachments'
 import { useChatContext } from '@/hooks/use-chat'
-import { useTweets } from '@/hooks/use-tweets'
 import { client } from '@/lib/client'
 import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
@@ -30,8 +29,12 @@ import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $getSelection,
+  $isRangeSelection,
+  COMMAND_PRIORITY_EDITOR,
   COMMAND_PRIORITY_HIGH,
   KEY_ENTER_COMMAND,
+  PASTE_COMMAND,
 } from 'lexical'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AttachmentItem } from './attachment-item'
@@ -48,6 +51,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
+import { MemoryTweet, PayloadTweet, useTweetsV2 } from '@/hooks/use-tweets-v2'
 
 const ChatInput = ({
   onSubmit,
@@ -55,7 +59,7 @@ const ChatInput = ({
   disabled,
   handleFilesAdded,
 }: {
-  onSubmit: (text: string, editorContent: string) => void
+  onSubmit: (text: string) => void
   onStop: () => void
   disabled: boolean
   handleFilesAdded: (files: File[]) => void
@@ -66,14 +70,10 @@ const ChatInput = ({
   const { attachments, removeAttachment, addKnowledgeAttachment, hasUploading } =
     useAttachments()
 
-  const { shadowEditor } = useTweets()
-
   const handleSubmit = () => {
-    const editorContent = shadowEditor.read(() => $getRoot().getTextContent().trim())
-
     const text = editor.read(() => $getRoot().getTextContent().trim())
 
-    onSubmit(text, editorContent)
+    onSubmit(text)
 
     editor.update(() => {
       const root = $getRoot()
@@ -89,16 +89,12 @@ const ChatInput = ({
         if (event && !event.shiftKey) {
           event.preventDefault()
 
-          const editorContent = shadowEditor.read(() =>
-            $getRoot().getTextContent().trim(),
-          )
-
           editor.update(() => {
             const root = $getRoot()
             const text = root.getTextContent().trim()
             if (!text) return
 
-            onSubmit(text, editorContent)
+            onSubmit(text)
 
             root.clear()
             const paragraph = $createParagraphNode()
@@ -111,8 +107,33 @@ const ChatInput = ({
       COMMAND_PRIORITY_HIGH,
     )
 
+    const removePasteCommand = editor.registerCommand<ClipboardEvent>(
+      PASTE_COMMAND,
+      (event) => {
+        const pastedText = event.clipboardData?.getData('Text')
+
+        if (pastedText) {
+          const trimmedText = pastedText.trim()
+
+          if (trimmedText !== pastedText) {
+            editor.update(() => {
+              const selection = $getSelection()
+              if ($isRangeSelection(selection)) {
+                selection.insertText(trimmedText)
+              }
+            })
+            return true
+          }
+        }
+
+        return false
+      },
+      COMMAND_PRIORITY_HIGH,
+    )
+
     return () => {
       removeCommand?.()
+      removePasteCommand?.()
     }
   }, [editor, onSubmit])
 
@@ -141,9 +162,10 @@ const ChatInput = ({
       if (files.length > 0) {
         e.preventDefault()
         handleFilesAdded(files)
+        return
       }
     },
-    [handleFilesAdded],
+    [handleFilesAdded, editor],
   )
 
   return (
@@ -264,10 +286,10 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     },
     enabled: isHistoryOpen,
   })
+  const { tweets, toPayloadTweet } = useTweetsV2()
 
   const { messages, status, sendMessage, startNewChat, id, stop } = useChatContext()
-  const { attachments, removeAttachment, addChatAttachment } =
-    useAttachments()
+  const { attachments, removeAttachment, addChatAttachment } = useAttachments()
 
   const updateURL = useCallback(
     (key: string, value: string) => {
@@ -281,14 +303,19 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
   )
 
   const handleSubmit = useCallback(
-    async (text: string, editorContent: string) => {
+    async (text: string) => {
       if (!text.trim()) return
 
       if (!Boolean(searchParams.get('chatId'))) {
         updateURL('chatId', id)
       }
 
-      sendMessage({ text, metadata: { attachments, editorContent, userMessage: text } })
+      const payloadTweets: PayloadTweet[] = tweets.map(toPayloadTweet)
+
+      sendMessage({
+        text,
+        metadata: { attachments, tweets: payloadTweets, userMessage: text },
+      })
 
       if (attachments.length > 0) {
         requestAnimationFrame(() => {
@@ -298,7 +325,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
         })
       }
     },
-    [searchParams, updateURL, id, sendMessage, attachments, removeAttachment],
+    [searchParams, updateURL, id, sendMessage, attachments, removeAttachment, tweets],
   )
 
   const handleNewChat = useCallback(() => {

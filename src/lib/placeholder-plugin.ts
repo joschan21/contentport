@@ -1,10 +1,9 @@
-import { useEffect } from "react"
-import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
-import { useLexicalIsTextContentEmpty } from "@lexical/react/useLexicalIsTextContentEmpty"
-import { $getRoot } from "lexical"
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalIsTextContentEmpty } from '@lexical/react/useLexicalIsTextContentEmpty'
+import { useEffect } from 'react'
 
 export default function PlaceholderPlugin({
-  placeholder = "Start typing..."
+  placeholder = 'Start typing...',
 }: {
   placeholder?: string
 }) {
@@ -17,10 +16,10 @@ export default function PlaceholderPlugin({
 
     const update = () => {
       if (isEmpty) {
-        element.style.setProperty("--placeholder", `"${placeholder}"`)
-        element.classList.add("show-placeholder")
+        element.style.setProperty('--placeholder', `"${placeholder}"`)
+        element.classList.add('show-placeholder')
       } else {
-        element.classList.remove("show-placeholder")
+        element.classList.remove('show-placeholder')
       }
     }
 

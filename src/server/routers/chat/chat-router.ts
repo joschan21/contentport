@@ -7,6 +7,7 @@ import {
   createIdGenerator,
   createUIMessageStream,
   createUIMessageStreamResponse,
+  smoothStream,
   stepCountIs,
   streamText,
   UIMessage,
@@ -24,6 +25,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { getAccount } from '../utils/get-account'
 import { createTweetTool } from './tools/create-tweet-tool'
 import { Ratelimit } from '@upstash/ratelimit'
+import { PayloadTweet } from '@/hooks/use-tweets-v2'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -88,7 +90,7 @@ const chatMessageSchema = z.object({
 export type Metadata = {
   userMessage: string
   attachments: Array<TAttachment>
-  editorContent: string
+  tweets: PayloadTweet[]
 }
 
 export interface ChatHistoryItem {
@@ -106,6 +108,7 @@ export type MyUIMessage = UIMessage<
     }
     'tool-output': {
       text: string
+      index: number
       status: 'processing' | 'streaming' | 'complete'
     }
     writeTweet: {
@@ -130,7 +133,6 @@ export const chatRouter = j.router({
     .input(z.object({ chatId: z.string().nullable() }))
     .get(async ({ c, input, ctx }) => {
       const { chatId } = input
-      const { user } = ctx
 
       if (!chatId) {
         return c.superjson({ messages: [] })
@@ -141,12 +143,6 @@ export const chatRouter = j.router({
       if (!messages) {
         return c.superjson({ messages: [] })
       }
-
-      // const chat = await redis.json.get<{ messages: UIMessage[] }>(
-      //   `chat:${user.email}:${chatId}`,
-      // )
-
-      // const visibleMessages = chat ? filterVisibleMessages(chat.messages) : []
 
       return c.superjson({ messages })
     }),
@@ -225,8 +221,19 @@ export const chatRouter = j.router({
         content.close('attached_links')
       }
 
-      if (message.metadata?.editorContent) {
-        content.tag('tweet_draft', message.metadata.editorContent)
+      if (message.metadata?.tweets) {
+        if (message.metadata.tweets[0] && message.metadata.tweets.length === 1) {
+          // single tweet
+          content.tag('tweet_draft', message.metadata.tweets[0].content)
+        } else if (message.metadata.tweets.length > 1) {
+          content.open('thread_draft', { note: 'please read this thread.' })
+          message.metadata.tweets.forEach((tweet) => {
+            content.tag('tweet_draft', tweet.content, {
+              index: tweet.index,
+            })
+          })
+          content.close('thread_draft')
+        }
       }
 
       content.close('message')
@@ -246,6 +253,7 @@ export const chatRouter = j.router({
         }),
         onFinish: async ({ messages }) => {
           await redis.set(`chat:history:${id}`, messages)
+          await redis.del(`website-contents:${id}`)
 
           const historyKey = `chat:history-list:${user.email}`
           const existingHistory = (await redis.get<ChatHistoryItem[]>(historyKey)) || []
@@ -273,17 +281,19 @@ export const chatRouter = j.router({
           })
         },
         execute: async ({ writer }) => {
+          const generationId = crypto.randomUUID()
           // tools
           const writeTweet = createTweetTool({
             writer,
             ctx: {
               plan: user.plan as 'free' | 'pro',
-              editorContent: message.metadata?.editorContent ?? '',
+              tweets: message.metadata?.tweets ?? [],
               instructions: userContent,
               messages,
               userContent,
               attachments: { attachments, links },
               redisKeys: {
+                thread: `thread:${id}:${generationId}`,
                 style: `style:${user.email}:${account.id}`,
                 account: `active-account:${user.email}`,
                 websiteContent: `website-contents:${id}`,
@@ -298,10 +308,14 @@ export const chatRouter = j.router({
               models: ['openai/gpt-4o'],
               reasoning: { enabled: false, effort: 'low' },
             }),
-            system: assistantPrompt({ editorContent: message.metadata?.editorContent }),
+            system: assistantPrompt({ tweets: message.metadata?.tweets ?? [] }),
             messages: convertToModelMessages(messages),
             tools: { writeTweet, readWebsiteContent },
             stopWhen: stepCountIs(3),
+            experimental_transform: smoothStream({
+              delayInMs: 20,
+              chunking: /[^-]*---/,
+            }),
           })
 
           writer.merge(result.toUIMessageStream())

@@ -8,7 +8,8 @@ import {
   bigint,
 } from 'drizzle-orm/pg-core'
 import { account, user } from './auth'
-import { InferSelectModel } from 'drizzle-orm'
+import { InferInsertModel, InferSelectModel } from 'drizzle-orm'
+import { z } from 'zod'
 
 type Media = {
   s3Key: string // s3
@@ -32,6 +33,7 @@ export const tweets = pgTable('tweets', {
   accountId: text('account_id')
     .notNull()
     .references(() => account.id, { onDelete: 'cascade' }),
+  isReplyTo: text('is_reply_to'),
   isQueued: boolean('is_queued').default(false),
   isScheduled: boolean('is_scheduled').default(false).notNull(),
   scheduledFor: timestamp('scheduled_for'),
@@ -42,4 +44,48 @@ export const tweets = pgTable('tweets', {
 })
 
 export type Tweet = InferSelectModel<typeof tweets>
+export type InsertTweet = InferInsertModel<typeof tweets>
 export type TweetQuery = InferSelectModel<typeof tweets>
+
+export const referenceTweets = pgTable('reference_tweets', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  topic: text('topic'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  engagedAt: timestamp('engaged_at'),
+  likes: integer('likes').default(0),
+  retweets: integer('retweets').default(0),
+  replies: integer('replies').default(0),
+  views: integer('views').default(0),
+  impressions: integer('impressions').default(0),
+  author: json('author').$type<{
+    name: string
+    username: string
+    profilePicture: string
+    isVerified: boolean
+    followers: number
+  }>(),
+})
+
+export const referenceTweetInsertSchema = z.object({
+  id: z.string(),
+  topic: z.string().optional(),
+  createdAt: z.string().datetime().or(z.date()).optional(),
+  likes: z.number().int().min(0).default(0),
+  retweets: z.number().int().min(0).default(0),
+  replies: z.number().int().min(0).default(0),
+  views: z.number().int().min(0).default(0),
+  impressions: z.number().int().min(0).default(0),
+  author: z
+    .object({
+      name: z.string(),
+      username: z.string(),
+      profilePicture: z.string().url(),
+      isVerified: z.boolean(),
+      followers: z.number().int().min(0),
+    })
+    .optional(),
+})
+
+export type ReferenceTweetInsert = z.infer<typeof referenceTweetInsertSchema>

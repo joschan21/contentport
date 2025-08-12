@@ -62,7 +62,7 @@ export const MessageWrapper = memo(
           <div className="w-full col-start-2 flex-1 space-y-2">
             <div
               className={cn(
-                'space-y-4 rounded-2xl',
+                'space-y-5 rounded-2xl',
                 isUser
                   ? 'bg-stone-800 p-3.5  w-fit justify-self-end text-white rounded-br-sm'
                   : 'text-gray-800 pt-3.5 rounded-bl-sm',

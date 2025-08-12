@@ -1,7 +1,23 @@
-import useTweetMetadata from '@/hooks/use-tweet-metdata'
+import { useTweetsV2 } from '@/hooks/use-tweets-v2'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useEffect, useState } from 'react'
 
-const ContentLengthIndicator = () => {
-  const { charCount } = useTweetMetadata()
+const ContentLengthIndicator = ({ tweetId }: { tweetId: string }) => {
+  const [editor] = useLexicalComposerContext()
+  const [charCount, setCharCount] = useState(0)
+  const { tweets } = useTweetsV2()
+
+  useEffect(() => {
+    const shadowEditor = tweets.find((t) => t.id === tweetId)?.editor
+
+    if (!shadowEditor) return
+
+    const removeListener = shadowEditor.registerTextContentListener((textContent) => {
+      setCharCount(textContent.length)
+    })
+
+    return removeListener
+  }, [editor, tweets])
 
   const getProgressColor = () => {
     const percentage = (charCount / 280) * 100
