@@ -1271,4 +1271,100 @@ export const tweetRouter = j.router({
 
       return c.json({ data })
     }),
+
+  getOpenGraph: privateProcedure
+    .input(
+      z.object({
+        url: z.string().url(),
+      }),
+    )
+    .get(async ({ c, ctx, input }) => {
+      const { url } = input
+
+      const cacheKey = `og:${url}`
+      const cached = await redis.get<{
+        image: string | null
+        title: string | null
+        description: string | null
+        siteName: string | null
+      }>(cacheKey)
+
+      if (cached) {
+        return c.json(cached)
+      }
+
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (compatible; ContentportBot/1.0; +https://contentport.io)',
+          },
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        })
+
+        if (!response.ok) {
+          return c.json({ image: null, title: null, description: null, siteName: null })
+        }
+
+        const html = await response.text()
+
+        const getMetaContent = (property: string): string | null => {
+          const propertyMatch = html.match(
+            new RegExp(`<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']+)["']`, 'i')
+          ) || html.match(
+            new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*property=["']${property}["']`, 'i')
+          )
+          
+          const nameMatch = html.match(
+            new RegExp(`<meta[^>]*name=["']${property}["'][^>]*content=["']([^"']+)["']`, 'i')
+          ) || html.match(
+            new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*name=["']${property}["']`, 'i')
+          )
+          
+          return propertyMatch?.[1] || nameMatch?.[1] || null
+        }
+
+        let ogImage = getMetaContent('og:image') || 
+                      getMetaContent('og:image:url') ||
+                      getMetaContent('og:image:secure_url') ||
+                      getMetaContent('twitter:image') ||
+                      getMetaContent('twitter:image:src')
+
+        if (ogImage && !ogImage.startsWith('http')) {
+          const baseUrl = new URL(url)
+          if (ogImage.startsWith('//')) {
+            ogImage = `${baseUrl.protocol}${ogImage}`
+          } else if (ogImage.startsWith('/')) {
+            ogImage = `${baseUrl.origin}${ogImage}`
+          } else {
+            ogImage = `${baseUrl.origin}/${ogImage}`
+          }
+        }
+
+        const ogTitle = getMetaContent('og:title') || 
+                       getMetaContent('twitter:title') ||
+                       html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim()
+
+        const ogDescription = getMetaContent('og:description') || 
+                             getMetaContent('twitter:description') ||
+                             getMetaContent('description')
+
+        const ogSiteName = getMetaContent('og:site_name') || 
+                          new URL(url).hostname.replace('www.', '')
+
+        const result = {
+          image: ogImage,
+          title: ogTitle,
+          description: ogDescription,
+          siteName: ogSiteName,
+        }
+
+        waitUntil(redis.set(cacheKey, result, { ex: 3600 }))
+
+        return c.json(result)
+      } catch (error) {
+        console.error('Error fetching OG data:', error)
+        return c.json({ image: null, title: null, description: null, siteName: null })
+      }
+    }),
 })
