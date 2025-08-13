@@ -96,15 +96,25 @@ export const auth = betterAuth({
       secure: true,
     },
   },
-  hooks: {
-    after: createAuthMiddleware(async (ctx) => {
-      const session = ctx.context.newSession
+  // hooks: {
+  //   after: createAuthMiddleware(async (ctx) => {
+  //     const p = ctx.path || ''
 
-      if (session) {
-        ctx.redirect('/studio')
-      } else {
-        ctx.redirect('/')
-      }
-    }),
-  },
+  //     if (
+  //       p.startsWith('/callback') ||
+  //       p.startsWith('/oauth2/callback') ||
+  //       p.startsWith('/oauth-proxy-callback')
+  //     ) {
+  //       return
+  //     }
+
+  //     const session = ctx.context.newSession
+
+  //     if (session) {
+  //       ctx.redirect('/studio')
+  //     } else {
+  //       ctx.redirect('/')
+  //     }
+  //   }),
+  // },
 })
