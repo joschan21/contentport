@@ -548,16 +548,7 @@ export const tweetRouter = j.router({
       }
 
       if (tweet.qstashId) {
-        const messages = qstash.messages
-        try {
-          await messages.delete(tweet.qstashId)
-        } catch (err) {
-          throw new HTTPException(500, {
-            message: 'Failed to cancel existing scheduled tweet',
-          })
-        }
-      } else {
-        throw new HTTPException(400, { message: 'Tweet is not scheduled' })
+        await qstash.messages.delete(tweet.qstashId).catch(() => {})
       }
 
       const client = new TwitterApi({
