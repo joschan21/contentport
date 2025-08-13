@@ -1,9 +1,8 @@
 import { db } from '@/db'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { createAuthMiddleware } from 'better-auth/api'
-import { PostHog } from 'posthog-node'
 import { oAuthProxy } from 'better-auth/plugins'
+import { PostHog } from 'posthog-node'
 
 const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   host: 'https://eu.i.posthog.com',
@@ -15,12 +14,12 @@ const getTrustedOrigins = () => {
   const origins = new Set<string>()
   const add = (v?: string) => v && origins.add(v)
   const toOrigin = (host?: string) =>
-    host?.startsWith('http') ? host : host ? `https://${host}` : undefined
+    host?.startsWith('http') ? host : host ? `https://www.${host}` : undefined
 
   add(process.env.BETTER_AUTH_URL) // current deployment origin
   add(toOrigin(process.env.VERCEL_BRANCH_URL)) // preview branch URL (if any)
   add(toOrigin(process.env.VERCEL_URL)) // deployment URL
-  add('https://contentport.io') // prod
+  add('https://www.contentport.io') // prod
   add('http://localhost:3000') // local dev
   return Array.from(origins)
 }
@@ -30,7 +29,7 @@ export const auth = betterAuth({
   trustedOrigins: getTrustedOrigins(),
   plugins: [
     oAuthProxy({
-      productionURL: 'https://contentport.io',
+      productionURL: 'https://www.contentport.io',
       currentURL: process.env.BETTER_AUTH_URL,
     }),
   ],
@@ -74,7 +73,7 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      redirectURI: 'https://contentport.io/api/auth/callback/google',
+      redirectURI: 'https://www.contentport.io/api/auth/callback/google',
     },
     twitter: {
       clientId: process.env.TWITTER_CLIENT_ID as string,
@@ -97,25 +96,4 @@ export const auth = betterAuth({
       secure: true,
     },
   },
-  // hooks: {
-  //   after: createAuthMiddleware(async (ctx) => {
-  //     const p = ctx.path || ''
-
-  //     if (
-  //       p.startsWith('/callback') ||
-  //       p.startsWith('/oauth2/callback') ||
-  //       p.startsWith('/oauth-proxy-callback')
-  //     ) {
-  //       return
-  //     }
-
-  //     const session = ctx.context.newSession
-
-  //     if (session) {
-  //       ctx.redirect('/studio')
-  //     } else {
-  //       ctx.redirect('/')
-  //     }
-  //   }),
-  // },
 })
