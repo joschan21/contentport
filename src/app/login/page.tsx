@@ -13,8 +13,13 @@ const LoginPage = () => {
     const { data } = await authClient.getSession()
     return !!data?.session.id
   }
+
   const handleAccess = async () => {
-    const { data, error } = await authClient.signIn.social({ provider: 'google' })
+    const { data, error } = await authClient.signIn.social({
+      provider: 'google',
+      callbackURL:
+        'https://contentport-git-feat-thread-support-joschan21s-projects.vercel.app/studio',
+    })
 
     if (error) {
       console.error(error)
