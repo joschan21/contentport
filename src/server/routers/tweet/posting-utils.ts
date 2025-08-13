@@ -1,14 +1,19 @@
-import { db } from "@/db"
-import { Tweet, tweets } from "@/db/schema"
-import { and, eq } from "drizzle-orm"
-import { HTTPException } from "hono/http-exception"
-import { ApiResponseError, SendTweetV2Params, TwitterApi } from "twitter-api-v2"
+import { db } from '@/db'
+import { Tweet, tweets } from '@/db/schema'
+import { and, eq } from 'drizzle-orm'
+import { HTTPException } from 'hono/http-exception'
+import { ApiResponseError, SendTweetV2Params, TwitterApi } from 'twitter-api-v2'
 
 async function postSingleTweetToTwitter(
   client: TwitterApi,
   tweet: Tweet,
   inReplyToTwitterId?: string,
 ): Promise<string> {
+  if (tweet.isPublished && tweet.twitterId) {
+    return tweet.twitterId
+  }
+
+  // TODO: DONT PUBLISH ALREADY PUBLISHED TWEET
   const tweetPayload: Partial<SendTweetV2Params> = {
     text: tweet.content,
   }
