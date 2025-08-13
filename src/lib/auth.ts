@@ -31,6 +31,7 @@ export const auth = betterAuth({
   plugins: [
     oAuthProxy({
       productionURL: 'https://contentport.io',
+      currentURL: process.env.BETTER_AUTH_URL,
     }),
   ],
   databaseHooks: {
