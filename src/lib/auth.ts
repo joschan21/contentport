@@ -11,38 +11,26 @@ const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
 
 const database = drizzleAdapter(db, { provider: 'pg' })
 
-function getBaseUrl() {
-  if (typeof window !== 'undefined') return window.location.origin
-
-  if (process.env.NODE_ENV === 'development') return 'http://localhost:3000'
-
-  if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL
-  if (process.env.VERCEL_BRANCH_URL) return `https://${process.env.VERCEL_URL}`
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
-
-  return `https://contentport.io`
-}
-
 const getTrustedOrigins = () => {
-  const origins: string[] = []
+  const origins = new Set<string>()
+  const add = (v?: string) => v && origins.add(v)
+  const toOrigin = (host?: string) =>
+    host?.startsWith('http') ? host : host ? `https://${host}` : undefined
 
-  if (process.env.VERCEL_BRANCH_URL) origins.push(process.env.VERCEL_BRANCH_URL)
-  if (process.env.VERCEL_URL) origins.push(process.env.VERCEL_URL)
-  if (process.env.BETTER_AUTH_URL) origins.push(process.env.BETTER_AUTH_URL)
-
-  origins.push('https://contentport.io')
-  origins.push('http://localhost:3000')
-
-  return origins
+  add(process.env.BETTER_AUTH_URL) // current deployment origin
+  add(toOrigin(process.env.VERCEL_BRANCH_URL)) // preview branch URL (if any)
+  add(toOrigin(process.env.VERCEL_URL)) // deployment URL
+  add('https://contentport.io') // prod
+  add('http://localhost:3000') // local dev
+  return Array.from(origins)
 }
 
 export const auth = betterAuth({
-  baseURL: 'https://contentport-git-feat-thread-support-joschan21s-projects.vercel.app',
+  baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: getTrustedOrigins(),
   plugins: [
     oAuthProxy({
       productionURL: 'https://contentport.io',
-      currentURL: `https://${process.env.VERCEL_BRANCH_URL}`,
     }),
   ],
   databaseHooks: {
@@ -101,15 +89,22 @@ export const auth = betterAuth({
       ],
     },
   },
+  advanced: {
+    defaultCookieAttributes: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: true,
+    },
+  },
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
       const session = ctx.context.newSession
 
-      // if (session) {
-      //   ctx.redirect('/studio')
-      // } else {
-      //   ctx.redirect('/')
-      // }
+      if (session) {
+        ctx.redirect('/studio')
+      } else {
+        ctx.redirect('/')
+      }
     }),
   },
 })

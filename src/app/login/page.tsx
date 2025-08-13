@@ -17,8 +17,6 @@ const LoginPage = () => {
   const handleAccess = async () => {
     const { data, error } = await authClient.signIn.social({
       provider: 'google',
-      callbackURL:
-        'https://contentport-git-feat-thread-support-joschan21s-projects.vercel.app/studio',
     })
 
     if (error) {
