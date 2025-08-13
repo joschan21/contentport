@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { DayFlag, DayPicker, SelectionState, UI } from 'react-day-picker'
 import { cn } from '@/lib/utils'
 import DuolingoButton from '../ui/duolingo-button'
+import { TimezoneSelector } from '@/components/ui/timezone-selector'
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
   onSchedule?: (date: Date, time: string) => void
@@ -95,6 +96,9 @@ export const Calendar20 = ({
     <Card className="w-full gap-0 p-0">
       <CardContent className="relative p-0 md:pr-48">
         <div className="p-5">
+          <div className="mb-4">
+            <TimezoneSelector size="sm" />
+          </div>
           <Calendar
             mode="single"
             selected={date}
