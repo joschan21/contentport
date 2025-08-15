@@ -1,5 +1,6 @@
 import { useTweetsV2 } from '@/hooks/use-tweets-v2'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { $getRoot } from 'lexical'
 import { useEffect, useState } from 'react'
 
 const ContentLengthIndicator = ({ tweetId }: { tweetId: string }) => {
@@ -12,8 +13,9 @@ const ContentLengthIndicator = ({ tweetId }: { tweetId: string }) => {
 
     if (!shadowEditor) return
 
-    const removeListener = shadowEditor.registerTextContentListener((textContent) => {
-      setCharCount(textContent.length)
+    const removeListener = shadowEditor.registerUpdateListener(({ editorState }) => {
+      const content = editorState.read(() => $getRoot().getTextContent())
+      setCharCount(content.length)
     })
 
     return removeListener
