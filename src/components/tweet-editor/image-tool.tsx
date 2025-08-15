@@ -1454,7 +1454,7 @@ export function ImageTool({
               <Button
                 className="flex-1 gap-2 h-11"
                 size="lg"
-                onClick={() => saveImage(1)}
+                onClick={() => saveImage(2)}
                 disabled={!blob?.src}
               >
                 Add to Tweet 🎉

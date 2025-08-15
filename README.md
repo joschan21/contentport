@@ -3,9 +3,6 @@
 ### public roadmap
 
 urgent & often requested:
-- allow pasting image in tweet editor
-- fix bug where scheduling doesn't work when editing from queue
-- implement chat history
 - support creating threads
 - showing OG images when pasting URLs
 - becoming responsive

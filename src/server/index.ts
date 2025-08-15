@@ -35,13 +35,14 @@ const api = j
  */
 const appRouter = j.mergeRouters(api, {
   file: dynamic(() => import('./routers/file-router')),
-  tweet: dynamic(() => import('./routers/tweet-router')),
+  tweet: dynamic(() => import('./routers/tweet/tweet-router')),
   knowledge: dynamic(() => import('./routers/knowledge-router')),
   chat: dynamic(() => import('./routers/chat/chat-router')),
   style: dynamic(() => import('./routers/style-router')),
   settings: dynamic(() => import('./routers/settings-router')),
   auth_router: dynamic(() => import('./routers/auth-router')),
   stripe: dynamic(() => import('./routers/stripe-router')),
+  // processing: dynamic(() => import('./routers/processing-router')),
 })
 
 export type AppRouter = typeof appRouter

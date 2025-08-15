@@ -212,6 +212,7 @@ export const authRouter = j.router({
       name: userProfile.name,
       profile_image_url: userProfile.profile_image_url_https,
       verified: data.verified,
+      twitterId: data.id,
     }
 
     await redis.json.set(`account:${user.email}:${dbAccountId}`, '$', connectedAccount)

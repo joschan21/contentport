@@ -9,5 +9,4 @@ export const authClient = createAuthClient({
       },
     }),
   ],
-  
 })

@@ -13,8 +13,11 @@ const LoginPage = () => {
     const { data } = await authClient.getSession()
     return !!data?.session.id
   }
+
   const handleAccess = async () => {
-    const { data, error } = await authClient.signIn.social({ provider: 'google' })
+    const { data, error } = await authClient.signIn.social({
+      provider: 'google',
+    })
 
     if (error) {
       console.error(error)

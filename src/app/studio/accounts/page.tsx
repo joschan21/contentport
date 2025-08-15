@@ -474,33 +474,6 @@ export default function AccountsPage() {
 
       <Separator />
 
-      {/* Post Settings Section */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-xl font-bold text-stone-900">Post Settings</h2>
-          <p className="text-stone-600 mt-1">Configure posting behavior and preferences</p>
-        </div>
-
-        <div className="bg-white border border-stone-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h3 className="text-base font-semibold text-stone-800">
-                Skip Post Confirmation
-              </h3>
-              <p className="text-sm text-stone-600">
-                When enabled, posts will be sent immediately without showing a confirmation modal
-              </p>
-            </div>
-            <Switch
-              checked={skipPostConfirmation}
-              onCheckedChange={handleSkipConfirmationToggle}
-            />
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
       {/* Style Settings Section */}
       <div className="space-y-4">
         <div>

@@ -110,6 +110,46 @@ export const LeftSidebar = () => {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Discover Group */}
+        {/* <SidebarGroup>
+          <SidebarGroupLabel
+            className={cn(
+              'transition-all duration-200 ease-out px-3',
+              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+            )}
+          >
+            Discover
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <Link
+              href={{
+                pathname: '/studio/feed',
+                search: serialize({ chatId: id }),
+              }}
+              className={cn(
+                buttonVariants({
+                  variant: 'ghost',
+                  className: 'w-full justify-start gap-2 px-3 py-2',
+                }),
+                pathname === '/studio/feed' &&
+                  'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
+              )}
+            >
+              <div className="size-6 flex items-center justify-center flex-shrink-0">
+                👀
+              </div>
+              <span
+                className={cn(
+                  'transition-all duration-200 ease-out',
+                  isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+                )}
+              >
+                Topic monitor
+              </span>
+            </Link>
+          </SidebarGroupContent>
+        </SidebarGroup> */}
+
         {/* Content Group */}
         <SidebarGroup>
           <SidebarGroupLabel

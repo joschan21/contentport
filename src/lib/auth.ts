@@ -1,7 +1,7 @@
 import { db } from '@/db'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { createAuthMiddleware } from 'better-auth/api'
+import { oAuthProxy } from 'better-auth/plugins'
 import { PostHog } from 'posthog-node'
 import { oAuthProxy } from 'better-auth/plugins'
 
@@ -14,12 +14,19 @@ const database = drizzleAdapter(db, { provider: 'pg' })
 const getTrustedOrigins = () => {
   const origins = new Set<string>()
   const add = (v?: string) => v && origins.add(v)
+
   const toOrigin = (host?: string) =>
+    host?.startsWith('http') ? host : host ? `https://${host}` : undefined
+  const toWWWOrigin = (host?: string) =>
     host?.startsWith('http') ? host : host ? `https://www.${host}` : undefined
 
-  add(process.env.BETTER_AUTH_URL) // current deployment origin
-  add(toOrigin(process.env.VERCEL_BRANCH_URL)) // preview branch URL (if any)
-  add(toOrigin(process.env.VERCEL_URL)) // deployment URL
+  add(process.env.BETTER_AUTH_URL)
+
+  add(toOrigin(process.env.VERCEL_BRANCH_URL))
+  add(toOrigin(process.env.VERCEL_URL))
+  add(toWWWOrigin(process.env.VERCEL_BRANCH_URL))
+  add(toWWWOrigin(process.env.VERCEL_URL))
+
   add('https://www.contentport.io') // prod
   add('http://localhost:3000') // local dev
   return Array.from(origins)
@@ -28,12 +35,15 @@ const getTrustedOrigins = () => {
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: getTrustedOrigins(),
-  plugins: [
-    oAuthProxy({
-      productionURL: 'https://www.contentport.io',
-      currentURL: process.env.BETTER_AUTH_URL,
-    }),
-  ],
+  plugins:
+    process.env.NODE_ENV === 'production'
+      ? [
+          oAuthProxy({
+            productionURL: 'https://www.contentport.io',
+            currentURL: process.env.BETTER_AUTH_URL,
+          }),
+        ]
+      : [],
   databaseHooks: {
     user: {
       create: {
@@ -74,7 +84,10 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      redirectURI: 'https://www.contentport.io/api/auth/callback/google',
+      redirectURI:
+        process.env.NODE_ENV === 'production'
+          ? 'https://www.contentport.io/api/auth/callback/google'
+          : undefined,
     },
     twitter: {
       clientId: process.env.TWITTER_CLIENT_ID as string,

@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils'
 import { marked } from 'marked'
 import { memo, useId, useMemo } from 'react'
 import ReactMarkdown, { Components } from 'react-markdown'
@@ -96,7 +97,7 @@ function MarkdownComponent({
   const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children])
 
   return (
-    <div className={className}>
+    <div className={cn("whitespace-pre-wrap space-y-4",className)}>
       {blocks.map((block, index) => (
         <MemoizedMarkdownBlock
           key={`${blockId}-block-${index}`}

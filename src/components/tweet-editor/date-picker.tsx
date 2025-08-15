@@ -67,9 +67,7 @@ export const Calendar20 = ({
   }
 
   const [date, setDate] = React.useState<Date | undefined>(getInitialDate())
-  const [selectedTime, setSelectedTime] = React.useState<string | null>(
-    getInitialTime(),
-  )
+  const [selectedTime, setSelectedTime] = React.useState<string | null>(getInitialTime())
 
   const isTimeSlotDisabled = (timeString: string) => {
     if (!date || date.toDateString() !== today.toDateString()) {
@@ -93,7 +91,7 @@ export const Calendar20 = ({
 
   return (
     <Card className="w-full gap-0 p-0">
-      <CardContent className="relative p-0 md:pr-48">
+      <CardContent className="relative">
         <div className="p-5">
           <Calendar
             mode="single"
@@ -166,11 +164,11 @@ export const Calendar20 = ({
           </div>
         </div>
       </CardContent>
-      <CardFooter className="flex flex-col gap-4 border-t px-6 !py-5 md:flex-row">
+      <CardFooter className="flex flex-col gap-4 border-t py-4 md:flex-row">
         <div className="text-sm">
           {date && selectedTime ? (
             <>
-              {editMode ? 'Rescheduled for' : 'Scheduled for'}{' '}
+              {editMode ? 'Reschedule for' : 'Scheduled for'}{' '}
               <span className="font-medium">
                 {' '}
                 {date?.toLocaleDateString('en-US', {
@@ -193,7 +191,7 @@ export const Calendar20 = ({
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
-            
+
             if (date && selectedTime && onSchedule) {
               onSchedule(date, selectedTime)
             }
