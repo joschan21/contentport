@@ -4,7 +4,7 @@ import { account as accountSchema, InsertTweet, tweets } from '@/db/schema'
 import { qstash } from '@/lib/qstash'
 import { redis } from '@/lib/redis'
 import { Ratelimit } from '@upstash/ratelimit'
-import { addDays, isSameDay, setHours, startOfDay, startOfHour } from 'date-fns'
+import { addDays, isFuture, isSameDay, setHours, startOfDay, startOfHour } from 'date-fns'
 import { fromZonedTime } from 'date-fns-tz'
 import { and, desc, eq, isNotNull, or } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
@@ -1291,8 +1291,9 @@ export const tweetRouter = j.router({
               thread: buildThread(tweet.id),
               isQueued: false,
             })),
-          ].sort((a, b) => a.unix - b.unix),
-          // .filter((entry) => isFuture(entry.unix)),
+          ]
+            .sort((a, b) => a.unix - b.unix)
+            .filter((entry) => isFuture(entry.unix)),
         })
       })
 
