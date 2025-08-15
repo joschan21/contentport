@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { DayFlag, DayPicker, SelectionState, UI } from 'react-day-picker'
 import { cn } from '@/lib/utils'
 import DuolingoButton from '../ui/duolingo-button'
+import { authClient } from '@/lib/auth-client'
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
   onSchedule?: (date: Date, time: string) => void
@@ -30,8 +31,22 @@ export const Calendar20 = ({
   const currentHour = today.getHours()
   const currentMinute = today.getMinutes()
 
+  const session = authClient.useSession()
+
   const timeSlots = Array.from({ length: 37 }, (_, i) => {
-    const totalMinutes = i * 15
+    const isAdmin = session?.data?.user?.isAdmin
+
+    // allows for testing queue slots
+    if (isAdmin && i === 0) {
+      const now = new Date()
+      const nextMinute = new Date(now.getTime() + 60000)
+      const hour = nextMinute.getHours().toString().padStart(2, '0')
+      const minute = nextMinute.getMinutes().toString().padStart(2, '0')
+      return `${hour}:${minute}`
+    }
+
+    const slotIndex = isAdmin ? i - 1 : i
+    const totalMinutes = slotIndex * 15
     const hour = Math.floor(totalMinutes / 60) + 9
     const minute = totalMinutes % 60
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
@@ -127,18 +142,6 @@ export const Calendar20 = ({
               [UI.Weekday]:
                 'text-muted-foreground rounded-md w-12 font-normal text-[0.8rem]',
               [UI.Week]: 'flex w-full mt-2',
-              //   [UI.Day]:
-              //     'h-9 w-9 text-center rounded-md text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20',
-              //   [UI.DayButton]: cn(
-              //     buttonVariants({ variant: 'ghost' }),
-              //     'h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-primary hover:text-primary-foreground',
-              //   ),
-              //   [SelectionState.range_end]: 'day-range-end',
-              //   [SelectionState.selected]:
-              //     'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
-              //   [SelectionState.range_middle]:
-              //     'aria-selected:bg-accent aria-selected:text-accent-foreground',
-              //   [DayFlag.today]: 'bg-accent text-accent-foreground',
               [DayFlag.outside]:
                 'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
               [DayFlag.disabled]: 'text-muted-foreground opacity-50',
@@ -151,9 +154,9 @@ export const Calendar20 = ({
           <div className="grid gap-2">
             {timeSlots
               .filter((time) => !isTimeSlotDisabled(time))
-              .map((time) => (
+              .map((time, i) => (
                 <Button
-                  key={time}
+                  key={`${time}-${i}`}
                   variant={selectedTime === time ? 'default' : 'outline'}
                   onClick={() => setSelectedTime(time)}
                   className="w-full shadow-none"

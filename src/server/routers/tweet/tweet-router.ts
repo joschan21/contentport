@@ -630,6 +630,7 @@ export const tweetRouter = j.router({
         .update(tweets)
         .set({
           twitterId: res.data.id,
+          isQueued: false,
           isPublished: true,
           isProcessing: false,
           isScheduled: false,
@@ -981,6 +982,7 @@ export const tweetRouter = j.router({
         userNow,
         timezone,
         maxDaysAhead: 90,
+        isAdmin: Boolean(user.isAdmin),
       })
 
       if (!nextSlot) {
@@ -1315,6 +1317,7 @@ export const tweetRouter = j.router({
         userNow,
         timezone,
         maxDaysAhead: 90,
+        isAdmin: Boolean(user.isAdmin)
       })
 
       if (!nextSlot) {

@@ -1,8 +1,8 @@
-import { db } from "@/db"
-import { tweets } from "@/db/schema"
-import { addDays, isAfter, setHours, startOfDay, startOfHour } from "date-fns"
-import { fromZonedTime } from "date-fns-tz"
-import { and, eq } from "drizzle-orm"
+import { db } from '@/db'
+import { tweets } from '@/db/schema'
+import { addDays, isAfter, setHours, startOfDay, startOfHour } from 'date-fns'
+import { fromZonedTime } from 'date-fns-tz'
+import { and, eq } from 'drizzle-orm'
 
 const SLOTS = [10, 12, 14]
 
@@ -12,17 +12,20 @@ export async function getNextAvailableQueueSlot({
   userNow,
   timezone,
   maxDaysAhead = 90,
+  isAdmin = false,
 }: {
   userId: string
   accountId: string
   userNow: Date
   timezone: string
   maxDaysAhead?: number
+  isAdmin?: boolean
 }): Promise<Date | null> {
-  if(process.env.VERCEL_ENV === "preview") {
+  if (process.env.VERCEL_ENV === 'preview' || isAdmin) {
+    // allow testing queue slots
     return new Date(userNow.getTime() + 60000)
   }
-  
+
   const scheduledTweets = await db.query.tweets.findMany({
     where: and(
       eq(tweets.userId, userId),
