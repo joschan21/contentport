@@ -1,7 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog'
 import DuolingoButton from './ui/duolingo-button'
 import { Icons } from './icons'
 import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
@@ -43,31 +50,27 @@ export default function TweetPostConfirmationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">Post to Twitter</DialogTitle>
+      <DialogContent className="bg-white rounded-2xl p-6">
+        <div className="size-12 bg-gray-100 rounded-full flex items-center justify-center">
+          <Icons.twitter className="size-6" />
+        </div>
+        <DialogHeader className="py-2">
+          <DialogTitle className="text-lg font-semibold">Post to Twitter</DialogTitle>
+          <DialogDescription>
+            This tweet will be posted immediately. Would you like to continue?
+          </DialogDescription>
+          <DialogDescription>
+            <span className="font-medium text-gray-900">Posting as:</span>{' '}
+            <AccountName className="font-normal text-gray-600" /> (
+            <AccountHandle className="text-gray-600" />)
+          </DialogDescription>
         </DialogHeader>
-        <div className="">
-          <p className="text-base opacity-60 mb-4">
-            This will post to Twitter. Continue?
-          </p>
-        </div>
 
-        <div>
-          <p className="text-sm opacity-60 mb-2.5">Posting as</p>
-          <div className="flex flex-row max-w-full items-center flex-wrap gap-3.5 h-[38px]">
-            <AccountAvatar className="size-9" />
-            <div className="flex flex-col flex-wrap gap-0">
-              <AccountName className="font-medium leading-[1.2]" />
-              <AccountHandle className="leading-[1.2]" />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3">
+        <DialogFooter>
           <DuolingoButton
             variant="secondary"
             size="sm"
+            className="h-11"
             onClick={() => {
               onOpenChange(false)
               onCancel?.()
@@ -75,11 +78,16 @@ export default function TweetPostConfirmationDialog({
           >
             Cancel
           </DuolingoButton>
-          <DuolingoButton size="sm" onClick={handleConfirm} disabled={isPosting}>
+          <DuolingoButton
+            loading={isPosting}
+            size="sm"
+            className="h-11"
+            onClick={handleConfirm}
+          >
             <Icons.twitter className="size-4 mr-2" />
             {isPosting ? 'Posting...' : 'Post Now'}
           </DuolingoButton>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
