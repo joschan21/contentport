@@ -30,10 +30,9 @@ export const Calendar20 = ({
   const currentHour = today.getHours()
   const currentMinute = today.getMinutes()
 
-  const timeSlots = Array.from({ length: 37 }, (_, i) => {
-    const totalMinutes = i * 15
-    const hour = Math.floor(totalMinutes / 60) + 9
-    const minute = totalMinutes % 60
+  const timeSlots = Array.from({ length: 1440 }, (_, i) => {
+    const hour = Math.floor(i / 60)
+    const minute = i % 60
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
   })
 

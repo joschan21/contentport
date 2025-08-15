@@ -1,15 +1,15 @@
+import { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 import {
+  bigint,
+  boolean,
+  integer,
   json,
   pgTable,
   text,
-  timestamp,
-  boolean,
-  integer,
-  bigint,
+  timestamp
 } from 'drizzle-orm/pg-core'
-import { account, user } from './auth'
-import { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 import { z } from 'zod'
+import { account, user } from './auth'
 
 type Media = {
   s3Key: string // s3
@@ -34,11 +34,16 @@ export const tweets = pgTable('tweets', {
     .notNull()
     .references(() => account.id, { onDelete: 'cascade' }),
   isReplyTo: text('is_reply_to'),
+
   isQueued: boolean('is_queued').default(false),
   isScheduled: boolean('is_scheduled').default(false).notNull(),
+  isPublished: boolean('is_published').default(false).notNull(),
+  isError: boolean('is_error').default(false).notNull(),
+  errorMessage: text('error_message'),
+  isProcessing: boolean('is_processing').default(false).notNull(),
+
   scheduledFor: timestamp('scheduled_for'),
   scheduledUnix: bigint('scheduled_unix', { mode: 'number' }),
-  isPublished: boolean('is_published').default(false).notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })

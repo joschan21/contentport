@@ -4,12 +4,14 @@ import { account as accountSchema, InsertTweet, tweets } from '@/db/schema'
 import { qstash } from '@/lib/qstash'
 import { redis } from '@/lib/redis'
 import { Ratelimit } from '@upstash/ratelimit'
-import { addDays, isFuture, isSameDay, setHours, startOfDay, startOfHour } from 'date-fns'
+import { addDays, isSameDay, setHours, startOfDay, startOfHour } from 'date-fns'
 import { fromZonedTime } from 'date-fns-tz'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, or } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-import { TwitterApi } from 'twitter-api-v2'
+import { ContentfulStatusCode } from 'hono/utils/http-status'
+import { ApiResponseError, SendTweetV2Params, TwitterApi } from 'twitter-api-v2'
 import { z } from 'zod'
+import { ZodError } from 'zod/v4'
 import { j, privateProcedure, qstashProcedure } from '../../jstack'
 import { getAccount } from '../utils/get-account'
 import { fetchMediaFromS3 } from './fetch-media-from-s3'
@@ -32,6 +34,48 @@ const payloadTweetSchema = z.object({
     }),
   ),
 })
+
+// const { tweetId, userId, accountId, isReplyTo } = body as {
+//   tweetId: string
+//   userId: string
+//   accountId: string
+//   isReplyTo?: string
+// }
+
+const postWithQStashSchema = z.object({
+  tweetId: z.string(),
+  userId: z.string(),
+  accountId: z.string(),
+  replyToTwitterId: z.string().optional(),
+  scheduledUnix: z.number().optional(),
+})
+
+type PostWithQStashArgs = z.infer<typeof postWithQStashSchema>
+
+const postWithQStash = async (args: PostWithQStashArgs) => {
+  const { accountId, tweetId, userId, replyToTwitterId, scheduledUnix } = args
+
+  const baseUrl =
+    process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
+
+  const payload: PostWithQStashArgs = {
+    tweetId,
+    userId,
+    accountId,
+    replyToTwitterId,
+    scheduledUnix,
+  }
+
+  const { messageId } = await qstash.publishJSON({
+    url: baseUrl + '/api/tweet/post_with_qstash',
+    body: payload,
+    notBefore: scheduledUnix,
+    retries: 2,
+    failureCallback: baseUrl + '/api/tweet/post_with_qstash_error',
+  })
+
+  return { messageId }
+}
 
 export const tweetRouter = j.router({
   getThread: privateProcedure
@@ -189,7 +233,10 @@ export const tweetRouter = j.router({
       }
 
       const mediaBuffer = Buffer.from(buffer)
-      const mediaId = await client.v1.uploadMedia(mediaBuffer, { mimeType })
+      const mediaId = await client.v1.uploadMedia(mediaBuffer, {
+        mimeType,
+        additionalOwners: activeAccount.twitterId ? [activeAccount.twitterId] : undefined,
+      })
 
       const mediaUpload = mediaId
 
@@ -309,9 +356,7 @@ export const tweetRouter = j.router({
       const newBaseTweetId = crypto.randomUUID()
 
       const baseUrl =
-        process.env.NODE_ENV === 'development'
-          ? 'https://sponge-relaxing-separately.ngrok-free.app'
-          : getBaseUrl()
+        process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
 
       // new schedule job
       const { messageId } = await qstash.publishJSON({
@@ -320,7 +365,6 @@ export const tweetRouter = j.router({
         notBefore: scheduledUnix,
       })
 
-      // new tweets
       const generatedIds = thread.map((_, i) =>
         i === 0 ? newBaseTweetId : crypto.randomUUID(),
       )
@@ -397,16 +441,21 @@ export const tweetRouter = j.router({
 
       const tweetId = crypto.randomUUID()
 
-      const baseUrl =
-        process.env.NODE_ENV === 'development'
-          ? 'https://sponge-relaxing-separately.ngrok-free.app'
-          : getBaseUrl()
-
-      const { messageId } = await qstash.publishJSON({
-        url: baseUrl + '/api/tweet/post',
-        body: { tweetId, userId: user.id, accountId: dbAccount.id },
-        notBefore: scheduledUnix,
+      const { messageId } = await postWithQStash({
+        tweetId,
+        userId: user.id,
+        accountId: dbAccount.id,
+        scheduledUnix,
       })
+
+      // const baseUrl =
+      //   process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
+
+      // const { messageId } = await qstash.publishJSON({
+      //   url: baseUrl + '/api/tweet/post',
+      //   body: { tweetId, userId: user.id, accountId: dbAccount.id },
+      //   notBefore: scheduledUnix,
+      // })
 
       try {
         const generatedIds = thread.map((_, i) =>
@@ -448,6 +497,234 @@ export const tweetRouter = j.router({
       })
     }),
 
+  post_status: privateProcedure
+    .input(
+      z.object({
+        messageId: z.string(),
+      }),
+    )
+    .get(async ({ c, ctx, input }) => {
+      const { messageId } = input
+
+      const status = await db.query.tweets.findFirst({
+        where: and(eq(tweets.qstashId, messageId)),
+        columns: {
+          isPublished: true,
+          isScheduled: true,
+          isError: true,
+          twitterId: true,
+          errorMessage: true,
+        },
+      })
+
+      if (!status) {
+        throw new HTTPException(404, { message: 'not found' })
+      }
+
+      return c.json(status)
+    }),
+
+  post_with_qstash_error: qstashProcedure.post(async ({ c, ctx, input }) => {
+    const { body } = ctx
+    const sourceBody = body.sourceBody
+
+    const decodedBody = Buffer.from(sourceBody, 'base64').toString('utf-8')
+
+    const parsedBody = JSON.parse(decodedBody)
+
+    const { tweetId, userId, accountId } = postWithQStashSchema.parse(parsedBody)
+
+    await db
+      .update(tweets)
+      .set({ isError: true, isProcessing: false })
+      .where(
+        and(
+          eq(tweets.id, tweetId),
+          eq(tweets.userId, userId),
+          eq(tweets.accountId, accountId),
+        ),
+      )
+
+    return c.json({ success: true })
+  }),
+
+  post_with_qstash: qstashProcedure.post(async ({ c, ctx }) => {
+    const { body } = ctx
+    const messageId = c.req.header('upstash-message-id')
+
+    const { tweetId, userId, accountId, replyToTwitterId } =
+      postWithQStashSchema.parse(body)
+
+    const [tweet] = await db
+      .select()
+      .from(tweets)
+      .where(
+        and(
+          eq(tweets.id, tweetId),
+          eq(tweets.userId, userId),
+          eq(tweets.accountId, accountId),
+        ),
+      )
+
+    if (!tweet) {
+      throw new HTTPException(404, { message: 'Tweet not found' })
+    }
+
+    if (tweet.isPublished) {
+      throw new HTTPException(409, {
+        message: `Tweet with id '${tweetId}' is already published, aborting`,
+      })
+    }
+
+    const account = await db.query.account.findFirst({
+      where: and(eq(accountSchema.userId, userId), eq(accountSchema.id, accountId)),
+    })
+
+    if (!account || !account.accessToken) {
+      throw new HTTPException(400, {
+        message: 'Twitter account not connected or access token missing',
+      })
+    }
+
+    await db
+      .update(tweets)
+      .set({ isProcessing: true })
+      .where(
+        and(
+          eq(tweets.id, tweetId),
+          eq(tweets.userId, userId),
+          eq(tweets.accountId, accountId),
+        ),
+      )
+
+    const client = new TwitterApi({
+      appKey: consumerKey as string,
+      appSecret: consumerSecret as string,
+      accessToken: account.accessToken as string,
+      accessSecret: account.accessSecret as string,
+    })
+
+    const payload: Partial<SendTweetV2Params> = {
+      text: tweet.content,
+    }
+
+    if (tweet.media && tweet.media.length > 0) {
+      payload.media = {
+        media_ids: tweet.media.map((media) => media.media_id).slice(0, 4) as [
+          string,
+          string,
+          string,
+          string,
+        ],
+      }
+    }
+
+    if (replyToTwitterId) {
+      payload.reply = {
+        in_reply_to_tweet_id: replyToTwitterId,
+      }
+    }
+
+    try {
+      const res = await client.v2.tweet(payload)
+
+      if (res.errors && res.errors.length > 0) {
+        const first = res.errors[0]!
+
+        throw new HTTPException(500, { message: first.detail })
+      }
+
+      await db
+        .update(tweets)
+        .set({
+          twitterId: res.data.id,
+          isPublished: true,
+          isProcessing: false,
+          isScheduled: false,
+          isError: false,
+        })
+        .where(
+          and(
+            eq(tweets.id, tweetId),
+            eq(tweets.userId, userId),
+            eq(tweets.accountId, accountId),
+          ),
+        )
+
+      const next = await db.query.tweets.findFirst({
+        where: and(
+          eq(tweets.isReplyTo, tweet.id),
+          eq(tweets.accountId, accountId),
+          eq(tweets.userId, userId),
+          eq(tweets.isPublished, false),
+        ),
+      })
+
+      if (next) {
+        postWithQStash({
+          tweetId: next.id,
+          accountId: next.accountId,
+          userId: next.userId,
+          replyToTwitterId: res.data.id,
+        })
+      }
+
+      return c.json({ success: true, tweetId: res.data.id, next })
+    } catch (err) {
+      console.error('[POST_WITH_QSTASH_ERROR]: ', JSON.stringify(err, null, 2))
+
+      await redis.set(
+        `error:debug:${messageId}-${new Date().getTime().toString()}`,
+        JSON.stringify({ error: err }),
+      )
+
+      const updateWithErrorMessage = async (errorMessage: string) => {
+        await db
+          .update(tweets)
+          .set({ isError: true, isProcessing: false, errorMessage })
+          .where(
+            and(
+              eq(tweets.id, tweetId),
+              eq(tweets.userId, userId),
+              eq(tweets.accountId, accountId),
+            ),
+          )
+      }
+
+      let message = 'Internal server error'
+      let statusCode: ContentfulStatusCode = 500
+
+      if (err instanceof HTTPException) {
+        message = err.message
+        statusCode = err.status
+        if (err.status.toString().startsWith('4')) {
+          await updateWithErrorMessage(message)
+        }
+      } else if (err instanceof ApiResponseError) {
+        message = err.data?.detail ?? err.message ?? 'Unknown Twitter API error'
+        statusCode = err.code as ContentfulStatusCode
+        if (err.code.toString().startsWith('4')) {
+          await updateWithErrorMessage(message)
+        }
+      } else if (err instanceof ZodError) {
+        message = 'Invalid request data'
+        statusCode = 400
+        await updateWithErrorMessage(message)
+      } else if (err instanceof Error) {
+        message = err.message || 'Internal server error'
+        await updateWithErrorMessage(message)
+      } else {
+        message = 'An unexpected error occurred'
+        await updateWithErrorMessage(message)
+      }
+
+      throw new HTTPException(statusCode, { message, cause: err })
+    }
+  }),
+
+  /**
+   * keep for legacy
+   */
   post: qstashProcedure.post(async ({ c, ctx }) => {
     const { body } = ctx
 
@@ -616,13 +893,6 @@ export const tweetRouter = j.router({
         })
       }
 
-      const client = new TwitterApi({
-        appKey: consumerKey as string,
-        appSecret: consumerSecret as string,
-        accessToken: dbAccount.accessToken as string,
-        accessSecret: dbAccount.accessSecret as string,
-      })
-
       try {
         const generatedIds = thread.map(() => crypto.randomUUID())
 
@@ -650,19 +920,23 @@ export const tweetRouter = j.router({
           throw new HTTPException(500, { message: 'Failed to create base tweet' })
         }
 
-        const { baseTweetId, allTweetIds } = await postThreadToTwitter(
-          client,
-          baseTweet,
-          account.id,
-        )
+        const { messageId } = await postWithQStash({
+          accountId: account.id,
+          tweetId: baseTweet.id,
+          userId: user.id,
+        })
+
+        await db
+          .update(tweets)
+          .set({ qstashId: messageId })
+          .where(eq(tweets.id, baseTweet.id))
 
         return c.json({
           success: true,
-          tweetId: baseTweetId,
+          messageId,
           accountId: account.id,
-          accountName: account.name, // Display name of the twitter (x) user, do not use for tweet urls
-          accountUsername: account.username, // Username of the twitter (x) user, use for correct tweet urls
-          allTweetIds, // Include all tweet IDs in the thread for frontend use
+          accountName: account.name,
+          accountUsername: account.username,
         })
       } catch (err) {
         console.error('Failed to post tweet:', err)
@@ -676,38 +950,6 @@ export const tweetRouter = j.router({
         })
       }
     }),
-
-  getPosted: privateProcedure.get(async ({ c, ctx }) => {
-    const { user } = ctx
-
-    const account = await getAccount({
-      email: user.email,
-    })
-
-    if (!account?.id) {
-      throw new HTTPException(400, {
-        message: 'Please connect your Twitter account',
-      })
-    }
-
-    const postedTweets = await db.query.tweets.findMany({
-      where: and(eq(tweets.accountId, account.id), eq(tweets.isPublished, true)),
-      orderBy: [desc(tweets.updatedAt)],
-    })
-
-    // Fetch media URLs for each tweet
-    const tweetsWithMedia = await Promise.all(
-      postedTweets.map(async (tweet) => {
-        const enrichedMedia = await fetchMediaFromS3(tweet.media || [])
-        return {
-          ...tweet,
-          media: enrichedMedia,
-        }
-      }),
-    )
-
-    return c.superjson({ tweets: tweetsWithMedia, accountId: account.id })
-  }),
 
   enqueue_tweet: privateProcedure
     .input(
@@ -756,23 +998,13 @@ export const tweetRouter = j.router({
       }
 
       const scheduledUnix = nextSlot.getTime()
-
       const baseTweetId = crypto.randomUUID()
 
-      const baseUrl =
-        process.env.NODE_ENV === 'development'
-          ? 'https://sponge-relaxing-separately.ngrok-free.app'
-          : getBaseUrl()
-
-      const { messageId } = await qstash.publishJSON({
-        url: baseUrl + '/api/tweet/post',
-        body: {
-          tweetId: baseTweetId,
-          userId: user.id,
-          accountId: dbAccount.id,
-          scheduledUnix,
-        },
-        notBefore: scheduledUnix / 1000, // in seconds
+      const { messageId } = await postWithQStash({
+        accountId: dbAccount.id,
+        tweetId: baseTweetId,
+        userId: user.id,
+        scheduledUnix,
       })
 
       try {
@@ -786,7 +1018,7 @@ export const tweetRouter = j.router({
           userId: user.id,
           content: tweet.content,
           scheduledFor: new Date(scheduledUnix),
-          scheduledUnix: scheduledUnix,
+          scheduledUnix,
 
           isScheduled: true,
           isQueued: true,
@@ -812,11 +1044,116 @@ export const tweetRouter = j.router({
       return c.json({
         success: true,
         tweetId: baseTweetId,
-        scheduledUnix: scheduledUnix,
+        scheduledUnix,
         accountId: account.id,
         accountName: account.name,
       })
     }),
+
+  get_posted: privateProcedure.get(async ({ c, ctx }) => {
+    const { user } = ctx
+
+    const account = await getAccount({
+      email: user.email,
+    })
+
+    if (!account?.id) {
+      throw new HTTPException(400, {
+        message: 'Please connect your Twitter account',
+      })
+    }
+
+    const _postedTweets = await db.query.tweets.findMany({
+      where: and(
+        eq(tweets.accountId, account.id),
+        or(
+          eq(tweets.isPublished, true),
+          eq(tweets.isError, true),
+          isNotNull(tweets.isReplyTo),
+        ),
+      ),
+      orderBy: [desc(tweets.updatedAt)],
+    })
+
+    const postedTweets = await Promise.all(
+      _postedTweets.map(async (tweet) => {
+        const enrichedMedia = await fetchMediaFromS3(tweet.media || [])
+        return {
+          ...tweet,
+          media: enrichedMedia,
+        }
+      }),
+    )
+
+    const buildThread = (baseTweetId: string): typeof postedTweets => {
+      const thread = []
+      const baseTweet = postedTweets.find((t) => t.id === baseTweetId)
+      if (!baseTweet) return []
+
+      thread.push(baseTweet)
+
+      // Find all replies in order
+      let currentId = baseTweetId
+      while (true) {
+        const nextTweet = postedTweets.find((t) => t.isReplyTo === currentId)
+        if (!nextTweet) break
+        thread.push(nextTweet)
+        currentId = nextTweet.id
+      }
+
+      return thread
+    }
+
+    const baseTweets = postedTweets.filter((tweet) => !tweet.isReplyTo)
+
+    const groupedByDate: Record<string, typeof baseTweets> = {}
+
+    baseTweets.forEach((baseTweet) => {
+      const publishDate = baseTweet.updatedAt || baseTweet.createdAt
+      const dateKey = startOfDay(new Date(publishDate)).getTime().toString()
+
+      if (!groupedByDate[dateKey]) {
+        groupedByDate[dateKey] = []
+      }
+      groupedByDate[dateKey].push(baseTweet)
+    })
+
+    // Build results structure similar to get_queue
+    const results: Array<
+      Record<
+        number,
+        Array<{
+          unix: number
+          thread: ReturnType<typeof buildThread>
+          isQueued: boolean
+        }>
+      >
+    > = []
+
+    Object.entries(groupedByDate).forEach(([dateKey, tweets]) => {
+      const threadsForDay = tweets.map((baseTweet) => ({
+        unix: (baseTweet.updatedAt || baseTweet.createdAt).getTime(),
+        thread: buildThread(baseTweet.id),
+        isQueued: false,
+      }))
+
+      // Sort by published time (most recent first)
+      threadsForDay.sort((a, b) => b.unix - a.unix)
+
+      results.push({
+        [Number(dateKey)]: threadsForDay,
+      })
+    })
+
+    // Sort results by date (most recent first)
+    results.sort((a, b) => {
+      const dateA = Number(Object.keys(a)[0])
+      const dateB = Number(Object.keys(b)[0])
+      return dateB - dateA
+    })
+
+    return c.superjson({ results })
+  }),
 
   get_queue: privateProcedure
     .input(
@@ -842,7 +1179,11 @@ export const tweetRouter = j.router({
       }
 
       const _scheduledTweets = await db.query.tweets.findMany({
-        where: and(eq(tweets.accountId, account.id), eq(tweets.isScheduled, true)),
+        where: and(
+          eq(tweets.accountId, account.id),
+          eq(tweets.isScheduled, true),
+          eq(tweets.isError, false),
+        ),
       })
 
       const scheduledTweets = await Promise.all(
@@ -855,7 +1196,6 @@ export const tweetRouter = j.router({
         }),
       )
 
-      // Group tweets into threads
       const buildThread = (baseTweetId: string): typeof scheduledTweets => {
         const thread = []
         const baseTweet = scheduledTweets.find((t) => t.id === baseTweetId)
@@ -948,9 +1288,8 @@ export const tweetRouter = j.router({
               thread: buildThread(tweet.id),
               isQueued: false,
             })),
-          ]
-            .sort((a, b) => a.unix - b.unix)
-            .filter((entry) => isFuture(entry.unix)),
+          ].sort((a, b) => a.unix - b.unix),
+          // .filter((entry) => isFuture(entry.unix)),
         })
       })
 

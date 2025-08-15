@@ -20,8 +20,7 @@ export default function PostedTweetsPage() {
       </div>
 
       <TweetList
-        mode="posted"
-        title=""
+        title="Posted Tweets"
         emptyStateTitle="No posted tweets yet"
         emptyStateDescription="Your published tweets will appear here once you start posting."
         emptyStateIcon={<CheckCircle2 className="size-12 text-stone-400 mx-auto" />}

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 interface DuolingoBadgeProps {
   children: ReactNode
-  variant?: "achievement" | "streak" | "level" | "xp" | "notification" | "gray" | "green" | "amber"
+  variant?: "achievement" | "streak" | "level" | "xp" | "error" | "gray" | "green" | "amber"
   size?: "sm" | "md" | "lg"
   className?: string
 }
@@ -27,7 +27,7 @@ export default function DuolingoBadge({
     level:
       "bg-gradient-to-b from-emerald-400 to-emerald-500 text-white border-2 border-emerald-300 shadow-[0_2px_0_#059669,0_4px_6px_-1px_rgba(16,185,129,0.3)]",
     xp: "bg-gradient-to-b from-blue-400 to-blue-500 text-white border-2 border-blue-300 shadow-[0_2px_0_#1D4ED8,0_4px_6px_-1px_rgba(59,130,246,0.3)]",
-    notification:
+    error:
       "bg-gradient-to-b from-red-400 to-red-500 text-white border-2 border-red-300 shadow-[0_2px_0_#DC2626,0_4px_6px_-1px_rgba(239,68,68,0.3)]",
     gray:
       "bg-gradient-to-b from-gray-400 to-gray-500 text-white border-2 border-gray-300 shadow-[0_2px_0_#6b7280,0_4px_6px_-1px_rgba(107,114,128,0.3)]",

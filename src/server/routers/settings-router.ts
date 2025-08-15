@@ -4,7 +4,6 @@ import { chatLimiter } from '@/lib/chat-limiter'
 import { redis } from '@/lib/redis'
 import { and, desc, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-import { TwitterApi } from 'twitter-api-v2'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
 
@@ -14,35 +13,7 @@ export type Account = {
   username: string
   profile_image_url: string
   verified: boolean
-}
-
-const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
-
-interface Settings {
-  user: {
-    profile_image_url: string
-    name: string
-    username: string
-    id: string
-    verified: boolean
-    verified_type: 'string'
-  }
-}
-
-interface TweetWithStats {
-  id: string
-  text: string
-  likes: number
-  retweets: number
-  created_at: string
-}
-
-interface StyleAnalysis {
-  overall: string
-  first_third: string
-  second_third: string
-  third_third: string
-  [key: string]: string
+  twitterId?: string // new
 }
 
 export const settingsRouter = j.router({

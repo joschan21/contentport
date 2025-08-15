@@ -40,6 +40,7 @@ import { Calendar20 } from '../tweet-editor/date-picker'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { HTTPException } from 'hono/http-exception'
 import { Tweet } from '@/db/schema'
+import { pollTweetStatus } from '@/lib/poll-tweet-status'
 
 export function AppSidebarInset({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient()
@@ -326,7 +327,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     const scheduledUnix = Math.floor(scheduledDateTime.getTime() / 1000)
     setRescheduledTime(scheduledUnix)
     setIsRescheduleDialogOpen(false)
-    
+
     toast.success('New schedule time selected. Click Save to apply changes.')
   }
 
@@ -334,50 +335,59 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     mutationFn: async ({ tweets }: { tweets: MemoryTweet[] }) => {
       const thread: PayloadTweet[] = tweets.map(toPayloadTweet)
 
-      const promise = client.tweet.postImmediate
-        .$post({
-          thread,
-        })
-        .then((data) => data.json())
+      const res = await client.tweet.postImmediate.$post({ thread })
+      const { messageId, accountUsername } = await res.json()
 
-      toast.promise(promise, {
-        loading: 'Posting...',
-        success: (data) => {
-          return (
-            <div className="flex items-center gap-2">
-              <p>Tweet posted!</p>
-              <Link
-                target="_blank"
-                rel="noreferrer"
-                href={`https://x.com/${data.accountUsername}/status/${data.tweetId}`}
-                className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
-              >
-                See tweet
-              </Link>
-            </div>
-          )
-        },
+      // Poll for completion
+      const { twitterId } = await pollTweetStatus(messageId, {
+        timeout: 10000,
+        interval: 250,
       })
 
-      return await promise
+      return { accountUsername, tweetId: twitterId }
     },
-    onSuccess: (data, variables) => {
+    onMutate: () => {
+      const toastId = toast.loading('Posting...')
+      return { toastId }
+    },
+    onSuccess: (data, variables, context) => {
+      if (context?.toastId) {
+        toast.dismiss(context.toastId)
+      }
+
+      toast.success(
+        <div className="flex items-center gap-2">
+          <p>Tweet posted!</p>
+          <Link
+            target="_blank"
+            rel="noreferrer"
+            href={`https://x.com/${data.accountUsername}/status/${data.tweetId}`}
+            className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
+          >
+            See tweet
+          </Link>
+        </div>,
+      )
+
       reset()
-
-      posthog.capture('tweet_posted', {
-        tweetId: data.tweetId,
-        accountId: data.accountId,
-        accountName: data.accountName,
-      })
-
       fire({
         particleCount: 200,
         spread: 160,
       })
+
+      // Analytics (uncomment when ready)
+      // posthog.capture('tweet_posted', {
+      //   tweetId: data.tweetId,
+      //   accountUsername: data.accountUsername,
+      // });
     },
-    onError: (error: HTTPException) => {
+    onError: (error: HTTPException, variables, context) => {
+      if (context?.toastId) {
+        toast.dismiss(context.toastId)
+      }
+
       console.error('Failed to post tweet:', error)
-      toast.error(error.message)
+      toast.error(error.message || 'Failed to post tweet')
     },
   })
 
@@ -478,7 +488,10 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                 <div>
                   {Boolean(editMode) ? (
                     <div className="flex items-center gap-2">
-                      <Dialog open={isRescheduleDialogOpen} onOpenChange={setIsRescheduleDialogOpen}>
+                      <Dialog
+                        open={isRescheduleDialogOpen}
+                        onOpenChange={setIsRescheduleDialogOpen}
+                      >
                         <DialogTrigger asChild>
                           <DuolingoButton
                             size="sm"
@@ -595,7 +608,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                           <TooltipTrigger asChild>
                             <DuolingoButton
                               size="sm"
-                              variant='emerald'
+                              variant="emerald"
                               onClick={() => setIsPostDialogOpen(true)}
                               className="group/toggle-button"
                             >
