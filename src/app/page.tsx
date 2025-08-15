@@ -1,4 +1,5 @@
 import Navbar from '@/components/navbar'
+import Footer from '@/components/footer'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { auth } from '@/lib/auth'
 import MuxPlayer from '@mux/mux-player-react'
@@ -198,6 +199,7 @@ const Page = async () => {
           </div>
         </div>
       </section> */}
+      <Footer />
     </>
   )
 }
