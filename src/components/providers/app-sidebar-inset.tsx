@@ -606,7 +606,6 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                           <TooltipTrigger asChild>
                             <DuolingoButton
                               size="sm"
-                              variant="emerald"
                               onClick={() => setIsPostDialogOpen(true)}
                               className="group/toggle-button"
                             >

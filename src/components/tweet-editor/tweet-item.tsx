@@ -15,12 +15,7 @@ import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { useMutation } from '@tanstack/react-query'
-import {
-  ImagePlus,
-  Trash2,
-  Upload,
-  X
-} from 'lucide-react'
+import { ImagePlus, Trash2, Upload, X } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import posthog from 'posthog-js'
 import React, { useCallback, useRef, useState } from 'react'
@@ -30,7 +25,7 @@ import {
   DrawerClose,
   DrawerContent,
   DrawerHeader,
-  DrawerTitle
+  DrawerTitle,
 } from '../ui/drawer'
 import DuolingoButton from '../ui/duolingo-button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
@@ -453,154 +448,7 @@ const TweetItem = ({
 
                 <ContentLengthIndicator tweetId={tweet.id} />
               </div>
-              <div className="flex items-center gap-2">
-                {/* {editMode ? (
-                  <>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <Popover>
-                          <TooltipTrigger asChild>
-                            <PopoverTrigger asChild>
-                              <DuolingoButton
-                                loading={scheduleTweetMutation.isPending}
-                                disabled={
-                                  updateTweetMutation.isPending ||
-                                  scheduleTweetMutation.isPending
-                                }
-                                variant="secondary"
-                                size="icon"
-                                className="aspect-square h-11 w-11"
-                              >
-                                <CalendarCog className="size-5" />
-                                <span className="sr-only">Reschedule tweet</span>
-                              </DuolingoButton>
-                            </PopoverTrigger>
-                          </TooltipTrigger>
-                          <PopoverContent className="max-w-3xl w-full">
-                            <Calendar20
-                              editMode={editMode}
-                              onSchedule={handleScheduleTweet}
-                              isPending={scheduleTweetMutation.isPending}
-                              initialScheduledTime={
-                                editTweetData?.tweet?.scheduledFor
-                                  ? new Date(editTweetData.tweet.scheduledFor)
-                                  : undefined
-                              }
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <TooltipContent>
-                          <p>Reschedule tweet</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <DuolingoButton
-                            className="h-11"
-                            onClick={handleUpdateTweet}
-                            disabled={
-                              updateTweetMutation.isPending ||
-                              scheduleTweetMutation.isPending
-                            }
-                          >
-                            <Save className="size-5 mr-1.5" />
-                            <span className="text-sm">
-                              {updateTweetMutation.isPending ? 'Saving...' : 'Save'}
-                            </span>
-                          </DuolingoButton>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Save tweet</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </>
-                ) : (
-                  <>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <DuolingoButton
-                            className="h-11"
-                            variant="secondary"
-                            onClick={handlePostTweet}
-                            disabled={tweet.mediaFiles.some((f) => f.uploading)}
-                          >
-                            <span className="text-sm">
-                              {postTweetMutation.isPending ? 'Posting...' : 'Post'}
-                            </span>
-                            <span className="sr-only">Post to Twitter</span>
-                          </DuolingoButton>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>
-                            {skipPostConfirmation
-                              ? 'The tweet will be posted immediately'
-                              : 'A confirmation modal will open'}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <div className="flex">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <DuolingoButton
-                              loading={isQueueing}
-                              disabled={mediaFiles.some((f) => f.uploading)}
-                              className="h-11 px-3 rounded-r-none border-r-0"
-                              onClick={handleAddToQueue}
-                            >
-                              <Clock className="size-4 mr-2" />
-                              <span className="text-sm">Queue</span>
-                            </DuolingoButton>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>
-                              Add to next queue slot -{' '}
-                              <Link
-                                href="/studio/scheduled"
-                                className="underline decoration-2 underline-offset-2"
-                              >
-                                what is this?
-                              </Link>
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <Popover>
-                            <TooltipTrigger asChild>
-                              <PopoverTrigger asChild>
-                                <DuolingoButton
-                                  loading={scheduleTweetMutation.isPending}
-                                  disabled={tweet.mediaFiles.some((f) => f.uploading)}
-                                  size="icon"
-                                  className="h-11 w-14 rounded-l-none border-l"
-                                >
-                                  <ChevronDown className="size-4" />
-                                  <span className="sr-only">Schedule manually</span>
-                                </DuolingoButton>
-                              </PopoverTrigger>
-                            </TooltipTrigger>
-                            <PopoverContent className="max-w-3xl w-full">
-                              <Calendar20
-                                onSchedule={handleScheduleTweet}
-                                isPending={scheduleTweetMutation.isPending}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <TooltipContent>
-                            <p>Schedule custom time</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </>
-                )} */}
-              </div>
+              <div className="flex items-center gap-2"></div>
             </div>
           </div>
         </div>
@@ -617,7 +465,6 @@ function validateFile(
   tweet: MemoryTweet,
   file: File,
 ): { valid: boolean; type?: 'image' | 'gif' | 'video'; error?: string } {
-  // Check file type
   let mediaType: 'image' | 'gif' | 'video'
   if (TWITTER_MEDIA_TYPES.image.includes(file.type as any)) {
     mediaType = 'image'
@@ -632,7 +479,6 @@ function validateFile(
     }
   }
 
-  // Check file size
   const sizeLimit = TWITTER_SIZE_LIMITS[mediaType]
   if (file.size > sizeLimit) {
     const sizeMB = Math.round(sizeLimit / (1024 * 1024))
@@ -642,7 +488,6 @@ function validateFile(
     }
   }
 
-  // Check media count limits
   const hasVideo = tweet.mediaFiles.some((m) => m.type === 'video')
   const hasGif = tweet.mediaFiles.some((m) => m.type === 'gif')
 

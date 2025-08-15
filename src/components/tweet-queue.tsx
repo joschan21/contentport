@@ -37,6 +37,7 @@ import DuolingoBadge from './ui/duolingo-badge'
 import DuolingoButton from './ui/duolingo-button'
 import { Loader } from './ui/loader'
 import { Separator } from './ui/separator'
+import { AccountHandle, AccountName } from '@/hooks/account-ctx'
 
 export default function TweetQueue() {
   const queryClient = useQueryClient()
@@ -324,6 +325,14 @@ export default function TweetQueue() {
                                     This {threadLength > 1 ? 'thread' : 'tweet'} will be
                                     posted and removed from your queue immediately. Would
                                     you like to continue?
+                                  </DialogDescription>
+                                  <DialogDescription>
+                                    <span className="font-medium text-gray-900">
+                                      Posting as:
+                                    </span>{' '}
+                                    <AccountName className="font-normal text-gray-600" />{' '}
+                                    (
+                                    <AccountHandle className="text-gray-600" />)
                                   </DialogDescription>
                                 </DialogHeader>
 

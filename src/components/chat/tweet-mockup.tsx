@@ -81,7 +81,7 @@ export const TweetMockup = memo(
         className={cn(
           'w-full grid grid-cols-[40px,1fr] gap-3 min-w-0 py-3 px-4 rounded-2xl',
           {
-            'p-6': threads?.length === 1,
+            'p-6': threads?.length === 1 || isLoading,
             'border border-black border-opacity-[0.01] bg-clip-padding group bg-white shadow-[0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)]':
               !isConnectedAfter && !isConnectedBefore,
           },
@@ -119,7 +119,9 @@ export const TweetMockup = memo(
           </div>
 
           <div className="w-full flex-1 pt-0.5">
-            <div className="mt-1 text-slate-800 text-[15px] space-y-3 whitespace-pre-wrap">
+            <div
+              className={'mt-1 text-slate-800 text-[15px] space-y-3 whitespace-pre-wrap'}
+            >
               {isLoading ? (
                 <div className="space-y-2">
                   <motion.div
