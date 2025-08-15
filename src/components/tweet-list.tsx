@@ -166,57 +166,69 @@ export default function TweetList({
                               </div>
                             </div>
 
-                            <div
-                              className={cn(
-                                'px-4 py-3 rounded-lg border',
-                                baseTweet
-                                  ? 'bg-white border-stone-200 shadow-sm'
-                                  : 'bg-stone-50 border-dashed border-stone-300',
-                              )}
-                            >
-                              {baseTweet ? (
-                                <div className="space-y-3">
-                                  {thread.map((tweet, index) => (
-                                    <div
-                                      key={index}
-                                      className={cn(
-                                        'space-y-2',
-                                        index > 0 && 'border-l-2 border-stone-200 pl-3',
-                                      )}
-                                    >
-                                      {index > 0 && (
-                                        <div className="text-xs text-stone-500 font-medium">
-                                          Tweet {index + 1}
-                                        </div>
-                                      )}
-                                      <p className="text-stone-900 whitespace-pre-line text-sm leading-relaxed">
-                                        {tweet.content || 'No content'}
-                                      </p>
-                                      {tweet.media && tweet.media.length > 0 && (
-                                        <div className="mt-2">
-                                          <MediaDisplay
-                                            mediaFiles={tweet.media.map((media) => ({
-                                              ...media,
-                                              uploading: false,
-                                              media_id: media.media_id,
-                                              s3Key: media.s3Key,
-                                              type: media.type as
-                                                | 'image'
-                                                | 'gif'
-                                                | 'video',
-                                            }))}
-                                            removeMediaFile={() => {}}
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2 text-stone-500">
-                                  <span className="text-sm">Empty slot</span>
-                                </div>
-                              )}
+                            <div>
+                              <div
+                                className={cn(
+                                  'px-4 py-3 rounded-lg border',
+                                  baseTweet
+                                    ? 'bg-white border-stone-200 shadow-sm'
+                                    : 'bg-stone-50 border-dashed border-stone-300',
+                                )}
+                              >
+                                {baseTweet ? (
+                                  <div className="space-y-3">
+                                    {thread.map((tweet, index) => (
+                                      <div
+                                        key={index}
+                                        className={cn(
+                                          'space-y-2',
+                                          index > 0 && 'border-l-2 border-stone-200 pl-3',
+                                        )}
+                                      >
+                                        {index > 0 && (
+                                          <div className="text-xs text-stone-500 font-medium">
+                                            Tweet {index + 1}
+                                          </div>
+                                        )}
+                                        <p className="text-stone-900 whitespace-pre-line text-sm leading-relaxed">
+                                          {tweet.content || 'No content'}
+                                        </p>
+                                        {tweet.media && tweet.media.length > 0 && (
+                                          <div className="mt-2">
+                                            <MediaDisplay
+                                              mediaFiles={tweet.media.map((media) => ({
+                                                ...media,
+                                                uploading: false,
+                                                media_id: media.media_id,
+                                                s3Key: media.s3Key,
+                                                type: media.type as
+                                                  | 'image'
+                                                  | 'gif'
+                                                  | 'video',
+                                              }))}
+                                              removeMediaFile={() => {}}
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2 text-stone-500">
+                                    <span className="text-sm">Empty slot</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {thread
+                                .filter((t) => t.isError && t.errorMessage)
+                                .map((t, i) => {
+                                  return (
+                                    <p key={i} className="mt-1.5 text-xs text-red-500">
+                                      Error: {t.errorMessage}
+                                    </p>
+                                  )
+                                })}
                             </div>
 
                             <div className="flex items-center">
