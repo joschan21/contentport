@@ -487,7 +487,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                       const root = $getRoot()
                       const paragraph = $createParagraphNode()
                       const text = $createTextNode(
-                        'Draft a tweet about 3 productivity tips for remote devs',
+                        'Create a thread about 3 productivity tips for remote devs',
                       )
                       root.clear()
                       paragraph.append(text)
@@ -498,7 +498,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                     editor.focus()
                   }}
                 >
-                  Draft a tweet about 3 productivity tips for remote devs
+                  Create a thread about 3 productivity tips for remote devs
                 </PromptSuggestion>
 
                 <PromptSuggestion
