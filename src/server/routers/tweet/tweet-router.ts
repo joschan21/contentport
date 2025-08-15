@@ -567,10 +567,12 @@ export const tweetRouter = j.router({
       )
 
     if (!tweet) {
+      console.error('Tweet not found', { tweetId, userId, accountId })
       throw new HTTPException(404, { message: 'Tweet not found' })
     }
 
     if (tweet.isPublished) {
+      console.error('Tweet already published', { tweetId, userId, accountId })
       throw new HTTPException(409, {
         message: `Tweet with id '${tweetId}' is already published, aborting`,
       })
@@ -581,6 +583,7 @@ export const tweetRouter = j.router({
     })
 
     if (!account || !account.accessToken) {
+      console.error('Account not found', { tweetId, userId, accountId })
       throw new HTTPException(400, {
         message: 'Twitter account not connected or access token missing',
       })
