@@ -111,7 +111,7 @@ export const LeftSidebar = () => {
         </SidebarGroup>
 
         {/* Discover Group */}
-        <SidebarGroup>
+        {/* <SidebarGroup>
           <SidebarGroupLabel
             className={cn(
               'transition-all duration-200 ease-out px-3',
@@ -148,7 +148,7 @@ export const LeftSidebar = () => {
               </span>
             </Link>
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup> */}
 
         {/* Content Group */}
         <SidebarGroup>
