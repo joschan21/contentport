@@ -118,18 +118,11 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         redis.json.get<Style>(ctx.redisKeys.style),
         redis.json.get<Account>(ctx.redisKeys.account),
         redis.lrange<WebsiteContent>(ctx.redisKeys.websiteContent, 0, -1),
-        // index !== 1
-        //   ? redis.lrange<string>(ctx.redisKeys.thread, 0, -1)
-        //   : Promise.resolve([]),
       ])
 
       if (!style || !account) {
         throw new Error('Style or account not found')
       }
-
-      // if (websiteContent) {
-      //   await redis.del(ctx.redisKeys.websiteContent)
-      // }
 
       const prompt = new XmlPrompt()
 
@@ -185,7 +178,6 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
       }
 
       // current job
-
       prompt.tag('current_user_request', instruction, {
         note: 'it is upon you to decide whether the user is referencing their previous history when iterating or if they are asking for changes in the current tweet drafts.',
       })
@@ -196,6 +188,8 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
 
       // style
       prompt.tag('style', createStylePrompt({ account, style }))
+
+      prompt.tag("reminder", "Remember to NEVER use ANY of the PROHIBITED_WORDS.")
 
       prompt.close('prompt')
 
