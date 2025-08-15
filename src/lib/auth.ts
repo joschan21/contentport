@@ -1,7 +1,7 @@
 import { db } from '@/db'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { oAuthProxy } from 'better-auth/plugins'
+import { createAuthMiddleware, oAuthProxy } from 'better-auth/plugins'
 import { PostHog } from 'posthog-node'
 
 const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
@@ -110,15 +110,15 @@ export const auth = betterAuth({
       secure: true,
     },
   },
-  // hooks: {
-  //   after: createAuthMiddleware(async (ctx) => {
-  //     const session = ctx.context.newSession
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      const session = ctx.context.newSession
 
-  //     if (session) {
-  //       ctx.redirect('/studio')
-  //     } else {
-  //       ctx.redirect('/')
-  //     }
-  //   }),
-  // },
+      if (session) {
+        ctx.redirect('/studio')
+      } else {
+        ctx.redirect('/')
+      }
+    }),
+  },
 })
