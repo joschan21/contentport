@@ -91,10 +91,6 @@ export default function TweetList({
   return (
     <div className="relative z-10 p-2">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-stone-800">{title}</h1>
-        </div>
-
         {results.length === 0 ? (
           <Card className="p-12 text-center">
             <div className="flex flex-col gap-4">
@@ -144,7 +140,12 @@ export default function TweetList({
                                 <div className="flex w-[120px] items-start justify-center gap-1 flex-wrap">
                                   {baseTweet ? (
                                     baseTweet.isError ? (
-                                      <DuolingoBadge className="text-xs px-2" variant="error">Error</DuolingoBadge>
+                                      <DuolingoBadge
+                                        className="text-xs px-2"
+                                        variant="error"
+                                      >
+                                        Error
+                                      </DuolingoBadge>
                                     ) : (
                                       <DuolingoBadge
                                         variant="green"
