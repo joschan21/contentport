@@ -35,25 +35,18 @@ const payloadTweetSchema = z.object({
   ),
 })
 
-// const { tweetId, userId, accountId, isReplyTo } = body as {
-//   tweetId: string
-//   userId: string
-//   accountId: string
-//   isReplyTo?: string
-// }
-
 const postWithQStashSchema = z.object({
   tweetId: z.string(),
   userId: z.string(),
   accountId: z.string(),
   replyToTwitterId: z.string().optional(),
-  scheduledUnix: z.number().optional(),
+  scheduledUnixInSeconds: z.number().optional(),
 })
 
 type PostWithQStashArgs = z.infer<typeof postWithQStashSchema>
 
 const postWithQStash = async (args: PostWithQStashArgs) => {
-  const { accountId, tweetId, userId, replyToTwitterId, scheduledUnix } = args
+  const { accountId, tweetId, userId, replyToTwitterId, scheduledUnixInSeconds } = args
 
   const baseUrl =
     process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
@@ -63,13 +56,13 @@ const postWithQStash = async (args: PostWithQStashArgs) => {
     userId,
     accountId,
     replyToTwitterId,
-    scheduledUnix,
+    scheduledUnixInSeconds,
   }
 
   const { messageId } = await qstash.publishJSON({
     url: baseUrl + '/api/tweet/post_with_qstash',
     body: payload,
-    notBefore: scheduledUnix,
+    notBefore: scheduledUnixInSeconds,
     retries: 2,
     failureCallback: baseUrl + '/api/tweet/post_with_qstash_error',
   })
@@ -322,7 +315,6 @@ export const tweetRouter = j.router({
       }
 
       // delete all current
-
       const deleteTweet = async (id: string) => {
         const [deletedTweet] = await db
           .delete(tweets)
@@ -355,14 +347,11 @@ export const tweetRouter = j.router({
 
       const newBaseTweetId = crypto.randomUUID()
 
-      const baseUrl =
-        process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
-
-      // new schedule job
-      const { messageId } = await qstash.publishJSON({
-        url: baseUrl + '/api/tweet/post',
-        body: { tweetId: newBaseTweetId, userId: user.id, accountId: dbAccount.id },
-        notBefore: scheduledUnix,
+      const { messageId } = await postWithQStash({
+        accountId: dbAccount.id,
+        tweetId: newBaseTweetId,
+        userId: user.id,
+        scheduledUnixInSeconds: scheduledUnix / 1000,
       })
 
       const generatedIds = thread.map((_, i) =>
@@ -374,10 +363,11 @@ export const tweetRouter = j.router({
         accountId: account.id,
         userId: user.id,
         content: tweet.content,
+
         isScheduled: true,
-        scheduledFor: new Date(scheduledUnix * 1000),
-        scheduledUnix: scheduledUnix * 1000,
+        scheduledUnix,
         isQueued: existingBaseTweet.isQueued,
+
         media: tweet.media,
         qstashId: messageId,
         isReplyTo: i === 0 ? undefined : generatedIds[i - 1],
@@ -445,7 +435,7 @@ export const tweetRouter = j.router({
         tweetId,
         userId: user.id,
         accountId: dbAccount.id,
-        scheduledUnix,
+        scheduledUnixInSeconds: scheduledUnix / 1000,
       })
 
       // const baseUrl =
@@ -467,8 +457,7 @@ export const tweetRouter = j.router({
           accountId: account.id,
           userId: user.id,
           content: tweet.content,
-          scheduledFor: new Date(scheduledUnix * 1000),
-          scheduledUnix: scheduledUnix * 1000,
+          scheduledUnix,
 
           isScheduled: true,
           isQueued: false,
@@ -1007,7 +996,7 @@ export const tweetRouter = j.router({
         accountId: dbAccount.id,
         tweetId: baseTweetId,
         userId: user.id,
-        scheduledUnix,
+        scheduledUnixInSeconds: scheduledUnix / 1000,
       })
 
       try {
@@ -1020,7 +1009,6 @@ export const tweetRouter = j.router({
           accountId: account.id,
           userId: user.id,
           content: tweet.content,
-          scheduledFor: new Date(scheduledUnix),
           scheduledUnix,
 
           isScheduled: true,

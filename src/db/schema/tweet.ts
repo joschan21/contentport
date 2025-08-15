@@ -42,7 +42,7 @@ export const tweets = pgTable('tweets', {
   errorMessage: text('error_message'),
   isProcessing: boolean('is_processing').default(false).notNull(),
 
-  scheduledFor: timestamp('scheduled_for'),
+  // unix timestamp in milliseconds
   scheduledUnix: bigint('scheduled_unix', { mode: 'number' }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

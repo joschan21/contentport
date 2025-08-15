@@ -265,9 +265,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     if (rescheduledTime) {
       scheduledUnix = rescheduledTime
     } else if (editTweetData?.thread?.[0]?.scheduledUnix) {
-      scheduledUnix = Math.floor(
-        new Date(editTweetData.thread[0].scheduledUnix).getTime() / 1000,
-      )
+      scheduledUnix = editTweetData.thread[0].scheduledUnix
     }
 
     if (!scheduledUnix) {
@@ -302,7 +300,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const scheduledUnix = Math.floor(scheduledDateTime.getTime() / 1000)
+    const scheduledUnix = scheduledDateTime.getTime()
 
     const thread = tweets.map(toPayloadTweet)
 
@@ -324,7 +322,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const scheduledUnix = Math.floor(scheduledDateTime.getTime() / 1000)
+    const scheduledUnix = Math.floor(scheduledDateTime.getTime())
     setRescheduledTime(scheduledUnix)
     setIsRescheduleDialogOpen(false)
 
