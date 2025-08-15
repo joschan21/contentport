@@ -50,17 +50,11 @@ const MAX_MEDIA_COUNT = 4
 interface TweetItemProps {
   tweet: MemoryTweet
   index: number
-  isDragging: boolean
   isConnectedAfter?: boolean
   isConnectedBefore?: boolean
 }
 
-const TweetItem = ({
-  tweet,
-  index,
-  isConnectedAfter = false,
-  isConnectedBefore = false,
-}: TweetItemProps) => {
+const TweetItem = ({ tweet, index }: TweetItemProps) => {
   const { removeTweet, addMediaFile, updateMediaFile } = useTweetsV2()
   const [isDragging, setIsDragging] = useState(false)
   const [isDrawerOpen, setisDrawerOpen] = useState(false)
@@ -290,18 +284,24 @@ const TweetItem = ({
     <Drawer modal={false} open={isDrawerOpen} onOpenChange={setisDrawerOpen}>
       <div
         className={cn(
-          'relative bg-white rounded-2xl w-full transition-colors',
-          !isConnectedAfter &&
-            !isConnectedBefore &&
-            'border p-6 border-black border-opacity-[0.01] bg-clip-padding group isolate shadow-[0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)]',
-          isDragging && 'border-indigo-600 border-dashed',
+          'relative p-3 border-2 border-transparent border-dashed bg-white rounded-xl w-full transition-colors',
+          {
+            'border-indigo-600 bg-indigo-50': isDragging,
+          },
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(tweet, e)}
       >
         <div className="w-full flex gap-3 relative">
-          <div className="relative z-50 w-10 h-14 bg-white flex -top-2.5 items-center justify-center">
+          <div
+            className={cn(
+              'relative z-50 w-10 h-14 bg-white flex -top-2.5 items-center justify-center transition-colors',
+              {
+                'bg-indigo-50': isDragging,
+              },
+            )}
+          >
             <AccountAvatar className="relative !z-50 size-10" />
           </div>
 
@@ -339,7 +339,12 @@ const TweetItem = ({
             {/* Tweet actions */}
             <div className="mt-3 w-full flex items-center justify-between">
               <div
-                className={cn('flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg')}
+                className={cn(
+                  'flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg transition-colors',
+                  {
+                    'bg-indigo-100': isDragging,
+                  },
+                )}
               >
                 <TooltipProvider>
                   <Tooltip>

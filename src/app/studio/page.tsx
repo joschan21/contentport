@@ -16,17 +16,16 @@ const Page = () => {
   const queryClient = useQueryClient()
 
   const { account, isLoading } = useAccount()
-  
+
   const editTweetId = searchParams?.get('edit')
   const isEditMode = Boolean(editTweetId)
 
   useEffect(() => {
-    // Check for ?account_connected=true in URL
     if (searchParams?.get('account_connected') === 'true') {
       setOauthOnboarding(true)
       setIsOpen(true)
       setOnboardingLoading(true)
-      // Optionally, you could poll or refetch until onboarding is complete
+
       const check = async () => {
         queryClient.invalidateQueries({ queryKey: ['get-active-account'] })
         setOnboardingLoading(false)
@@ -50,7 +49,7 @@ const Page = () => {
         />
       ) : null}
       <div className="max-w-xl w-full mx-auto">
-        <TweetEditor editMode={isEditMode} editTweetId={editTweetId} />
+        <TweetEditor editMode={isEditMode} />
       </div>
     </>
   )
