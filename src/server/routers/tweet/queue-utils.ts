@@ -19,7 +19,10 @@ export async function getNextAvailableQueueSlot({
   timezone: string
   maxDaysAhead?: number
 }): Promise<Date | null> {
-  console.log('userid', userId)
+  if(process.env.VERCEL_ENV === "preview") {
+    return new Date(userNow.getTime() + 60000)
+  }
+  
   const scheduledTweets = await db.query.tweets.findMany({
     where: and(
       eq(tweets.userId, userId),
