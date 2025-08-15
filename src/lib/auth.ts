@@ -3,7 +3,6 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { oAuthProxy } from 'better-auth/plugins'
 import { PostHog } from 'posthog-node'
-import { oAuthProxy } from 'better-auth/plugins'
 
 const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   host: 'https://eu.i.posthog.com',
