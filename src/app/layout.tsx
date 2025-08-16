@@ -1,7 +1,7 @@
 import { Providers } from '@/components/providers/providers'
 import { Analytics } from '@vercel/analytics/next'
 import { Metadata, Viewport } from 'next'
-import { Instrument_Serif, JetBrains_Mono, Rubik } from 'next/font/google'
+import { Instrument_Serif, Inter, JetBrains_Mono, Rubik } from 'next/font/google'
 import { Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { Databuddy, track } from '@databuddy/sdk'
@@ -30,10 +30,9 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://contentport.io'),
 }
 
-const elegant = Instrument_Serif({
-  weight: '400',
-  variable: '--font-elegant',
-  style: 'italic',
+const inter = Inter({
+  weight: '600',
+  variable: '--font-inter',
   subsets: ['latin'],
 })
 
@@ -57,7 +56,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html suppressHydrationWarning lang="en">
       <body
-        className={`${rubik.className} ${elegant.variable} ${jetBrainsMono.variable} antialiased light`}
+        className={`${rubik.className} ${inter.variable} ${jetBrainsMono.variable} antialiased light`}
       >
         <Analytics />
 
