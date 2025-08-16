@@ -23,12 +23,12 @@ const NavigationLinks = ({
   className?: string
   isAuthenticated: boolean
 }) => (
-  <div className={cn('flex items-center gap-6', className)}>
+  <div className={cn('flex justify-center items-center gap-6', className)}>
     <Link
       href={`https://github.com/${GITHUB_REPO}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-gray-700 hover:text-gray-900 transition-colors font-medium"
+      className="text-gray-700 w-fit hover:text-gray-900 transition-colors font-medium"
     >
       GitHub
     </Link>
@@ -78,64 +78,68 @@ const Navbar = ({ title }: { title: string }) => {
   }, [mobileMenuOpen])
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 bg-white/90 backdrop-blur-md border-b border-black border-opacity-[0.1] h-16">
-      <nav className="max-w-7xl mx-auto h-full flex items-center px-6 lg:px-8">
-        <div className="flex lg:flex-1">
-          <Logo />
-        </div>
-        <div className="flex lg:hidden">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(true)}
-            className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
-          >
-            <span className="sr-only">Open main menu</span>
-            <Menu aria-hidden="true" className="size-6" />
-          </button>
-        </div>
-        <div className="hidden lg:flex items-center gap-8">
-          <NavigationLinks isAuthenticated={isAuthenticated} />
-          <PrimaryButton isAuthenticated={isAuthenticated} />
-        </div>
+    <>
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-[50] bg-black bg-opacity-50" />
+      )}
+      <header className="fixed inset-x-0 top-0 z-50 bg-white/90 backdrop-blur-md border-b border-black border-opacity-[0.1] h-16">
+        <nav className="max-w-7xl mx-auto h-full flex items-center px-6 lg:px-8">
+          <div className="flex sm:flex-1">
+            <Logo />
+          </div>
+          <div className="flex ml-auto sm:hidden">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
+            >
+              <span className="sr-only">Open main menu</span>
+              <Menu aria-hidden="true" className="size-6" />
+            </button>
+          </div>
+          <div className="hidden sm:flex items-center gap-8">
+            <NavigationLinks isAuthenticated={isAuthenticated} />
+            <PrimaryButton isAuthenticated={isAuthenticated} />
+          </div>
 
-        <div
-          className={cn('lg:hidden', mobileMenuOpen ? 'fixed inset-0 z-50' : 'hidden')}
-        >
           <div
-            className="fixed inset-0 bg-black bg-opacity-25"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          <div className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-white px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
-            <div className="flex items-center justify-between">
-              <Logo />
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(false)}
-                className="-m-2.5 rounded-md p-2.5 text-gray-700"
-              >
-                <span className="sr-only">Close menu</span>
-                <X aria-hidden="true" className="size-6" />
-              </button>
-            </div>
-            <div className="mt-6 flow-root">
-              <div className="-my-6 divide-y divide-gray-500/10">
-                <div className="py-6 space-y-6">
-                  <NavigationLinks
-                    className="flex-col items-start gap-4"
-                    isAuthenticated={isAuthenticated}
-                  />
-                  <PrimaryButton
-                    className="w-full"
-                    onClick={() => setMobileMenuOpen(false)}
-                    isAuthenticated={isAuthenticated}
-                  />
+            className={cn(
+              'sm:hidden',
+              mobileMenuOpen ? 'fixed inset-0 z-[100]' : 'hidden',
+            )}
+          >
+            <div className="absolute top-0 inset-x-0 bg-white right-0 z-[100] w-full overflow-y-auto px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
+              <div className="flex items-center justify-between">
+                <Logo />
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="-m-2.5 rounded-md p-2.5 text-gray-700"
+                >
+                  <span className="sr-only">Close menu</span>
+                  <X aria-hidden="true" className="size-6" />
+                </button>
+              </div>
+              <div className="mt-6 flow-root">
+                <div className="-my-6 divide-y divide-gray-500/10">
+                  <div className="py-6 space-y-6">
+                    <NavigationLinks
+                      className="flex justify-center sm:flex-col items-start gap-4"
+                      isAuthenticated={isAuthenticated}
+                    />
+                    <PrimaryButton
+                      className="w-full"
+                      onClick={() => setMobileMenuOpen(false)}
+                      isAuthenticated={isAuthenticated}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </nav>
-    </header>
+        </nav>
+      </header>
+    </>
   )
 }
 
