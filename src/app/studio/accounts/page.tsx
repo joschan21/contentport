@@ -280,7 +280,7 @@ export default function AccountsPage() {
   })
 
   return (
-    <div className="relative z-10 max-w-2xl w-full mx-auto p-6 space-y-8">
+    <div className="relative z-10 max-w-2xl w-full mx-auto p-6 space-y-8 pb-32">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold text-stone-900">Account Management</h1>
         <p className="text-stone-600">
@@ -582,7 +582,10 @@ export default function AccountsPage() {
                       {style.tweets.length} reference tweet
                       {style.tweets.length > 1 ? 's' : ''}
                     </p>
-                    <div className="space-y-3">
+                    <div
+                      className="space-y-3 border rounded-lg bg-stone-50 max-h-96 overflow-y-auto"
+                      style={{ minHeight: '6rem' }} // optional: ensures some height even if empty
+                    >
                       {style.tweets.map((tweet, index) => (
                         <div className="relative" key={index}>
                           <DuolingoButton
