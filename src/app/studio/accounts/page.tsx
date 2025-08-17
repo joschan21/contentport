@@ -43,6 +43,7 @@ import {
   Loader2,
   Lock,
   Plus,
+  RefreshCw,
   Save,
   Sparkles,
   Trash2,
@@ -215,6 +216,55 @@ export default function AccountsPage() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    },
+  })
+
+  const {
+    mutate: refreshProfileData,
+    isPending: isRefreshingProfile,
+    variables: refreshProfileVariables,
+  } = useMutation({
+    mutationFn: async ({ accountId }: { accountId: string }) => {
+      const res = await client.settings.refresh_profile_data.$post({ accountId })
+      return await res.json()
+    },
+    onMutate: async ({ accountId }) => {
+      // Cancel any outgoing refetches to avoid optimistic update being overwritten
+      await queryClient.cancelQueries({ queryKey: ['accounts'] })
+      await queryClient.cancelQueries({ queryKey: ['get-active-account'] })
+    },
+    onSuccess: ({ account, profile_image_url }, { accountId }) => {
+      queryClient.setQueryData(['accounts'], (oldData: any) => {
+        if (!oldData?.accounts) return oldData
+        return {
+          ...oldData,
+          accounts: oldData.accounts.map((acc: Account) =>
+            acc.id === accountId
+              ? { 
+                  ...acc, 
+                  profile_image_url, 
+                  name: account.name,
+                  username: account.username 
+                }
+              : acc
+          ),
+        }
+      })
+
+      const activeAccount = queryClient.getQueryData(['get-active-account']) as any
+      if (activeAccount?.id === accountId) {
+        queryClient.setQueryData(['get-active-account'], {
+          ...activeAccount,
+          profile_image_url,
+          name: account.name,
+          username: account.username,
+        })
+      }
+
+      toast.success('Profile refreshed!')
+    },
+    onError: (error: HTTPException) => {
+      toast.error(error.message || 'Failed to refresh profile picture')
     },
   })
 
@@ -429,6 +479,25 @@ export default function AccountsPage() {
                               <Check className="size-3 mr-1" />
                               Active
                             </DuolingoBadge>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <DuolingoButton
+                                  onClick={() => refreshProfileData({ accountId: acc.id })}
+                                  variant="secondary"
+                                  size="icon"
+                                  className="h-6 w-6 p-1"
+                                  loading={
+                                    isRefreshingProfile && 
+                                    refreshProfileVariables?.accountId === acc.id
+                                  }
+                                >
+                                  <RefreshCw className="size-3" />
+                                </DuolingoButton>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-gray-900 text-white border-gray-700">
+                                <p className="text-xs">Refresh profile data</p>
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
                         </div>
                       ) : null}
