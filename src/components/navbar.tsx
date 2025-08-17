@@ -82,7 +82,7 @@ const Navbar = ({ title }: { title: string }) => {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-[50] bg-black bg-opacity-50" />
       )}
-      <header className="fixed inset-x-0 top-0 z-50 bg-white/90 backdrop-blur-md border-b border-black border-opacity-[0.1] h-16">
+      <header className="fixed inset-x-0 top-0 z-50 bg-white/80 backdrop-blur-md border-b border-black border-opacity-[0.1] h-16">
         <nav className="max-w-7xl mx-auto h-full flex items-center px-6 lg:px-8">
           <div className="flex sm:flex-1">
             <Logo />
