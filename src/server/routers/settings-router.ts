@@ -6,6 +6,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
+import { TwitterApi } from 'twitter-api-v2'
 
 export type Account = {
   id: string
