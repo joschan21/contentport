@@ -1,9 +1,11 @@
 import { getBaseUrl } from '@/constants/base-url'
 import { db } from '@/db'
 import { account as accountSchema, InsertTweet, tweets } from '@/db/schema'
+import { firecrawl } from '@/lib/firecrawl'
 import { qstash } from '@/lib/qstash'
 import { redis } from '@/lib/redis'
 import { Ratelimit } from '@upstash/ratelimit'
+import { waitUntil } from '@vercel/functions'
 import { addDays, isFuture, isSameDay, setHours, startOfDay, startOfHour } from 'date-fns'
 import { fromZonedTime } from 'date-fns-tz'
 import { and, desc, eq, isNotNull, or } from 'drizzle-orm'
@@ -17,7 +19,6 @@ import { getAccount } from '../utils/get-account'
 import { fetchMediaFromS3 } from './fetch-media-from-s3'
 import { postThreadToTwitter } from './posting-utils'
 import { getNextAvailableQueueSlot } from './queue-utils'
-import { waitUntil } from '@vercel/functions'
 
 const consumerKey = process.env.TWITTER_CONSUMER_KEY as string
 const consumerSecret = process.env.TWITTER_CONSUMER_SECRET as string
@@ -1378,17 +1379,27 @@ export const tweetRouter = j.router({
 
         const html = await response.text()
 
+        const decodeHtmlEntities = (str: string): string => {
+          return str
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#x27;/g, "'")
+            .replace(/&#x2F;/g, '/')
+        }
+
         const getMetaContent = (property: string): string | null => {
           const propertyMatch =
             html.match(
               new RegExp(
-                `<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']+)["']`,
+                `<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']*)["']`,
                 'i',
               ),
             ) ||
             html.match(
               new RegExp(
-                `<meta[^>]*content=["']([^"']+)["'][^>]*property=["']${property}["']`,
+                `<meta[^>]*content=["']([^"']*)["'][^>]*property=["']${property}["']`,
                 'i',
               ),
             )
@@ -1396,18 +1407,19 @@ export const tweetRouter = j.router({
           const nameMatch =
             html.match(
               new RegExp(
-                `<meta[^>]*name=["']${property}["'][^>]*content=["']([^"']+)["']`,
+                `<meta[^>]*name=["']${property}["'][^>]*content=["']([^"']*)["']`,
                 'i',
               ),
             ) ||
             html.match(
               new RegExp(
-                `<meta[^>]*content=["']([^"']+)["'][^>]*name=["']${property}["']`,
+                `<meta[^>]*content=["']([^"']*)["'][^>]*name=["']${property}["']`,
                 'i',
               ),
             )
 
-          return propertyMatch?.[1] || nameMatch?.[1] || null
+          const rawContent = propertyMatch?.[1] || nameMatch?.[1] || null
+          return rawContent ? decodeHtmlEntities(rawContent) : null
         }
 
         let ogImage =
