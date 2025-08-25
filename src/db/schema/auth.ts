@@ -50,6 +50,8 @@ export const account = pgTable('account', {
   updatedAt: timestamp('updated_at').notNull(),
 })
 
+export type Account = typeof account.$inferSelect
+
 export const verification = pgTable('verification', {
   id: text('id').primaryKey(),
   identifier: text('identifier').notNull(),

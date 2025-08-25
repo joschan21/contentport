@@ -4,16 +4,16 @@ import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format, isThisWeek, isToday, isTomorrow } from 'date-fns'
-import { Clock, Edit, MoreHorizontal, Send, Trash2 } from 'lucide-react'
+import { ArrowRight, Clock, Edit, MoreHorizontal, Send, Trash2 } from 'lucide-react'
 
 import { useConfetti } from '@/hooks/use-confetti'
 
-import { Tweet, TweetQuery } from '@/db/schema'
+import { Tweet } from '@/db/schema'
+import { AccountHandle, AccountName } from '@/hooks/account-ctx'
 import { useTweetsV2 } from '@/hooks/use-tweets-v2'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import posthog from 'posthog-js'
-import { Fragment, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Icons } from './icons'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -37,7 +37,6 @@ import DuolingoBadge from './ui/duolingo-badge'
 import DuolingoButton from './ui/duolingo-button'
 import { Loader } from './ui/loader'
 import { Separator } from './ui/separator'
-import { AccountHandle, AccountName } from '@/hooks/account-ctx'
 
 export default function TweetQueue() {
   const queryClient = useQueryClient()
@@ -78,45 +77,79 @@ export default function TweetQueue() {
     },
   })
 
+  const toastRef = useRef<string | null>(null)
+
   const { mutate: postImmediateFromQueue, isPending: isPosting } = useMutation({
     mutationFn: async ({ tweetId }: { tweetId: string }) => {
-      const res = await client.tweet.postImmediateFromQueue.$post({ tweetId })
-      const data = await res.json()
-      return data
+      const res = await client.tweet.postImmediateFromQueue.$post({
+        baseTweetId: tweetId,
+      })
+      const { messageId, accountUsername, hasExpiredMedia } = await res.json()
+
+      return { messageId, accountUsername, hasExpiredMedia }
     },
-    onSuccess: (data) => {
+    onMutate: async () => {
+      toastRef.current = toast.loading('Preparing tweet...')
+      return { toastId: toastRef.current }
+    },
+    onSuccess: (data, variables, context) => {
+      if (toastRef.current) {
+        toast.dismiss(toastRef.current)
+        toastRef.current = null
+      }
+
       setPendingPostId(null)
 
       queryClient.invalidateQueries({ queryKey: ['next-queue-slot'] })
       queryClient.invalidateQueries({ queryKey: ['queue-slots'] })
       queryClient.invalidateQueries({ queryKey: ['scheduled-and-published-tweets'] })
 
-      toast.success(
-        <div className="flex items-center gap-2">
-          <p>Tweet posted!</p>
-          <Link
-            target="_blank"
-            rel="noreferrer"
-            href={`https://x.com/${data.accountUsername}/status/${data.tweetId}`}
-            className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
-          >
-            See tweet
-          </Link>
-        </div>,
-      )
-
-      posthog.capture('tweet_posted', {
-        tweetId: data.tweetId,
-        accountId: data.accountId,
-        accountName: data.accountName,
-      })
+      if (data.hasExpiredMedia) {
+        toast.success(
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="font-medium">Tweet is being prepared!</p>
+              <p className="text-sm text-gray-600">
+                We're uploading your media to Twitter now.
+              </p>
+            </div>
+            <Link
+              href="/studio/posted"
+              className="text-sm text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 transition-colors"
+            >
+              Check status in Posted Tweets <ArrowRight className="size-3.5" />
+            </Link>
+          </div>,
+          { duration: 8000 },
+        )
+      } else {
+        toast.success(
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="font-medium">Tweet is being posted!</p>
+            </div>
+            <Link
+              href="/studio/posted"
+              className="text-sm text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 transition-colors"
+            >
+              Check status in Posted Tweets <ArrowRight className="size-3.5" />
+            </Link>
+          </div>,
+          { duration: 6000 },
+        )
+      }
 
       fire({
         particleCount: 200,
         spread: 160,
       })
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      if (toastRef.current) {
+        toast.dismiss(toastRef.current)
+        toastRef.current = null
+      }
+
       console.error('Failed to post tweet:', error)
       toast.error('Failed to post tweet')
     },

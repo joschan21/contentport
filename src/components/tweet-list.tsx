@@ -1,16 +1,20 @@
 'use client'
 
 import MediaDisplay from '@/components/media-display'
-import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import DuolingoBadge from '@/components/ui/duolingo-badge'
 import DuolingoButton from '@/components/ui/duolingo-button'
-import { useAccount } from '@/hooks/account-ctx'
+import {
+  AccountAvatar,
+  AccountHandle,
+  AccountName,
+  useAccount,
+} from '@/hooks/account-ctx'
 import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
 import { useQuery } from '@tanstack/react-query'
-import { format, isThisWeek, isToday, isTomorrow, isYesterday } from 'date-fns'
-import { CheckCircle2, Clock, Eye } from 'lucide-react'
+import { format, isToday, isYesterday } from 'date-fns'
+import { Clock, Eye } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Fragment } from 'react'
@@ -39,28 +43,6 @@ export default function TweetList({
     },
     enabled: !!account,
   })
-
-  const getDateLabel = (dateString: string) => {
-    const date = new Date(dateString)
-
-    if (isToday(date)) {
-      return 'Today'
-    }
-
-    if (isTomorrow(date)) {
-      return 'Tomorrow'
-    }
-
-    if (isYesterday(date)) {
-      return 'Yesterday'
-    }
-
-    if (isThisWeek(date)) {
-      return format(date, 'EEEE')
-    }
-
-    return format(date, 'MMMM d')
-  }
 
   if (isLoading) {
     return (
@@ -122,7 +104,7 @@ export default function TweetList({
                   <CardContent className="space-y-3">
                     <div
                       className="grid gap-3"
-                      style={{ gridTemplateColumns: 'auto 1fr auto' }}
+                      style={{ gridTemplateColumns: 'auto 1fr' }}
                     >
                       {threads.map(({ unix, thread, isQueued }, i) => {
                         const baseTweet = thread?.[0]
@@ -145,6 +127,13 @@ export default function TweetList({
                                         variant="error"
                                       >
                                         Error
+                                      </DuolingoBadge>
+                                    ) : baseTweet.isProcessing ? (
+                                      <DuolingoBadge
+                                        className="text-xs px-2"
+                                        variant="gray"
+                                      >
+                                        Processing
                                       </DuolingoBadge>
                                     ) : (
                                       <DuolingoBadge
@@ -169,27 +158,39 @@ export default function TweetList({
                             <div>
                               <div
                                 className={cn(
-                                  'px-4 py-3 rounded-lg border',
+                                  'px-4 py-4 rounded-lg grid gap-4',
                                   baseTweet
-                                    ? 'bg-white border-stone-200 shadow-sm'
+                                    ? 'bg-stone-100 border border-black border-opacity-5'
                                     : 'bg-stone-50 border-dashed border-stone-300',
                                 )}
+                                style={{ gridTemplateColumns: 'auto 1fr' }}
                               >
+                                <AccountAvatar className="size-10" />
                                 {baseTweet ? (
                                   <div className="space-y-3">
                                     {thread.map((tweet, index) => (
                                       <div
                                         key={index}
                                         className={cn(
-                                          'space-y-2',
+                                          'space-y-1',
                                           index > 0 && 'border-l-2 border-stone-200 pl-3',
                                         )}
                                       >
                                         {index > 0 && (
-                                          <div className="text-xs text-stone-500 font-medium">
+                                          <div className="text-xs text-stone-400 font-medium">
                                             Tweet {index + 1}
                                           </div>
                                         )}
+
+                                        {index === 0 && (
+                                          <div className="flex gap-2 items-center">
+                                            <div className="flex gap-1.5 items-start">
+                                              <AccountName className="leading-none text-sm" />
+                                              <AccountHandle className="leading-none text-sm" />
+                                            </div>
+                                          </div>
+                                        )}
+
                                         <p className="text-stone-900 whitespace-pre-line text-sm leading-relaxed">
                                           {tweet.content || 'No content'}
                                         </p>
@@ -212,6 +213,18 @@ export default function TweetList({
                                         )}
                                       </div>
                                     ))}
+
+                                    {!baseTweet.isError && (
+                                      <Link
+                                        href={`https://x.com/${account?.username}/status/${baseTweet.twitterId}`}
+                                        className="inline-flex items-center gap-1.5 underline text-sm text-gray-500"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        <Eye className="size-3.5" />
+                                        <p>See on twitter</p>
+                                      </Link>
+                                    )}
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-2 text-stone-500">
@@ -229,29 +242,6 @@ export default function TweetList({
                                     </p>
                                   )
                                 })}
-                            </div>
-
-                            <div className="flex items-center">
-                              {baseTweet && (
-                                <Link
-                                  className={cn(
-                                    buttonVariants({
-                                      variant: 'outline',
-                                      size: 'icon',
-                                      className: 'size-8',
-                                    }),
-                                    {
-                                      'opacity-50 cursor-disabled pointer-events-none':
-                                        !baseTweet.twitterId || !account?.username,
-                                    },
-                                  )}
-                                  href={`https://x.com/${account?.username}/status/${baseTweet.twitterId}`}
-                                  target="_blank"
-                                >
-                                  <Eye className="size-4" />
-                                  <span className="sr-only">View on Twitter</span>
-                                </Link>
-                              )}
                             </div>
                           </Fragment>
                         )

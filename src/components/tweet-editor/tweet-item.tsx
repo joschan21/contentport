@@ -143,7 +143,7 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
         throw new Error('Upload controller not found')
       }
 
-      const res = await client.tweet.uploadMediaToTwitter.$post(
+      const res = await client.file.uploadMediaToTwitter.$post(
         {
           s3Key,
           mediaType,
@@ -153,14 +153,7 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
 
       return await res.json()
     },
-    onSuccess: ({ media_id }) => {
-      // setCurrentTweet((prev) => ({
-      //   ...prev,
-      //   mediaIds: [...prev.mediaIds, media_id],
-      // }))
-    },
     onSettled: (data, error, variables) => {
-      // Clean up controller after both uploads complete
       abortControllersRef.current.delete(variables.fileUrl)
     },
   })

@@ -1,7 +1,6 @@
 import { getBaseUrl } from '@/constants/base-url'
 import { db } from '@/db'
 import { account as accountSchema, InsertTweet, tweets } from '@/db/schema'
-import { firecrawl } from '@/lib/firecrawl'
 import { qstash } from '@/lib/qstash'
 import { redis } from '@/lib/redis'
 import { Ratelimit } from '@upstash/ratelimit'
@@ -16,8 +15,9 @@ import { z } from 'zod'
 import { ZodError } from 'zod/v4'
 import { j, privateProcedure, qstashProcedure } from '../../jstack'
 import { getAccount } from '../utils/get-account'
+import { ensureValidMedia } from '../utils/upload-media-to-twitter'
 import { fetchMediaFromS3 } from './fetch-media-from-s3'
-import { postThreadToTwitter } from './posting-utils'
+
 import { getNextAvailableQueueSlot } from './queue-utils'
 
 const consumerKey = process.env.TWITTER_CONSUMER_KEY as string
@@ -163,82 +163,6 @@ export const tweetRouter = j.router({
       )
 
       return c.superjson({ thread: threadWithMedia })
-    }),
-
-  uploadMediaToTwitter: privateProcedure
-    .input(
-      z.object({
-        s3Key: z.string(),
-        mediaType: z.enum(['image', 'gif', 'video']),
-      }),
-    )
-    .post(async ({ c, ctx, input }) => {
-      const { user } = ctx
-      const { s3Key, mediaType } = input
-
-      const activeAccount = await getAccount({ email: user.email })
-
-      if (!activeAccount) {
-        throw new HTTPException(400, {
-          message: 'No active account found',
-        })
-      }
-
-      const account = await db.query.account.findFirst({
-        where: and(
-          eq(accountSchema.userId, user.id),
-          eq(accountSchema.id, activeAccount.id),
-        ),
-      })
-
-      if (!account) {
-        throw new HTTPException(400, {
-          message: 'Twitter account not connected or access token missing',
-        })
-      }
-
-      const client = new TwitterApi({
-        appKey: consumerKey as string,
-        appSecret: consumerSecret as string,
-        accessToken: account.accessToken as string,
-        accessSecret: account.accessSecret as string,
-      })
-
-      const mediaUrl = `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${s3Key}`
-      const response = await fetch(mediaUrl)
-
-      if (!response.ok) {
-        throw new HTTPException(400, { message: 'Failed to fetch media from S3' })
-      }
-
-      const buffer = await response.arrayBuffer()
-
-      let mimeType: string
-
-      switch (mediaType) {
-        case 'image':
-          mimeType = response.headers.get('content-type') || 'image/png'
-          break
-        case 'gif':
-          mimeType = 'image/gif'
-          break
-        case 'video':
-          mimeType = response.headers.get('content-type') || 'video/mp4'
-          break
-      }
-
-      const mediaBuffer = Buffer.from(buffer)
-      const mediaId = await client.v1.uploadMedia(mediaBuffer, {
-        mimeType,
-        additionalOwners: activeAccount.twitterId ? [activeAccount.twitterId] : undefined,
-      })
-
-      const mediaUpload = mediaId
-
-      return c.json({
-        media_id: mediaUpload,
-        media_key: `3_${mediaUpload}`,
-      })
     }),
 
   delete: privateProcedure
@@ -603,14 +527,29 @@ export const tweetRouter = j.router({
     }
 
     if (tweet.media && tweet.media.length > 0) {
-      const validMediaIds = tweet.media
-        .map((media) => media.media_id)
-        .filter(Boolean)
-        .slice(0, 4)
+      const validatedMedia = await ensureValidMedia({
+        account,
+        mediaItems: tweet.media.slice(0, 4),
+      })
+
+      const validMediaIds = validatedMedia.map((media) => media.media_id).filter(Boolean)
 
       if (validMediaIds.length > 0) {
         // @ts-expect-error max-4 length tuple
         payload.media = { media_ids: validMediaIds }
+      }
+
+      if (validatedMedia.length !== tweet.media.slice(0, 4).length) {
+        await db
+          .update(tweets)
+          .set({ media: validatedMedia })
+          .where(
+            and(
+              eq(tweets.id, tweetId),
+              eq(tweets.userId, userId),
+              eq(tweets.accountId, accountId),
+            ),
+          )
       }
     }
 
@@ -718,70 +657,15 @@ export const tweetRouter = j.router({
     }
   }),
 
-  /**
-   * keep for legacy
-   */
-  post: qstashProcedure.post(async ({ c, ctx }) => {
-    const { body } = ctx
-
-    const { tweetId, userId, accountId } = body as {
-      tweetId: string
-      userId: string
-      accountId: string
-    }
-
-    const baseTweet = await db.query.tweets.findFirst({
-      where: eq(tweets.id, tweetId),
-    })
-
-    if (!baseTweet) {
-      throw new HTTPException(404, { message: 'Tweet not found' })
-    }
-
-    if (baseTweet.isPublished) {
-      return c.json({ success: true })
-    }
-
-    const account = await db.query.account.findFirst({
-      where: and(
-        eq(accountSchema.userId, userId),
-        // use account that this was scheduled with
-        eq(accountSchema.id, accountId),
-      ),
-    })
-
-    if (!account || !account.accessToken) {
-      console.log('no account')
-      throw new HTTPException(400, {
-        message: 'Twitter account not connected or access token missing',
-      })
-    }
-
-    const client = new TwitterApi({
-      appKey: consumerKey as string,
-      appSecret: consumerSecret as string,
-      accessToken: account.accessToken as string,
-      accessSecret: account.accessSecret as string,
-    })
-
-    const { baseTweetId, allTweetIds } = await postThreadToTwitter(
-      client,
-      baseTweet,
-      account.id,
-    )
-
-    return c.json({ success: true, baseTweetId, allTweetIds })
-  }),
-
   postImmediateFromQueue: privateProcedure
     .input(
       z.object({
-        tweetId: z.string(),
+        baseTweetId: z.string(),
       }),
     )
     .mutation(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { tweetId } = input
+      const { baseTweetId } = input
 
       const account = await getAccount({
         email: user.email,
@@ -803,12 +687,12 @@ export const tweetRouter = j.router({
         })
       }
 
-      const [tweet] = await db
+      const [baseTweet] = await db
         .select()
         .from(tweets)
         .where(
           and(
-            eq(tweets.id, tweetId),
+            eq(tweets.id, baseTweetId),
             eq(tweets.userId, user.id),
             eq(tweets.accountId, account.id),
             eq(tweets.isScheduled, true),
@@ -816,35 +700,46 @@ export const tweetRouter = j.router({
           ),
         )
 
-      if (!tweet) {
+      if (!baseTweet) {
         throw new HTTPException(404, { message: 'Tweet not found' })
       }
 
-      if (tweet.qstashId) {
-        await qstash.messages.delete(tweet.qstashId).catch(() => {})
+      let hasExpiredMedia = false
+
+      if (baseTweet.media && baseTweet.media.length > 0) {
+        for (const { media_id } of baseTweet.media) {
+          const expiryUnix = await redis.get(`tweet-media-upload:${media_id}`)
+
+          if (!expiryUnix || Number(expiryUnix) < Date.now()) {
+            hasExpiredMedia = true
+            break
+          }
+        }
       }
 
-      const client = new TwitterApi({
-        appKey: consumerKey as string,
-        appSecret: consumerSecret as string,
-        accessToken: dbAccount.accessToken as string,
-        accessSecret: dbAccount.accessSecret as string,
-      })
-
       try {
-        const { baseTweetId, allTweetIds } = await postThreadToTwitter(
-          client,
-          tweet,
-          account.id,
-        )
+        if (baseTweet.qstashId) {
+          await qstash.messages.delete(baseTweet.qstashId).catch(() => {})
+        }
+
+        const { messageId } = await postWithQStash({
+          accountId: account.id,
+          tweetId: baseTweet.id,
+          userId: user.id,
+        })
+
+        await db
+          .update(tweets)
+          .set({ qstashId: messageId })
+          .where(eq(tweets.id, baseTweet.id))
 
         return c.json({
           success: true,
-          tweetId: baseTweetId,
+          messageId,
+          hasExpiredMedia,
           accountId: account.id,
-          accountName: account.name, // Display name of the twitter (x) user, do not use for tweet urls
-          accountUsername: account.username, // Username of the twitter (x) user, use for correct tweet urls
-          allTweetIds, // Include all tweet IDs in the thread for frontend use
+          accountName: account.name,
+          accountUsername: account.username,
         })
       } catch (err) {
         console.error('Failed to post tweet:', err)
@@ -1064,6 +959,7 @@ export const tweetRouter = j.router({
         eq(tweets.accountId, account.id),
         or(
           eq(tweets.isPublished, true),
+          eq(tweets.isProcessing, true),
           eq(tweets.isError, true),
           isNotNull(tweets.isReplyTo),
         ),
