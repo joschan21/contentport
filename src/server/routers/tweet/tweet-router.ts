@@ -603,13 +603,14 @@ export const tweetRouter = j.router({
     }
 
     if (tweet.media && tweet.media.length > 0) {
-      payload.media = {
-        media_ids: tweet.media.map((media) => media.media_id).slice(0, 4) as [
-          string,
-          string,
-          string,
-          string,
-        ],
+      const validMediaIds = tweet.media
+        .map((media) => media.media_id)
+        .filter(Boolean)
+        .slice(0, 4)
+
+      if (validMediaIds.length > 0) {
+        // @ts-expect-error max-4 length tuple
+        payload.media = { media_ids: validMediaIds }
       }
     }
 
@@ -656,7 +657,7 @@ export const tweetRouter = j.router({
       })
 
       if (next) {
-        postWithQStash({
+        await postWithQStash({
           tweetId: next.id,
           accountId: next.accountId,
           userId: next.userId,
