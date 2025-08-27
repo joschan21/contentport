@@ -45,8 +45,11 @@ import { pollTweetStatus } from '@/lib/poll-tweet-status'
 export function AppSidebarInset({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient()
   const { state, toggleSidebar } = useSidebar()
+
   const [isPostDialogOpen, setIsPostDialogOpen] = useState(false)
   const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false)
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false)
+
   const [rescheduledTime, setRescheduledTime] = useState<number | null>(null)
   const isCollapsed = state === 'collapsed'
   const { tweets, toPayloadTweet, reset } = useTweetsV2()
@@ -174,6 +177,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     },
     onSuccess: (data, variables) => {
       reset()
+      setIsScheduleDialogOpen(false)
 
       fire({
         particleCount: 200,
@@ -527,11 +531,17 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                   ) : (
                     <div className="flex items-center gap-2">
                       <div className="flex">
-                        <Dialog>
+                        <Dialog
+                          open={isScheduleDialogOpen}
+                          onOpenChange={setIsScheduleDialogOpen}
+                        >
                           <TooltipProvider delayDuration={0}>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <DialogTrigger asChild>
+                                <DialogTrigger
+                                  onClick={() => setIsScheduleDialogOpen(true)}
+                                  asChild
+                                >
                                   <DuolingoButton
                                     size="sm"
                                     className="group/toggle-button rounded-r-none"
