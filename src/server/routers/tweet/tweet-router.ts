@@ -1000,7 +1000,7 @@ export const tweetRouter = j.router({
     const groupedByDate: Record<string, typeof baseTweets> = {}
 
     baseTweets.forEach((baseTweet) => {
-      const publishDate = baseTweet.updatedAt || baseTweet.createdAt
+      const publishDate = baseTweet.scheduledUnix ?? baseTweet.updatedAt.getTime()
       const dateKey = startOfDay(new Date(publishDate)).getTime().toString()
 
       if (!groupedByDate[dateKey]) {
