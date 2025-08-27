@@ -7,7 +7,7 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { waitUntil } from '@vercel/functions'
 import { addDays, isFuture, isSameDay, setHours, startOfDay, startOfHour } from 'date-fns'
 import { fromZonedTime } from 'date-fns-tz'
-import { and, desc, eq, isNotNull, or } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, lte, or } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { ContentfulStatusCode } from 'hono/utils/http-status'
 import { ApiResponseError, SendTweetV2Params, TwitterApi } from 'twitter-api-v2'
@@ -956,6 +956,7 @@ export const tweetRouter = j.router({
     const _postedTweets = await db.query.tweets.findMany({
       where: and(
         eq(tweets.accountId, account.id),
+        lte(tweets.scheduledUnix, new Date().getTime()),
         or(
           eq(tweets.isPublished, true),
           eq(tweets.isProcessing, true),
