@@ -506,7 +506,7 @@ export const tweetRouter = j.router({
 
     await db
       .update(tweets)
-      .set({ isProcessing: true })
+      .set({ isProcessing: true, updatedAt: new Date() })
       .where(
         and(
           eq(tweets.id, tweetId),
@@ -539,18 +539,16 @@ export const tweetRouter = j.router({
         payload.media = { media_ids: validMediaIds }
       }
 
-      if (validatedMedia.length !== tweet.media.slice(0, 4).length) {
-        await db
-          .update(tweets)
-          .set({ media: validatedMedia })
-          .where(
-            and(
-              eq(tweets.id, tweetId),
-              eq(tweets.userId, userId),
-              eq(tweets.accountId, accountId),
-            ),
-          )
-      }
+      await db
+        .update(tweets)
+        .set({ media: validatedMedia, updatedAt: new Date() })
+        .where(
+          and(
+            eq(tweets.id, tweetId),
+            eq(tweets.userId, userId),
+            eq(tweets.accountId, accountId),
+          ),
+        )
     }
 
     if (replyToTwitterId) {
@@ -577,6 +575,7 @@ export const tweetRouter = j.router({
           isProcessing: false,
           isScheduled: false,
           isError: false,
+          updatedAt: new Date(),
         })
         .where(
           and(
@@ -1024,7 +1023,7 @@ export const tweetRouter = j.router({
 
     Object.entries(groupedByDate).forEach(([dateKey, tweets]) => {
       const threadsForDay = tweets.map((baseTweet) => ({
-        unix: (baseTweet.updatedAt || baseTweet.createdAt).getTime(),
+        unix: baseTweet.scheduledUnix ?? baseTweet.updatedAt.getTime(),
         thread: buildThread(baseTweet.id),
         isQueued: false,
       }))
