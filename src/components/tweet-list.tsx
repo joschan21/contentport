@@ -199,6 +199,7 @@ export default function TweetList({
                                             <MediaDisplay
                                               mediaFiles={tweet.media.map((media) => ({
                                                 ...media,
+                                                url: `https://dtvhue6he2eeq.cloudfront.net/${media.s3Key}`,
                                                 uploading: false,
                                                 media_id: media.media_id,
                                                 s3Key: media.s3Key,
