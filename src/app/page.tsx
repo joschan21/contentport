@@ -1,3 +1,4 @@
+import TestimonialCard from '@/frontend/studio/components/TestimonialCard'
 import { LogoCloud } from '@/components/logo-cloud'
 import Navbar from '@/components/navbar'
 import DuolingoButton from '@/components/ui/duolingo-button'
@@ -382,11 +383,7 @@ const Page = async () => {
                 </h2>
               </div>
               <div className="mx-auto max-w-7xl px-6 lg:px-8 space-y-12">
-                <Script
-                  src="https://widget.senja.io/widget/72519276-9e16-4bc4-9911-49ffb12b73b4/platform.js"
-                  type="text/javascript"
-                  async
-                ></Script>
+                <TestimonialCard></TestimonialCard>
                 <div
                   className="senja-embed block w-full"
                   data-id="72519276-9e16-4bc4-9911-49ffb12b73b4"
