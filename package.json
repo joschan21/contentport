@@ -113,6 +113,7 @@
     "react-resizable-panels": "^2.1.7",
     "react-router": "^7.5.3",
     "react-simple-code-editor": "^0.14.1",
+    "react-tweet": "^3.2.2",
     "react-use": "^17.6.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
