@@ -73,12 +73,6 @@ export const auth = betterAuth({
       isAdmin: { type: 'boolean', defaultValue: false, required: false },
     },
   },
-  session: {
-    cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60,
-    },
-  },
   database,
   socialProviders: {
     google: {
