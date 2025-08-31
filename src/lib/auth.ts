@@ -34,15 +34,12 @@ const getTrustedOrigins = () => {
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: getTrustedOrigins(),
-  plugins:
-    process.env.NODE_ENV === 'production'
-      ? [
-          oAuthProxy({
-            productionURL: 'https://www.contentport.io',
-            currentURL: process.env.BETTER_AUTH_URL,
-          }),
-        ]
-      : [],
+  plugins: [
+    oAuthProxy({
+      productionURL: 'https://www.contentport.io',
+      currentURL: process.env.BETTER_AUTH_URL,
+    }),
+  ],
   databaseHooks: {
     user: {
       create: {
@@ -78,10 +75,7 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      redirectURI:
-        process.env.NODE_ENV === 'production'
-          ? 'https://www.contentport.io/api/auth/callback/google'
-          : undefined,
+      redirectURI: 'https://www.contentport.io/api/auth/callback/google',
     },
     twitter: {
       clientId: process.env.TWITTER_CLIENT_ID as string,
