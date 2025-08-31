@@ -20,6 +20,7 @@ const getTrustedOrigins = () => {
     host?.startsWith('http') ? host : host ? `https://www.${host}` : undefined
 
   add(process.env.BETTER_AUTH_URL)
+  console.log('ℹ️ currently on url:', process.env.BETTER_AUTH_URL)
 
   add(toOrigin(process.env.VERCEL_BRANCH_URL))
   add(toOrigin(process.env.VERCEL_URL))
