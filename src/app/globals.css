@@ -400,6 +400,13 @@ body {
   }
 }
 
+.swiper-slide {
+  height: auto !important
+}
+.swiper-wrapper {
+  align-items: stretch !important
+}
+
 /* Custom minimal scrollbar styling */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

@@ -48,7 +48,7 @@ const TWITTER_MEDIA_TYPES = {
 const URL_REGEX =
   /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/g
 
-const MATCHERS = createLinkMatcherWithRegExp(URL_REGEX, (text) => {
+export const MATCHERS = createLinkMatcherWithRegExp(URL_REGEX, (text) => {
   return text.startsWith('http') ? text : `https://${text}`
 })
 
@@ -337,7 +337,7 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
                 <MentionsPlugin />
                 <MentionTooltipPlugin />
                 <AutoLinkPlugin matchers={[MATCHERS]} />
-                <LinkPreviewPlugin tweetId={tweet.id} />
+                <LinkPreviewPlugin shouldShowLink={!Boolean(tweet?.mediaFiles.length)} />
                 <ShadowEditorSyncPlugin tweetId={tweet.id} />
               </LexicalComposer>
             </div>

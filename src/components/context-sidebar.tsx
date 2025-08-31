@@ -19,7 +19,6 @@ import {
   SidebarHeader,
   useSidebar,
 } from './ui/sidebar'
-import { Icons } from './icons'
 
 const searchParams = {
   tweetId: parseAsString,
@@ -111,14 +110,14 @@ export const LeftSidebar = () => {
         </SidebarGroup>
 
         {/* Discover Group */}
-        {/* <SidebarGroup>
+        <SidebarGroup>
           <SidebarGroupLabel
             className={cn(
               'transition-all duration-200 ease-out px-3',
               isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
             )}
           >
-            Discover
+            Engage
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <Link
@@ -144,11 +143,11 @@ export const LeftSidebar = () => {
                   isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
                 )}
               >
-                Topic monitor
+                Feed
               </span>
             </Link>
           </SidebarGroupContent>
-        </SidebarGroup> */}
+        </SidebarGroup>
 
         {/* Content Group */}
         <SidebarGroup>

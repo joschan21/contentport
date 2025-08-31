@@ -5,7 +5,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $getNodeByKey } from 'lexical'
 import { useEffect, useState } from 'react'
 
-export const LinkPreviewPlugin = ({ tweetId }: { tweetId: string }) => {
+export const LinkPreviewPlugin = ({ shouldShowLink }: { shouldShowLink: boolean }) => {
   const [editor] = useLexicalComposerContext()
   const { tweets } = useTweetsV2()
 
@@ -42,9 +42,9 @@ export const LinkPreviewPlugin = ({ tweetId }: { tweetId: string }) => {
   }, [editor])
 
   const firstLink = previewLinks[0]
-  const tweet = tweets.find((t) => t.id === tweetId)
+  // const tweet = tweets.find((t) => t.id === tweetId)
 
-  if (firstLink && !Boolean(tweet?.mediaFiles.length)) {
+  if (firstLink && shouldShowLink /* !Boolean(tweet?.mediaFiles.length) */) {
     return <LinkPreview url={firstLink.url} />
   }
 
