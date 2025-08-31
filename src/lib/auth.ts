@@ -20,7 +20,6 @@ const getTrustedOrigins = () => {
     host?.startsWith('http') ? host : host ? `https://www.${host}` : undefined
 
   add(process.env.BETTER_AUTH_URL)
-  console.log('ℹ️ currently on url:', process.env.BETTER_AUTH_URL)
 
   add(toOrigin(process.env.VERCEL_BRANCH_URL))
   add(toOrigin(process.env.VERCEL_URL))
@@ -28,6 +27,7 @@ const getTrustedOrigins = () => {
   add(toWWWOrigin(process.env.VERCEL_URL))
 
   add('https://www.contentport.io') // prod
+  add('https://www.staging.contentport.io') // prod
   add('http://localhost:3000') // local dev
   return Array.from(origins)
 }
@@ -35,12 +35,6 @@ const getTrustedOrigins = () => {
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: getTrustedOrigins(),
-  plugins: [
-    oAuthProxy({
-      productionURL: 'https://www.contentport.io',
-      currentURL: process.env.BETTER_AUTH_URL,
-    }),
-  ],
   databaseHooks: {
     user: {
       create: {
@@ -76,7 +70,6 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      redirectURI: 'https://www.contentport.io/api/auth/callback/google',
     },
     twitter: {
       clientId: process.env.TWITTER_CLIENT_ID as string,
