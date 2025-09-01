@@ -22,7 +22,7 @@ const Page = () => {
   const [newIds, setNewIds] = useState<string[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { data: keywordData } = useQuery({
+  const { data: keywordData, isFetched: isKeywordsFetched } = useQuery({
     queryKey: ['get-keywords'],
     queryFn: async () => {
       const res = await client.feed.get_keywords.$get()
@@ -53,9 +53,19 @@ const Page = () => {
       return data
     },
     onMutate: (variables) => {
-      return toast.loading(`Getting latest tweets...`, {
-        duration: Infinity,
-      })
+      return toast.loading(
+        <div>
+          <p className="inline-flex flex-col text-sm/6 text-gray-900">
+            <strong className="font-semibold">Getting latest tweets</strong>
+            <span className="text-gray-700">
+              This can take a few seconds. You can leave this page meanwhile.
+            </span>
+          </p>
+        </div>,
+        {
+          duration: Infinity,
+        },
+      )
     },
     onSuccess: (data, _, toastId) => {
       queryClient.invalidateQueries({ queryKey: ['get-feed'] })
@@ -84,7 +94,7 @@ const Page = () => {
       ref={containerRef}
       className="relative h-full"
     >
-      {keywordData.keywords.length === 0 && (
+      {isKeywordsFetched && keywordData.keywords.length === 0 && (
         <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
