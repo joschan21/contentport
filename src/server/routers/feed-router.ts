@@ -105,8 +105,6 @@ export const feedRouter = j.router({
 
     const data = await res.json()
 
-    console.log('[FEED RESPONSE]', JSON.stringify(data, null, 2));
-
     const { newIds, scanStartedAt } = z
       .object({
         newIds: z.array(z.string()),
