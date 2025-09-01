@@ -95,7 +95,7 @@ export const InfoModal = ({ onContinue }: InfoModalProps) => {
             <div className="aspect-video w-full h-full overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
               <img
                 alt="Onboarding decoration image"
-                src="https://static.ferndesk.com/assets/helpdesk-setup-2.webp"
+                src="/new-monitor.png"
                 className="h-full w-full object-cover"
               />
             </div>
@@ -109,8 +109,8 @@ export const InfoModal = ({ onContinue }: InfoModalProps) => {
                 </p>
                 <div className="mb-8 space-y-4 text-left">
                   <div className="flex items-start space-x-3">
-                    <div className="mt-1 flex size-8 items-center justify-center rounded-full bg-emerald-50">
-                      <TimerIcon className="size-5 text-emerald-600" />
+                    <div className="mt-1 flex size-8 items-center justify-center rounded-full bg-indigo-50">
+                      <TimerIcon className="size-5 text-indigo-600" />
                     </div>
                     <div>
                       <h4 className="text-sm font-semibold text-gray-700">
@@ -122,8 +122,8 @@ export const InfoModal = ({ onContinue }: InfoModalProps) => {
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
-                    <div className="mt-1 flex size-8 items-center justify-center rounded-full bg-emerald-50">
-                      <BellRingingIcon className="size-5 text-emerald-600" />
+                    <div className="mt-1 flex size-8 items-center justify-center rounded-full bg-indigo-50">
+                      <BellRingingIcon className="size-5 text-indigo-600" />
                     </div>
                     <div>
                       <h4 className="text-sm font-semibold text-gray-700">
