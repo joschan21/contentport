@@ -95,7 +95,6 @@ export const auth = betterAuth({
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
       const session = ctx.context.newSession
-
       if (session) {
         ctx.redirect('/studio')
       } else {
