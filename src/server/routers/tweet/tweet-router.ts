@@ -1147,10 +1147,18 @@ export const tweetRouter = j.router({
       all.forEach((day) => {
         const [dayUnix, timestamps] = Object.entries(day)[0]!
 
-        // Get only base tweets for this day (threads start with base tweets)
-        const baseTweetsForThisDay = scheduledTweets.filter(
-          (t) => isSameDay(t.scheduledUnix!, Number(dayUnix)) && !Boolean(t.isReplyTo),
-        )
+        const baseTweetsForThisDay = scheduledTweets.filter((t) => {
+          if (!t.scheduledUnix || Boolean(t.isReplyTo)) return false
+
+          const tweetDateInTimezone = new Date(
+            new Date(t.scheduledUnix).toLocaleString('en-US', { timeZone: timezone }),
+          )
+          const dayDateInTimezone = new Date(
+            new Date(Number(dayUnix)).toLocaleString('en-US', { timeZone: timezone }),
+          )
+
+          return isSameDay(tweetDateInTimezone, dayDateInTimezone)
+        })
 
         const manualBaseTweetsForThisDay = baseTweetsForThisDay.filter(
           (t) => !Boolean(t.isQueued),
