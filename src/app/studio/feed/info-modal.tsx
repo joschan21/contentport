@@ -8,6 +8,8 @@ import { Swiper, SwiperSlide } from 'swiper/react'
 import DuolingoButton from '../../../components/ui/duolingo-button'
 import { Input } from '../../../components/ui/input'
 
+import 'swiper/css'
+
 interface InfoModalProps {
   onContinue?: ({ keywords }: { keywords: string[] }) => void | Promise<void>
 }
