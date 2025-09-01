@@ -5,13 +5,13 @@ import { ChevronRight, Hash, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import type SwiperType from 'swiper'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import DuolingoButton from '../../../components/ui/duolingo-button'
-import { Input } from '../../../components/ui/input'
+import DuolingoButton from '@/components/ui/duolingo-button'
+import { Input } from '@/components/ui/input'
 
 import 'swiper/css'
 
 interface InfoModalProps {
-  onContinue?: ({ keywords }: { keywords: string[] }) => void | Promise<void>
+  onContinue?: () => void | Promise<void>
 }
 
 export const InfoModal = ({ onContinue }: InfoModalProps) => {
@@ -29,9 +29,13 @@ export const InfoModal = ({ onContinue }: InfoModalProps) => {
       })
       return await res.json()
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['get-keywords'] })
       queryClient.setQueryData(['get-keywords'], { keywords })
+
+      if (onContinue) {
+        await onContinue()
+      }
     },
   })
 
@@ -54,10 +58,6 @@ export const InfoModal = ({ onContinue }: InfoModalProps) => {
   const handleContinue = async () => {
     setIsNavigating(true)
     saveKeywords(keywords)
-
-    if (onContinue && keywords) {
-      await onContinue({ keywords })
-    }
   }
 
   const goToNext = () => {

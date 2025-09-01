@@ -1,12 +1,10 @@
-import { db } from '@/db'
-import { referenceTweets, user } from '@/db/schema'
+import { redis } from '@/lib/redis'
+import { Redis } from '@upstash/redis'
 import { EnrichedTweet, enrichTweet } from 'react-tweet'
 import { getTweet } from 'react-tweet/api'
-import { j, privateProcedure } from '../jstack'
-import { z } from 'zod'
-import { redis } from '@/lib/redis'
 import superjson from 'superjson'
-import { Redis } from '@upstash/redis'
+import { z } from 'zod'
+import { j, privateProcedure } from '../jstack'
 
 const redis_raw = Redis.fromEnv({
   automaticDeserialization: false,
