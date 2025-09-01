@@ -92,18 +92,15 @@ export const auth = betterAuth({
       secure: true,
     },
   },
-  hooks:
-    process.env.VERCEL_ENV === 'preview'
-      ? undefined
-      : {
-          after: createAuthMiddleware(async (ctx) => {
-            const session = ctx.context.newSession
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      const session = ctx.context.newSession
 
-            if (session) {
-              ctx.redirect('/studio')
-            } else {
-              ctx.redirect('/')
-            }
-          }),
-        },
+      if (session) {
+        ctx.redirect('/studio')
+      } else {
+        ctx.redirect('/')
+      }
+    }),
+  },
 })
