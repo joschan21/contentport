@@ -27,6 +27,7 @@ const getTrustedOrigins = () => {
   add(toWWWOrigin(process.env.VERCEL_URL))
 
   add('https://www.contentport.io') // prod
+  add('https://www.staging.contentport.io') // prod
   add('http://localhost:3000') // local dev
   return Array.from(origins)
 }
@@ -34,15 +35,6 @@ const getTrustedOrigins = () => {
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: getTrustedOrigins(),
-  plugins:
-    process.env.NODE_ENV === 'production'
-      ? [
-          oAuthProxy({
-            productionURL: 'https://www.contentport.io',
-            currentURL: process.env.BETTER_AUTH_URL,
-          }),
-        ]
-      : [],
   databaseHooks: {
     user: {
       create: {
@@ -78,10 +70,6 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      redirectURI:
-        process.env.NODE_ENV === 'production'
-          ? 'https://www.contentport.io/api/auth/callback/google'
-          : undefined,
     },
     twitter: {
       clientId: process.env.TWITTER_CLIENT_ID as string,
@@ -104,15 +92,18 @@ export const auth = betterAuth({
       secure: true,
     },
   },
-  // hooks: {
-  //   after: createAuthMiddleware(async (ctx) => {
-  //     const session = ctx.context.newSession
+  hooks:
+    process.env.VERCEL_ENV === 'preview'
+      ? undefined
+      : {
+          after: createAuthMiddleware(async (ctx) => {
+            const session = ctx.context.newSession
 
-  //     if (session) {
-  //       ctx.redirect('/studio')
-  //     } else {
-  //       ctx.redirect('/')
-  //     }
-  //   }),
-  // },
+            if (session) {
+              ctx.redirect('/studio')
+            } else {
+              ctx.redirect('/')
+            }
+          }),
+        },
 })

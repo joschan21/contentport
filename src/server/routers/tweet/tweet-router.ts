@@ -42,13 +42,21 @@ const postWithQStashSchema = z.object({
   userId: z.string(),
   accountId: z.string(),
   replyToTwitterId: z.string().optional(),
+  quoteToTwitterId: z.string().optional(),
   scheduledUnixInSeconds: z.number().optional(),
 })
 
 type PostWithQStashArgs = z.infer<typeof postWithQStashSchema>
 
 const postWithQStash = async (args: PostWithQStashArgs) => {
-  const { accountId, tweetId, userId, replyToTwitterId, scheduledUnixInSeconds } = args
+  const {
+    accountId,
+    tweetId,
+    userId,
+    replyToTwitterId,
+    scheduledUnixInSeconds,
+    quoteToTwitterId,
+  } = args
 
   const baseUrl =
     process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
@@ -58,6 +66,7 @@ const postWithQStash = async (args: PostWithQStashArgs) => {
     userId,
     accountId,
     replyToTwitterId,
+    quoteToTwitterId,
     scheduledUnixInSeconds,
   }
 
@@ -467,7 +476,7 @@ export const tweetRouter = j.router({
     const { body } = ctx
     const messageId = c.req.header('upstash-message-id')
 
-    const { tweetId, userId, accountId, replyToTwitterId } =
+    const { tweetId, userId, accountId, replyToTwitterId, quoteToTwitterId } =
       postWithQStashSchema.parse(body)
 
     const [tweet] = await db
@@ -555,6 +564,10 @@ export const tweetRouter = j.router({
       payload.reply = {
         in_reply_to_tweet_id: replyToTwitterId,
       }
+    }
+
+    if (quoteToTwitterId) {
+      payload.quote_tweet_id = quoteToTwitterId
     }
 
     try {
@@ -757,11 +770,13 @@ export const tweetRouter = j.router({
     .input(
       z.object({
         thread: z.array(payloadTweetSchema).min(1),
+        replyToTwitterId: z.string().optional(),
+        quoteToTwitterId: z.string().optional(),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { thread } = input
+      const { thread, replyToTwitterId, quoteToTwitterId } = input
 
       const account = await getAccount({
         email: user.email,
@@ -814,6 +829,8 @@ export const tweetRouter = j.router({
           accountId: account.id,
           tweetId: baseTweet.id,
           userId: user.id,
+          replyToTwitterId,
+          quoteToTwitterId,
         })
 
         await db
