@@ -94,8 +94,7 @@ const Page = () => {
       ref={containerRef}
       className="relative h-full"
     >
-      {/* {isKeywordsFetched && keywordData.keywords.length === 0 && ( */}
-      {true && (
+      {isKeywordsFetched && keywordData.keywords.length === 0 && (
         <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
