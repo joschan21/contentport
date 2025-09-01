@@ -33,36 +33,42 @@ export const Calendar20 = ({
 
   const session = authClient.useSession()
 
-  const timeSlots = Array.from({ length: 37 }, (_, i) => {
+  const timeSlots = React.useMemo(() => {
     const isAdmin = session?.data?.user?.isAdmin
+    const slots: { value: string; label: string }[] = Array.from({ length: 96 }, (_, i) => {
+      const totalMinutes = i * 15
+      const hour = Math.floor(totalMinutes / 60)
+      const minute = totalMinutes % 60
+      const value = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+      const displayHour = hour % 12 || 12
+      const ampm = hour >= 12 ? 'PM' : 'AM'
+      const label = `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`
+      return { value, label }
+    })
 
-    // allows for testing queue slots
-    if (isAdmin && i === 0) {
+    if (isAdmin) {
       const now = new Date()
       const nextMinute = new Date(now.getTime() + 60000)
-      const hour = nextMinute.getHours().toString().padStart(2, '0')
-      const minute = nextMinute.getMinutes().toString().padStart(2, '0')
-      return `${hour}:${minute}`
+      const h = nextMinute.getHours()
+      const m = nextMinute.getMinutes()
+      const value = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+      const displayHour = h % 12 || 12
+      const ampm = h >= 12 ? 'PM' : 'AM'
+      slots.unshift({ value, label: `${displayHour}:${m.toString().padStart(2, '0')} ${ampm}` })
     }
 
-    const slotIndex = isAdmin ? i - 1 : i
-    const totalMinutes = slotIndex * 15
-    const hour = Math.floor(totalMinutes / 60) + 9
-    const minute = totalMinutes % 60
-    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-  })
+    return slots
+  }, [session?.data?.user?.isAdmin])
 
   const getNextAvailableTime = (): string => {
     const currentTime = currentHour * 60 + currentMinute
     return (
-      timeSlots.find((timeSlot) => {
-        const timeParts = timeSlot.split(':').map(Number)
-        const hour = timeParts[0] ?? 0
-        const minute = timeParts[1] ?? 0
-        const slotTime = hour * 60 + minute
+      timeSlots.find((t) => {
+        const [h, m] = t.value.split(':').map(Number)
+        const slotTime = (h ?? 0) * 60 + (m ?? 0)
         return slotTime > currentTime
-      }) ??
-      timeSlots[0] ??
+      })?.value ??
+      timeSlots[0]?.value ??
       '10:00'
     )
   }
@@ -84,19 +90,24 @@ export const Calendar20 = ({
   const [date, setDate] = React.useState<Date | undefined>(getInitialDate())
   const [selectedTime, setSelectedTime] = React.useState<string | null>(getInitialTime())
 
-  const isTimeSlotDisabled = (timeString: string) => {
+  const [ampm, setAmPm] = React.useState<'ALL' | 'AM' | 'PM'>('ALL')
+
+  const isTimeSlotDisabled = (value: string) => {
     if (!date || date.toDateString() !== today.toDateString()) {
       return false
     }
 
-    const timeParts = timeString.split(':').map(Number)
-    const hour = timeParts[0] ?? 0
-    const minute = timeParts[1] ?? 0
-    const slotTime = hour * 60 + minute
+    const [hour, minute] = value.split(':').map(Number)
+    const slotTime = (hour ?? 0) * 60 + (minute ?? 0)
     const currentTime = currentHour * 60 + currentMinute
 
     return slotTime <= currentTime
   }
+
+  const selectedTimeLabel = React.useMemo(() => {
+    const found = timeSlots.find((t) => t.value === selectedTime)
+    return found?.label ?? selectedTime
+  }, [selectedTime, timeSlots])
 
   const isPastDate = (date: Date) => {
     const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -151,17 +162,35 @@ export const Calendar20 = ({
           />
         </div>
         <div className="no-scrollbar inset-y-0 right-0 flex max-h-72 w-full scroll-pb-6 flex-col gap-4 overflow-y-auto border-t p-6 md:absolute md:max-h-none md:w-48 md:border-t-0 md:border-l">
+          <div className="flex gap-2">
+            {(['ALL', 'AM', 'PM'] as const).map((opt) => (
+              <Button
+                key={opt}
+                size="sm"
+                variant={ampm === opt ? 'default' : 'outline'}
+                onClick={() => setAmPm(opt)}
+                className="flex-1"
+              >
+                {opt}
+              </Button>
+            ))}
+          </div>
           <div className="grid gap-2">
             {timeSlots
-              .filter((time) => !isTimeSlotDisabled(time))
-              .map((time, i) => (
+              .filter((t) => {
+                if (ampm === 'ALL') return true
+                const h = parseInt(t.value.split(':')[0] ?? '0', 10)
+                return ampm === 'AM' ? h < 12 : h >= 12
+              })
+              .filter((t) => !isTimeSlotDisabled(t.value))
+              .map((t, i) => (
                 <Button
-                  key={`${time}-${i}`}
-                  variant={selectedTime === time ? 'default' : 'outline'}
-                  onClick={() => setSelectedTime(time)}
+                  key={`${t.value}-${i}`}
+                  variant={selectedTime === t.value ? 'default' : 'outline'}
+                  onClick={() => setSelectedTime(t.value)}
                   className="w-full shadow-none"
                 >
-                  {time}
+                  {t.label}
                 </Button>
               ))}
           </div>
@@ -180,7 +209,7 @@ export const Calendar20 = ({
                   month: 'long',
                 })}{' '}
               </span>
-              at <span className="font-medium">{selectedTime}</span>.
+              at <span className="font-medium">{selectedTimeLabel}</span>.
             </>
           ) : (
             <>Select a date and time for your meeting.</>
