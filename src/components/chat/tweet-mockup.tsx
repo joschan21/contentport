@@ -1,6 +1,7 @@
 import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
 import { useTweetsV2 } from '@/hooks/use-tweets-v2'
 import { motion } from 'framer-motion'
+import type { Variants } from 'framer-motion'
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
 import { ChevronsLeft } from 'lucide-react'
 import { PropsWithChildren, memo } from 'react'
@@ -26,7 +27,7 @@ export const TweetMockup = memo(
   }>) => {
     const { tweets, addTweet, updateTweet } = useTweetsV2()
 
-    const containerVariants = {
+    const containerVariants: Variants = {
       hidden: { opacity: 0, y: 20, scale: 0.95 },
       visible: {
         opacity: 1,
@@ -79,7 +80,7 @@ export const TweetMockup = memo(
         initial={isLoading ? 'hidden' : false}
         animate={isLoading ? 'visible' : false}
         className={cn(
-          'w-full grid grid-cols-[40px,1fr] gap-3 min-w-0 py-3 px-4 rounded-2xl',
+          'relative w-full grid grid-cols-[40px,1fr] gap-3 min-w-0 py-3 px-4 rounded-2xl',
           {
             'p-6': threads?.length === 1 || isLoading,
             'border border-black border-opacity-[0.01] bg-clip-padding group bg-white shadow-[0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)]':
@@ -104,7 +105,13 @@ export const TweetMockup = memo(
                 animate={{
                   opacity: 1,
                 }}
-                className="absolute right-4 top-4 flex items-center gap-2"
+                className={cn(
+                  'absolute right-4 flex items-center gap-2',
+                  {
+                    'top-4': threads?.length === 1 || isLoading,
+                    'top-1': threads && threads.length > 1,
+                  },
+                )}
               >
                 <DuolingoButton
                   onClick={apply}
