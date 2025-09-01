@@ -16,6 +16,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { GearIcon } from '@phosphor-icons/react'
+import { authClient } from '@/lib/auth-client'
+import { HTTPException } from 'hono/http-exception'
+import toast from 'react-hot-toast'
 
 interface FeedSettingsModalProps {
   isOpen: boolean
@@ -26,6 +29,7 @@ interface FeedSettingsModalProps {
 
 export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsModalProps) {
   const queryClient = useQueryClient()
+  const { data: userData } = authClient.useSession()
 
   const [input, setInput] = useState<string>('')
   const [keywords, setKeywords] = useState<string[]>([])
@@ -57,6 +61,13 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
       setIsOpen(false)
       onSave()
     },
+    onError: (err) => {
+      if (err instanceof HTTPException) {
+        toast.error(err.message)
+      } else {
+        toast.error('An error occurred')
+      }
+    },
   })
 
   const addKeyword = () => {
@@ -75,8 +86,10 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
     }
   }
 
-  const isAtLimit = false
-  const canSave = keywords.length > 0 && !isAtLimit
+  const isAtLimit = Boolean(
+    userData?.user.plan === 'pro' ? keywords.length >= 5 : keywords.length >= 1,
+  )
+  const canSave = keywords.length > 0
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -120,7 +133,8 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-3">
-                Keywords to Monitor
+                Keywords to Monitor ({keywords.length}/
+                {userData?.user.plan === 'pro' ? '5' : '1'})
               </label>
 
               <div className="flex gap-2">
@@ -155,7 +169,6 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
                       <button
                         onClick={() => removeKeyword(index)}
                         className="ml-1 w-4 h-4 flex items-center justify-center text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 rounded-full transition-colors"
-                        disabled={isAtLimit}
                       >
                         <X className="w-3 h-3" />
                       </button>

@@ -7,6 +7,7 @@ import type SwiperType from 'swiper'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { Input } from '@/components/ui/input'
+import { authClient } from '@/lib/auth-client'
 
 import 'swiper/css'
 
@@ -21,6 +22,7 @@ export const InfoModal = ({ onContinue }: InfoModalProps) => {
   const [isNavigating, setIsNavigating] = useState(false)
   const queryClient = useQueryClient()
   const [keywords, setKeywords] = useState<string[]>([])
+  const { data: userData } = authClient.useSession()
 
   const { mutate: saveKeywords } = useMutation({
     mutationFn: async (keywords: string[]) => {
@@ -72,6 +74,9 @@ export const InfoModal = ({ onContinue }: InfoModalProps) => {
     }
   }
 
+  const isAtLimit = Boolean(
+    userData?.user.plan === 'pro' ? keywords.length >= 5 : keywords.length >= 1,
+  )
   const canContinue = keywords.length > 0
 
   return (
@@ -155,6 +160,10 @@ export const InfoModal = ({ onContinue }: InfoModalProps) => {
 
               <div className="space-y-4 mt-5">
                 <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-3">
+                    Keywords to Monitor ({keywords.length}/
+                    {userData?.user.plan === 'pro' ? '5' : '1'})
+                  </label>
                   <div className="flex gap-2">
                     <Input
                       placeholder="Add a keyword..."
@@ -162,10 +171,11 @@ export const InfoModal = ({ onContinue }: InfoModalProps) => {
                       onChange={(e) => setInput(e.target.value)}
                       onKeyPress={handleKeywordKeyPress}
                       className="flex-1 h-12 px-4 text-base border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-indigo-500/20 transition-all duration-200"
+                      disabled={isAtLimit}
                     />
                     <DuolingoButton
                       onClick={addKeyword}
-                      disabled={!input.trim()}
+                      disabled={!input.trim() || isAtLimit}
                       variant="icon"
                       size="icon"
                       className="h-12 w-12 rounded-xl"
