@@ -5,9 +5,10 @@ import { testimonials } from "@/constants/testimonials";
 export default function TestimonialCard() {
 
     const reviews = testimonials
-    
-      const firstRow = reviews.slice(0, reviews.length / 2);
-      const secondRow = reviews.slice(reviews.length / 2);
+
+    const firstRow = reviews.slice(0, 4);
+    const secondRow = reviews.slice(4);
+
     
       const ReviewCard = ({
         img,
@@ -27,7 +28,7 @@ export default function TestimonialCard() {
         return (
           <figure
             className={cn(
-              "relative h-full w-64 cursor-pointer overflow-hidden rounded-xl border p-4 flex flex-col",
+              "relative h-full w-full cursor-pointer overflow-hidden rounded-xl border p-4 flex flex-col",
               // light styles
               "border-gray-950/[.1] bg-gray-950/[.01] hover:bg-gray-950/[.05]",
               // dark styles
@@ -38,7 +39,7 @@ export default function TestimonialCard() {
               <div className="flex items-center gap-2">
                 <img className="rounded-full" width="40" height="40" alt="" src={img} />
                 <div className="flex flex-col">
-                  <figcaption className="text-base font-medium text-gray-600 dark:text-gray-400">
+                  <figcaption className="text-md font-medium text-gray-600 dark:text-gray-400">
                     {name}
                   </figcaption>
                   <p className="text-xs font-medium text-gray-600 dark:text-gray-400">{username}</p>
@@ -68,20 +69,34 @@ export default function TestimonialCard() {
 
     return (
        <>
-        <div className="relative flex w-full flex-col items-center justify-center overflow-hidden">
-        <TestimonialsMarquee pauseOnHover className="[--duration:60s]">
-          {firstRow.map((review) => (
-            <ReviewCard key={review.username} {...review} />
-          ))}
-        </TestimonialsMarquee>
-        <TestimonialsMarquee reverse pauseOnHover className="[--duration:60s]">
-          {secondRow.map((review) => (
-            <ReviewCard key={review.username} {...review} />
-          ))}
-        </TestimonialsMarquee>
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-background"></div>
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-1/4 bg-gradient-to-l from-background"></div>
-      </div>
+        {/* First Row - 4 Big, Centered Testimonials */}
+        <div className="flex justify-center items-center w-full mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl">
+            {firstRow.map((review) => (
+                <ReviewCard key={review.username} {...review} />
+            ))}
+          </div>
+        </div>
+
+        {/* Rest of the testimonials - flex wrap so last row centers */}
+        <div className="flex justify-center items-center w-full">
+          <div className="flex flex-wrap gap-6 justify-center max-w-7xl">
+            {secondRow.map((review) => (
+              <div
+                key={review.username}
+                className="
+                  basis-full
+                  sm:basis-[calc((100%-24px)/2)]
+                  md:basis-[calc((100%-24px*2)/3)]
+                  lg:basis-[calc((100%-24px*3)/4)]
+                  xl:basis-[calc((100%-24px*4)/5)]
+                "
+              >
+                <ReviewCard {...review} />
+              </div>
+            ))}
+          </div>
+        </div>
        </>
     )
 }
