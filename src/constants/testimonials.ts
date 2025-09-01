@@ -17,12 +17,12 @@ export const testimonials: Testimonial[] = [
         title: "SWE @uptstash"
       },
       {
-        name: "Michael",
-        username: "@michael_chomsky",
-        body: "@contentport is so fire it's gonna reach 1m ARR < 1 year",
-        img: "/images/user/michael_128.jpg",
-        href: "https://x.com/michael_chomsky/status/1936639940735225873",
-        title: "Devrel @inference.net"
+        name: "Iza",
+        username: "@izadoesdev",
+        body: "contentport actually makes writing tweets fun \n like i can just focus on the ideas instead of fighting the interface \nfeels like it was built by someone who actually uses twitter",
+        img: "/images/user/iza_128.jpg",
+        href: "https://x.com/izadoesdev/status/1947722887109996636",
+        title: "Building @trydatabuddy"
       },
       {
         name: "aasim - oss/acc",
@@ -31,6 +31,14 @@ export const testimonials: Testimonial[] = [
         img: "/images/user/aasim_128.jpg",
         href: "https://x.com/BhatAasim9/status/1935367855999951200",
         title: "Engineer"
+      },
+      {
+        name: "Daniel Zaremba",
+        username: "@dzrmb",
+        body: `First post made with @contentport. \n Feels clean, fast af, and simple to write in. \n I have no excuses to not grow my X account anymore! 🙈`,
+        img: "/images/user/daniel_128.jpg",
+        href: "https://x.com/dzrmb/status/1952005140652712330",
+        title: "Consultant"
       },
       {
         name: "ahmet",
@@ -57,6 +65,14 @@ export const testimonials: Testimonial[] = [
         title: "Building @usemarblecms"
       },
       {
+        name: "Vikas Wakde",
+        username: "@VikasWakde42",
+        body: "Loving ContentPort by @joshtriedcoding \n\nThe UI/UX is amazing and the features are so clean\n\nThank you for building this open source! \n\nPS: this tweet is drafted and posted by @contentport",
+        img: "/images/user/vikas_128.jpg",
+        href: "https://x.com/VikasWakde42/status/1951668308995911725",
+        title: "SWE"
+      },
+      {
         name: "Vlad",
         username: "@deifosv",
         body: "This looks nice, I like that is not about writing the posts for me but helping me shape what I want to say. Looking forward to this.",
@@ -81,12 +97,12 @@ export const testimonials: Testimonial[] = [
         title: "Co-founder of @mail0dotcom"
       },
       {
-        name: "Iza",
-        username: "@izadoesdev",
-        body: "contentport actually makes writing tweets fun \n like i can just focus on the ideas instead of fighting the interface \nfeels like it was built by someone who actually uses twitter",
-        img: "/images/user/iza_128.jpg",
-        href: "https://x.com/izadoesdev/status/1947722887109996636",
-        title: "Building @trydatabuddy"
+        name: "Michael",
+        username: "@michael_chomsky",
+        body: "@contentport is so fire it's gonna reach 1m ARR < 1 year",
+        img: "/images/user/michael_128.jpg",
+        href: "https://x.com/michael_chomsky/status/1936639940735225873",
+        title: "Devrel @inference.net"
       },
       {
         name: "Nikita",
@@ -103,14 +119,6 @@ export const testimonials: Testimonial[] = [
         img: "/images/user/muhammad_128.jpg",
         href: "https://x.com/zafarbuildzz/status/1950768228919124025",
         title: "SWE"
-      },
-      {
-        name: "Daniel Zaremba",
-        username: "@dzrmb",
-        body: `First post made with @contentport. \n Feels clean, fast af, and simple to write in. \n I have no excuses to not grow my X account anymore! 🙈`,
-        img: "/images/user/daniel_128.jpg",
-        href: "https://x.com/dzrmb/status/1952005140652712330",
-        title: "Consultant"
       },
       {
         name: "miaugladiator11",
