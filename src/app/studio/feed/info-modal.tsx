@@ -11,6 +11,8 @@ import { authClient } from '@/lib/auth-client'
 
 import 'swiper/css'
 
+import 'swiper/css'
+
 interface InfoModalProps {
   onContinue?: () => void | Promise<void>
 }
