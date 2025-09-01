@@ -5,6 +5,7 @@ import { getTweet } from 'react-tweet/api'
 import superjson from 'superjson'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
+import { HTTPException } from 'hono/http-exception'
 
 const redis_raw = Redis.fromEnv({
   automaticDeserialization: false,
@@ -26,8 +27,6 @@ export const feedRouter = j.router({
     })
 
     const data = await res.json()
-
-    console.log('[FEED RESPONSE]', JSON.stringify(data, null, 2));
 
     const { newIds, scanStartedAt } = z
       .object({
@@ -102,6 +101,18 @@ export const feedRouter = j.router({
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
       const { keywords } = input
+
+      if (user.plan === 'free' && keywords.length > 1) {
+        throw new HTTPException(402, {
+          message: 'Topic limit (1) reached, please upgrade to monitor more keywords.',
+        })
+      }
+
+      if (user.plan === 'pro' && keywords.length > 5) {
+        throw new HTTPException(402, {
+          message: 'Topic limit (5) reached.',
+        })
+      }
 
       await redis.set(`feed-keywords:${user.email}`, keywords)
       await redis.del(`feed:${user.id}`)
