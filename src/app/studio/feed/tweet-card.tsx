@@ -1,92 +1,131 @@
 import { Icons } from '@/components/icons'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { InferOutput } from '@/server'
 import { Heart, MessageCircleIcon } from 'lucide-react'
-import Link from 'next/link'
-import {
-  EnrichedTweet,
-  QuotedTweet,
-  TweetBody,
-  TweetInReplyTo,
-  TweetMedia,
-} from 'react-tweet'
+import { EnrichedTweet, QuotedTweet, TweetMedia } from 'react-tweet'
+import { TweetBody } from './tweet-body'
 
-export const TweetCard = ({ tweet, isNew }: { tweet: EnrichedTweet; isNew: boolean }) => {
+interface TweetCardProps {
+  keywords: string[]
+  isNew: boolean
+  threadGroup?: InferOutput['feed']['get_tweets'][number]
+}
+
+export const TweetCard = ({ keywords, isNew, threadGroup }: TweetCardProps) => {
+  if (!threadGroup) return null
+
+  const { main, replyChains } = threadGroup
+
+  const renderTweet = (tweet: EnrichedTweet, isMainTweet: boolean = false) => (
+    <article className="flex-auto">
+      <div className="flex items-center gap-1.5 mb-3">
+        <div className="flex flex-col gap-px">
+          <span className="font-semibold truncate inline-flex items-center gap-1.5 text-gray-900 leading-none">
+            <p className="text-sm">{tweet.user.name.slice(0, 20)}</p>
+            {tweet.user.name.length > 20 ? '...' : ''}
+            {tweet.user.is_blue_verified ? (
+              <Icons.verificationBadge className="size-3.5" />
+            ) : null}
+            <span className="font-normal inline-flex items-center gap-1.5">
+              <span className="text-gray-400">·</span>
+              <span className="text-gray-500 text-sm">
+                {formatTimeAgo(new Date(tweet.created_at))}
+              </span>
+            </span>
+          </span>
+          <span className="text-gray-500 text-sm leading-none">
+            @{tweet.user.screen_name}
+          </span>
+        </div>
+      </div>
+
+      <div className="!text-sm">
+        <TweetBody highlights={keywords} tweet={tweet} />
+      </div>
+
+      {tweet.mediaDetails?.length ? (
+        <div className="relative overflow-hidden border rounded-lg border-black border-opacity-5 shadow-sm">
+          <TweetMedia tweet={tweet} />
+        </div>
+      ) : null}
+
+      {tweet.quoted_tweet && (
+        <div className="mt-3 p-2 pb-4 bg-gray-100 !text-sm rounded-lg border-black border-opacity-5 shadow-sm">
+          <QuotedTweet tweet={tweet.quoted_tweet} />{' '}
+        </div>
+      )}
+
+      <div className="flex gap-4">
+        <div className="flex items-center gap-2 mt-3 text-gray-500 text-sm">
+          <div className="flex items-center gap-1">
+            <Heart className="size-4" />
+            <span>{tweet.favorite_count}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mt-3 text-gray-500 text-sm">
+          <div className="flex items-center gap-1">
+            <MessageCircleIcon className="size-4" />
+            <span>{tweet.conversation_count}</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  )
+
   return (
     <>
       <div
         className={cn(
-          'relative bg-white h-fit origin-center rounded-lg overflow-hidden w-96 border px-6 pt-6 pb-3 transition-all',
+          'relative bg-white h-fit origin-center rounded-lg overflow-hidden w-96 pt-5 pb-2 px-2 transition-all border border-black border-opacity-5 bg-clip-padding shadow-[0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)]',
           {
             'bg-red-500': isNew,
           },
         )}
       >
-        <article>
-          <div className="flex items-center gap-1.5 mb-3">
-            <Avatar className="size-10">
-              <AvatarImage src={tweet.user.profile_image_url_https} />
+        <ul role="list" className="space-y-2">
+          {/* Main Tweet */}
+          <li className="relative flex gap-x-3 px-2.5 pb-4">
+            {replyChains.length > 0 && (
+              <div className="absolute top-5 left-[18px] flex w-6 justify-center -bottom-6">
+                <div className="w-px bg-gray-200" />
+              </div>
+            )}
+            <Avatar className="relative size-9 flex-none">
+              <AvatarImage src={main.user.profile_image_url_https} />
             </Avatar>
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold truncate inline-flex items-center gap-1.5 text-gray-900 leading-none">
-                {tweet.user.name.slice(0, 20)}
-                {tweet.user.is_blue_verified ? (
-                  <Icons.verificationBadge className="size-4" />
-                ) : null}
-                {tweet.user.name.length > 20 ? '...' : ''}
-                <span className="font-normal inline-flex items-center gap-1.5">
-                  <span className="text-gray-400">·</span>
-                  <span className="text-gray-500 text-sm">
-                    {formatTimeAgo(new Date(tweet.created_at))}
-                  </span>
-                </span>
-              </span>
-              <span className="text-gray-500 text-sm leading-none">
-                @{tweet.user.screen_name}
-              </span>
-            </div>
+            {renderTweet(main, true)}
+          </li>
 
-            <Link
-              className="ml-auto"
-              href={tweet.url}
-              rel="noopener noreferrer"
-              target="_blank"
+          {/* Reply Chains */}
+          {replyChains.map((chain, chainIndex) => (
+            <div
+              key={`chain-${chainIndex}`}
+              className="relative mt-6 last:mt-0 py-5 pt-3 px-3 bg-gray-50 rounded-lg border border-black/5"
             >
-              <Icons.twitter className="size-6" />
-            </Link>
-          </div>
-          {tweet.in_reply_to_status_id_str && (
-            <div className="text-gray-500 mb-1">
-              <TweetInReplyTo tweet={tweet} />
-            </div>
-          )}
-          <TweetBody tweet={tweet} />
-          {tweet.mediaDetails?.length ? (
-            <div className="relative overflow-hidden">
-              <TweetMedia tweet={tweet} />
-            </div>
-          ) : null}
+              <p className="mb-3 text-xs text-gray-500">
+                Reply to @{main.user.screen_name}
+              </p>
 
-          <div className="mt-3 bg-gray-50 rounded-xl">
-            {tweet.quoted_tweet && <QuotedTweet tweet={tweet.quoted_tweet} />}
-          </div>
+              {chain.map((tweet, tweetIndex) => (
+                <li key={tweet.id_str} className="relative flex gap-x-3 mb-4 last:mb-0">
+                  {tweetIndex !== chain.length - 1 && (
+                    <div className="absolute top-0 left-0 flex w-8 justify-center -bottom-6">
+                      <div className="w-px bg-gray-200" />
+                    </div>
+                  )}
 
-          <div className="flex gap-4">
-            <div className="flex items-center gap-2 mt-3 text-gray-500 text-sm">
-              <div className="flex items-center gap-1">
-                <Heart className="size-4" />
-                <span>{tweet.favorite_count}</span>
-              </div>
-            </div>
+                  <Avatar className="relative size-8 flex-none">
+                    <AvatarImage src={tweet.user.profile_image_url_https} />
+                  </Avatar>
 
-            <div className="flex items-center gap-2 mt-3 text-gray-500 text-sm">
-              <div className="flex items-center gap-1">
-                <MessageCircleIcon className="size-4" />
-                <span>{tweet.conversation_count}</span>
-              </div>
+                  {renderTweet(tweet)}
+                </li>
+              ))}
             </div>
-          </div>
-        </article>
+          ))}
+        </ul>
       </div>
     </>
   )
