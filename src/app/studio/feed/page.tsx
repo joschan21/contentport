@@ -14,6 +14,7 @@ import toast from 'react-hot-toast'
 import { EmptyState } from './empty-state'
 import { Feed } from './feed'
 import { FeedSettingsModal } from './feed-settings-modal'
+import { Loader } from '@/components/ui/loader'
 
 const Page = () => {
   const queryClient = useQueryClient()
@@ -39,7 +40,6 @@ const Page = () => {
 
       return data
     },
-    initialData: { tweets: [] },
     refetchOnWindowFocus: false,
   })
 
@@ -55,9 +55,9 @@ const Page = () => {
     onMutate: (variables) => {
       return toast.loading(
         <div>
-          <p className="inline-flex flex-col text-sm/6 text-gray-900">
+          <p className="inline-flex flex-col text-sm space-y-1 text-gray-900">
             <strong className="font-semibold">Getting latest tweets</strong>
-            <span className="text-gray-700">
+            <span className="text-gray-700 leading-[18px]">
               This can take a few seconds. You can leave this page meanwhile.
             </span>
           </p>
@@ -111,7 +111,7 @@ const Page = () => {
           <div className="flex-1">
             <h1 className="text-2xl font-semibold text-gray-900 mb-3">Topic monitor</h1>
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-gray-500 text-sm">Monitoring:</p>
+              <p className="text-gray-500 text-sm">Listing all relevant tweets for:</p>
               {keywordData.keywords.map((keyword) => (
                 <div
                   key={keyword}
@@ -171,13 +171,20 @@ const Page = () => {
           </div>
         </div>
 
-        {isLoading ? (
-          <p>loading feed...</p>
-        ) : isFetched && data.tweets.length === 0 ? (
+        {isPending ? (
+          <div className="flex items-center gap-2.5">
+            <Loader variant="classic" size='sm' />
+            <p className='text-sm text-gray-800'>Curating feed...</p>
+          </div>
+        ) : isFetched && data?.length === 0 ? (
           <EmptyState onAddKeywords={() => setIsSettingsModalOpen(true)} />
-        ) : (
-          <Feed data={data} containerRef={containerRef} />
-        )}
+        ) : data ? (
+          <Feed
+            keywords={keywordData.keywords ?? []}
+            data={data}
+            containerRef={containerRef}
+          />
+        ) : null}
       </div>
     </motion.div>
   )

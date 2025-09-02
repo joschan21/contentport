@@ -1,85 +1,148 @@
+import { cn } from '@/lib/utils'
+import { InferOutput } from '@/server'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import throttle from 'lodash.throttle'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { EnrichedTweet } from 'react-tweet'
 import { TweetCard } from './tweet-card'
 
 interface FeedProps {
-  data: { tweets: EnrichedTweet[] }
+  keywords: string[]
+  data: InferOutput['feed']['get_tweets']
   containerRef: React.RefObject<HTMLDivElement | null>
 }
 
-export const Feed = ({ data, containerRef }: FeedProps) => {
+export const Feed = ({ keywords, data, containerRef }: FeedProps) => {
   const parentRef = useRef<HTMLDivElement>(null)
-  const [containerWidth, setContainerWidth] = useState(1245)
+  const [cardWidth, setCardWidth] = useState(384)
+  const [containerWidth, setContainerWidth] = useState(0)
+  const [lanes, setLanes] = useState(3)
+  const [gap, setGap] = useState(16)
 
-  const calculateLanes = useCallback((containerWidth: number) => {
-    const minCardWidth = 410 // 384
-    const gap = 0
-    const maxLanes = Math.floor((containerWidth + gap) / (minCardWidth + gap))
-    return Math.max(1, Math.min(maxLanes, 4))
+  const calculateResponsiveLayout = useCallback((width: number) => {
+    let newLanes: number
+    let newGap: number
+    let newCardWidth: number
+
+    if (width >= 1200) {
+      newLanes = 3
+      newGap = 16
+      newCardWidth = Math.min(384, (width - (newLanes - 1) * newGap) / newLanes)
+    } else if (width >= 768) {
+      newLanes = 2
+      newGap = 12
+      newCardWidth = Math.min(384, (width - (newLanes - 1) * newGap) / newLanes)
+    } else {
+      newLanes = 1
+      newGap = 8
+      newCardWidth = Math.min(384, width - 2 * newGap)
+    }
+
+    return { lanes: newLanes, gap: newGap, cardWidth: newCardWidth }
   }, [])
 
-  const lanes = calculateLanes(containerWidth)
-
   const virtualizer = useVirtualizer({
-    count: data.tweets.length,
+    count: data.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: (i) => {
-      const tweet = data.tweets[i]
-      return tweet ? estimateTweetHeight(tweet) : 300
-    },
+    estimateSize: useCallback(
+      (index: number) => {
+        return 300
+      },
+      [data],
+    ),
     overscan: 5,
     lanes,
   })
 
   useEffect(() => {
-    const updateWidth = throttle(() => {
-      if (parentRef.current) {
-        setContainerWidth(parentRef.current.offsetWidth)
-      }
-    }, 25)
+    if (!containerRef.current) return
 
-    updateWidth()
+    const resizeObserver = new ResizeObserver(
+      throttle((entries) => {
+        for (const entry of entries) {
+          const { width } = entry.contentRect
+          setContainerWidth(width)
 
-    const resizeObserver = new ResizeObserver(updateWidth)
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current)
-    }
+          const {
+            lanes: newLanes,
+            gap: newGap,
+            cardWidth: newCardWidth,
+          } = calculateResponsiveLayout(width)
+
+          setLanes(newLanes)
+          setGap(newGap)
+          setCardWidth(newCardWidth)
+        }
+      }, 100),
+    )
+
+    resizeObserver.observe(containerRef.current)
 
     return () => {
       resizeObserver.disconnect()
     }
-  }, [containerRef])
+  }, [containerRef, calculateResponsiveLayout])
+
+  const totalContentWidth = lanes * cardWidth + (lanes - 1) * gap
+
+  const getJustifyClass = (lane: number) => {
+    if (lanes === 1) return 'justify-center'
+    if (lanes === 2) {
+      return lane === 0 ? 'justify-end' : 'justify-start'
+    }
+    if (lanes === 3) {
+      if (lane === 0) return 'justify-end'
+      if (lane === 1) return 'justify-center'
+      return 'justify-start'
+    }
+    if (lanes === 4) {
+      if (lane === 0) return 'justify-end'
+      if (lane === 1 || lane === 2) return 'justify-center'
+      return 'justify-start'
+    }
+    return 'justify-center'
+  }
+
+  const getLaneWidth = () => {
+    return `${100 / lanes}%`
+  }
+
+  const getLaneLeft = (lane: number) => {
+    return `${(lane * 100) / lanes}%`
+  }
 
   return (
-    <div ref={parentRef} className="relative max-h-[75vh] overflow-auto">
+    <div className="relative max-h-screen overflow-auto">
       <div
         className="relative w-full"
+        ref={parentRef}
         style={{
           height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
         }}
       >
         {virtualizer.getVirtualItems().map((item) => {
-          const tweet = data.tweets[item.index]
+          const threadGroup = data[item.index]
 
-          if (tweet) {
+          if (threadGroup) {
             return (
               <div
                 key={item.key}
                 data-index={item.index}
                 ref={virtualizer.measureElement}
+                className={cn('flex', getJustifyClass(item.lane))}
                 style={{
                   position: 'absolute',
-                  willChange: 'transform',
-                  paddingTop: item.index >= lanes ? 16 : 0,
                   top: 0,
-                  left: '50%',
-                  width: '415px', //   width: '384px',
-                  transform: `translateX(calc(-50% + ${(item.lane - (lanes - 1) / 2) * 400}px)) translateY(${item.start}px)`,
+                  left: getLaneLeft(item.lane),
+                  width: getLaneWidth(),
+                  willChange: 'transform',
+                  paddingTop: item.index >= lanes ? gap : 0,
+                  paddingLeft: item.lane === 0 ? 0 : gap / 2,
+                  paddingRight: item.lane === lanes - 1 ? 0 : gap / 2,
+                  transform: `translateY(${item.start}px)`,
                 }}
               >
-                <TweetCard isNew={false} tweet={tweet} />
+                <TweetCard isNew={false} threadGroup={threadGroup} keywords={keywords} />
               </div>
             )
           }
@@ -87,19 +150,4 @@ export const Feed = ({ data, containerRef }: FeedProps) => {
       </div>
     </div>
   )
-}
-
-function estimateTweetHeight(tweet: EnrichedTweet) {
-  let height = 120
-
-  const textLines = Math.ceil(tweet.text.length / 50)
-  height += textLines * 24
-
-  if (tweet.mediaDetails?.length) height += 200
-
-  if (tweet.quoted_tweet) height += 100
-
-  if (tweet.in_reply_to_status_id_str) height += 30
-
-  return height + 20
 }
