@@ -251,7 +251,7 @@ export const Icons = {
       />
     </svg>
   ),
-  databuddy: (props: LucideProps) => (
+databuddy: (props: LucideProps) => (
     <svg
       width="512"
       height="512"

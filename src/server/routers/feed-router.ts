@@ -92,7 +92,15 @@ export const feedRouter = j.router({
   refresh: privateProcedure.post(async ({ c, ctx, input }) => {
     const { user } = ctx
 
-    const keywords = await redis.get<string[]>(`feed-keywords:${user.email}`)
+    let keywords: string[] = []
+
+    if (user.plan === 'free') {
+      keywords = ['contentport']
+    } else {
+      keywords = (await redis.get<string[]>(`feed-keywords:${user.email}`)) ?? []
+    }
+
+    const userId = user.plan === 'free' ? 'contentport' : user.id
 
     const res = await fetch(`${process.env.TWITTER_API_SERVICE}/feed/refresh`, {
       method: 'POST',
@@ -100,7 +108,7 @@ export const feedRouter = j.router({
         'Content-Type': 'application/json',
         Authorization: `Bearer ${process.env.CONTENTPORT_IDENTITY_KEY}`,
       },
-      body: JSON.stringify({ userId: user.id, keywords }),
+      body: JSON.stringify({ userId, keywords }),
     })
 
     const data = await res.json()
@@ -122,8 +130,19 @@ export const feedRouter = j.router({
     .get(async ({ c, ctx, input }) => {
       const { user } = ctx
 
-      const keywords = await redis.get<string[]>(`feed-keywords:${user.email}`)
-      const ids = await redis.smembers(`feed:${user.id}`)
+      let keywords: string[] = []
+      if (user.plan === 'free') {
+        keywords = ['contentport']
+      } else {
+        keywords = (await redis.get<string[]>(`feed-keywords:${user.email}`)) ?? []
+      }
+
+      let ids: string[] = []
+      if (user.plan === 'free') {
+        ids = await redis.smembers(`feed:contentport`)
+      } else {
+        ids = await redis.smembers(`feed:${user.id}`)
+      }
 
       const tweetMap: Map<string, EnrichedTweet> = new Map()
       const replyMap: Record<string, string[]> = {}
@@ -267,7 +286,14 @@ export const feedRouter = j.router({
   get_keywords: privateProcedure.get(async ({ c, ctx }) => {
     const { user } = ctx
 
-    const keywords = (await redis.get<string[]>(`feed-keywords:${user.email}`)) ?? []
+    let keywords: string[] = []
+
+    if (user.plan === 'free') {
+      keywords = ['contentport']
+    } else {
+      const feedKeywords = await redis.get<string[]>(`feed-keywords:${user.email}`)
+      if (feedKeywords) keywords = feedKeywords
+    }
 
     return c.json({ keywords })
   }),
