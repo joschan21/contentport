@@ -111,12 +111,12 @@ const Page = () => {
           <div className="flex-1">
             <h1 className="text-2xl font-semibold text-gray-900 mb-3">Topic monitor</h1>
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-gray-500 text-sm">Listing all relevant tweets for:</p>
+              <p className="text-gray-500 text-sm">Showing relevant tweets for:</p>
               {keywordData.keywords.map((keyword) => (
                 <div
                   key={keyword}
                   className={cn(
-                    'inline-flex items-center gap-x-1.5 rounded-md px-2 py-1 text-xs font-medium text-gray-900 inset-ring inset-ring-gray-200',
+                    'inline-flex items-center gap-x-1 rounded-md px-2 py-1 text-xs font-medium text-gray-900 inset-ring inset-ring-gray-200',
                   )}
                 >
                   <svg
@@ -173,8 +173,8 @@ const Page = () => {
 
         {isPending ? (
           <div className="flex items-center gap-2.5">
-            <Loader variant="classic" size='sm' />
-            <p className='text-sm text-gray-800'>Curating feed...</p>
+            <Loader variant="classic" size="sm" />
+            <p className="text-sm text-gray-800">Curating feed...</p>
           </div>
         ) : isFetched && data?.length === 0 ? (
           <EmptyState onAddKeywords={() => setIsSettingsModalOpen(true)} />

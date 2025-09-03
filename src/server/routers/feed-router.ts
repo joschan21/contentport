@@ -1,11 +1,11 @@
 import { redis } from '@/lib/redis'
 import { Redis } from '@upstash/redis'
+import { HTTPException } from 'hono/http-exception'
 import { EnrichedTweet, enrichTweet } from 'react-tweet'
-import { getTweet, Tweet } from 'react-tweet/api'
+import { getTweet } from 'react-tweet/api'
 import superjson from 'superjson'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
-import { HTTPException } from 'hono/http-exception'
 
 const levenshteinDistance = (str1: string, str2: string): number => {
   const matrix = Array(str2.length + 1)
@@ -129,7 +129,7 @@ export const feedRouter = j.router({
       const replyMap: Record<string, string[]> = {}
       const mains = new Set<EnrichedTweet>()
 
-      const allTweets = await Promise.all(
+      await Promise.all(
         ids.map(async (id) => {
           const cached = await redis_raw.get<string>(`enriched-tweet:${id}`)
           if (cached) {
@@ -221,15 +221,17 @@ export const feedRouter = j.router({
                 } else return acc
               }, '')
 
-              const mentions = tweet.entities.filter(
+              const relevantEntities = tweet.entities.filter(
                 (e) =>
-                  e.type === 'mention' &&
-                  fuzzyIncludes(e.text.toLowerCase(), keyword.toLowerCase()),
+                  e.type === 'mention' ||
+                  e.type === 'hashtag' ||
+                  (e.type === 'url' &&
+                    fuzzyIncludes(e.text.toLowerCase(), keyword.toLowerCase())),
               )
 
               const isRelevant =
                 Boolean(fuzzyIncludes(text.toLowerCase(), keyword.toLowerCase())) ||
-                Boolean(mentions.length)
+                Boolean(relevantEntities.length)
 
               return isRelevant
             })

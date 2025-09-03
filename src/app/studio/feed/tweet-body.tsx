@@ -28,9 +28,9 @@ export const TweetBody = ({
         case 'url':
         case 'symbol':
           return (
-            <TweetLink key={i} href={item.href}>
+            <span key={i} >
               {highlights.length > 0 ? highlightText(item.text, highlights) : item.text}
-            </TweetLink>
+            </span>
           )
         case 'media':
           return
@@ -41,7 +41,7 @@ export const TweetBody = ({
               <span key={i}>
                 {highlightedContent.map((content, idx) => 
                   typeof content === 'string' ? (
-                    <span key={`${i}-${idx}`} dangerouslySetInnerHTML={{ __html: content }} />
+                    <span className='whitespace-pre-wrap' key={`${i}-${idx}`} dangerouslySetInnerHTML={{ __html: content }} />
                   ) : (
                     content
                   )
@@ -49,7 +49,7 @@ export const TweetBody = ({
               </span>
             )
           }
-          return <span key={i} dangerouslySetInnerHTML={{ __html: item.text }} />
+          return <span className='whitespace-pre-wrap' key={i} dangerouslySetInnerHTML={{ __html: item.text }} />
       }
     })}
   </p>

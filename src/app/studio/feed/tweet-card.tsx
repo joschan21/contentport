@@ -2,8 +2,10 @@ import { Icons } from '@/components/icons'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { InferOutput } from '@/server'
-import { Heart, MessageCircleIcon } from 'lucide-react'
-import { EnrichedTweet, QuotedTweet, TweetMedia } from 'react-tweet'
+import { ChatCircleIcon, HeartIcon, XLogoIcon } from '@phosphor-icons/react'
+import Link from 'next/link'
+import { EnrichedTweet, TweetMedia } from 'react-tweet'
+import { QuotedTweet } from './quoted-tweet'
 import { TweetBody } from './tweet-body'
 
 interface TweetCardProps {
@@ -17,8 +19,8 @@ export const TweetCard = ({ keywords, isNew, threadGroup }: TweetCardProps) => {
 
   const { main, replyChains } = threadGroup
 
-  const renderTweet = (tweet: EnrichedTweet, isMainTweet: boolean = false) => (
-    <article className="flex-auto">
+  const renderTweet = (tweet: EnrichedTweet) => (
+    <article>
       <div className="flex items-center gap-1.5 mb-3">
         <div className="flex flex-col gap-px">
           <span className="font-semibold truncate inline-flex items-center gap-1.5 text-gray-900 leading-none">
@@ -40,35 +42,60 @@ export const TweetCard = ({ keywords, isNew, threadGroup }: TweetCardProps) => {
         </div>
       </div>
 
-      <div className="!text-sm">
-        <TweetBody highlights={keywords} tweet={tweet} />
-      </div>
+      <TweetBody highlights={keywords} tweet={tweet} />
 
-      {tweet.mediaDetails?.length ? (
-        <div className="relative overflow-hidden border rounded-lg border-black border-opacity-5 shadow-sm">
-          <TweetMedia tweet={tweet} />
-        </div>
-      ) : null}
+      {tweet.mediaDetails?.length ? <TweetMedia tweet={tweet} /> : null}
 
       {tweet.quoted_tweet && (
-        <div className="mt-3 p-2 pb-4 bg-gray-100 !text-sm rounded-lg border-black border-opacity-5 shadow-sm">
-          <QuotedTweet tweet={tweet.quoted_tweet} />{' '}
-        </div>
+        <QuotedTweet
+          isNestedQuote={Boolean(tweet.in_reply_to_status_id_str)}
+          tweet={tweet.quoted_tweet}
+        />
       )}
 
-      <div className="flex gap-4">
-        <div className="flex items-center gap-2 mt-3 text-gray-500 text-sm">
+      <div className="flex gap-4 mt-4">
+        <div
+          className={cn(
+            'flex items-center gap-2 text-gray-500 text-sm p-2 -m-2 hover:bg-gray-50 rounded-lg',
+            {
+              'hover:bg-gray-100': Boolean(tweet.in_reply_to_status_id_str),
+            },
+          )}
+        >
           <div className="flex items-center gap-1">
-            <Heart className="size-4" />
+            <HeartIcon className="size-4" />
             <span>{tweet.favorite_count}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 mt-3 text-gray-500 text-sm">
+        <div
+          className={cn(
+            'flex items-center gap-2 text-gray-500 text-sm p-2 -m-2 hover:bg-gray-50 rounded-lg',
+            {
+              'hover:bg-gray-100': Boolean(tweet.in_reply_to_status_id_str),
+            },
+          )}
+        >
           <div className="flex items-center gap-1">
-            <MessageCircleIcon className="size-4" />
+            <ChatCircleIcon className="size-4" />
             <span>{tweet.conversation_count}</span>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-gray-500 text-sm">
+          <Link
+            href={`https://x.com/${tweet.user.screen_name}/status/${tweet.id_str}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              'flex items-center gap-1 p-2 -m-2 hover:bg-gray-50 rounded-lg',
+              {
+                'hover:bg-gray-100': Boolean(tweet.in_reply_to_status_id_str),
+              },
+            )}
+          >
+            <XLogoIcon className="size-4" />
+          </Link>
         </div>
       </div>
     </article>
@@ -79,9 +106,6 @@ export const TweetCard = ({ keywords, isNew, threadGroup }: TweetCardProps) => {
       <div
         className={cn(
           'relative bg-white h-fit origin-center rounded-lg overflow-hidden w-96 pt-5 pb-2 px-2 transition-all border border-black border-opacity-5 bg-clip-padding shadow-[0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)]',
-          {
-            'bg-red-500': isNew,
-          },
         )}
       >
         <ul role="list" className="space-y-2">
@@ -95,7 +119,7 @@ export const TweetCard = ({ keywords, isNew, threadGroup }: TweetCardProps) => {
             <Avatar className="relative size-9 flex-none">
               <AvatarImage src={main.user.profile_image_url_https} />
             </Avatar>
-            {renderTweet(main, true)}
+            {renderTweet(main)}
           </li>
 
           {/* Reply Chains */}
@@ -131,7 +155,7 @@ export const TweetCard = ({ keywords, isNew, threadGroup }: TweetCardProps) => {
   )
 }
 
-function formatTimeAgo(date: Date): string {
+export function formatTimeAgo(date: Date): string {
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
