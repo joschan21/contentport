@@ -327,10 +327,10 @@ export function TerminalLoader({
 
   return (
     <div className={cn('flex items-center space-x-1', containerSizes[size], className)}>
-      <span className={cn('text-primary font-mono', textSizes[size])}>{'>'}</span>
+      <span className={cn('text-gray-500 font-mono', textSizes[size])}>{'>'}</span>
       <div
         className={cn(
-          'bg-primary animate-[blink_1s_step-end_infinite]',
+          'bg-gray-500 animate-[blink_1s_step-end_infinite]',
           cursorSizes[size],
         )}
       />

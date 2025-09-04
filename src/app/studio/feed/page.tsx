@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { RefreshCcwIcon } from 'lucide-react'
 
@@ -14,6 +14,9 @@ import toast from 'react-hot-toast'
 import { EmptyState } from './empty-state'
 import { Feed } from './feed'
 import { FeedSettingsModal } from './feed-settings-modal'
+import { Loader } from '@/components/ui/loader'
+import { authClient } from '@/lib/auth-client'
+import { useRouter } from 'next/navigation'
 
 const Page = () => {
   const queryClient = useQueryClient()
@@ -21,6 +24,9 @@ const Page = () => {
   const [sortBy, setSortBy] = useState<'recent' | 'popular'>('recent')
   const [newIds, setNewIds] = useState<string[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false)
+  const { data: authData } = authClient.useSession()
+  const router = useRouter()
 
   const { data: keywordData, isFetched: isKeywordsFetched } = useQuery({
     queryKey: ['get-keywords'],
@@ -31,6 +37,12 @@ const Page = () => {
     initialData: { keywords: [] },
   })
 
+  useEffect(() => {
+    if (isKeywordsFetched && keywordData.keywords.length === 0) {
+      setIsInfoModalOpen(true)
+    }
+  }, [isKeywordsFetched, keywordData.keywords])
+
   const { data, isPending, isLoading, isFetched } = useQuery({
     queryKey: ['get-feed', sortBy],
     queryFn: async () => {
@@ -39,7 +51,6 @@ const Page = () => {
 
       return data
     },
-    initialData: { tweets: [] },
     refetchOnWindowFocus: false,
   })
 
@@ -55,9 +66,9 @@ const Page = () => {
     onMutate: (variables) => {
       return toast.loading(
         <div>
-          <p className="inline-flex flex-col text-sm/6 text-gray-900">
+          <p className="inline-flex flex-col text-sm space-y-1 text-gray-900">
             <strong className="font-semibold">Getting latest tweets</strong>
-            <span className="text-gray-700">
+            <span className="text-gray-700 leading-[18px]">
               This can take a few seconds. You can leave this page meanwhile.
             </span>
           </p>
@@ -87,22 +98,16 @@ const Page = () => {
   })
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
-      ref={containerRef}
-      className="relative h-full"
-    >
-      {isKeywordsFetched && keywordData.keywords.length === 0 && (
+    <div ref={containerRef} className="h-full">
+      {isInfoModalOpen && (
         <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.3, ease: 'easeInOut' }}
-          className="absolute -mt-12 inset-0 z-50 flex justify-center overflow-y-auto p-8 backdrop-blur-sm"
+          className="fixed inset-0 z-10 flex justify-center overflow-y-auto p-8 backdrop-blur-sm"
         >
           <div className="relative mx-4 my-auto w-full max-w-md">
-            <InfoModal onContinue={() => refreshFeed()} />
+            <InfoModal onContinue={() => setIsInfoModalOpen(false)} />
           </div>
         </motion.div>
       )}
@@ -111,12 +116,12 @@ const Page = () => {
           <div className="flex-1">
             <h1 className="text-2xl font-semibold text-gray-900 mb-3">Topic monitor</h1>
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-gray-500 text-sm">Monitoring:</p>
+              <p className="text-gray-500 text-sm">Showing relevant tweets for:</p>
               {keywordData.keywords.map((keyword) => (
                 <div
                   key={keyword}
                   className={cn(
-                    'inline-flex items-center gap-x-1.5 rounded-md px-2 py-1 text-xs font-medium text-gray-900 inset-ring inset-ring-gray-200',
+                    'inline-flex items-center gap-x-1 rounded-md px-2 py-1 text-xs font-medium text-gray-900 inset-ring inset-ring-gray-200',
                   )}
                 >
                   <svg
@@ -129,6 +134,15 @@ const Page = () => {
                   {keyword}
                 </div>
               ))}
+
+              {authData?.user.plan === 'free' && isKeywordsFetched && (
+                <button
+                  onClick={() => router.push('/studio/settings')}
+                  className="text-xs text-gray-600 underline"
+                >
+                  Upgrade to add more &rarr;
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-gray-500 text-sm">Sort by:</p>
@@ -171,15 +185,22 @@ const Page = () => {
           </div>
         </div>
 
-        {isLoading ? (
-          <p>loading feed...</p>
-        ) : isFetched && data.tweets.length === 0 ? (
+        {isPending ? (
+          <div className="flex items-center gap-2.5">
+            <Loader variant="classic" size="sm" />
+            <p className="text-sm text-gray-800">Curating feed...</p>
+          </div>
+        ) : isFetched && data?.length === 0 ? (
           <EmptyState onAddKeywords={() => setIsSettingsModalOpen(true)} />
-        ) : (
-          <Feed data={data} containerRef={containerRef} />
-        )}
+        ) : data ? (
+          <Feed
+            keywords={keywordData.keywords ?? []}
+            data={data}
+            containerRef={containerRef}
+          />
+        ) : null}
       </div>
-    </motion.div>
+    </div>
   )
 }
 

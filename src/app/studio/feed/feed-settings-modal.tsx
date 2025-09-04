@@ -15,10 +15,11 @@ import {
   DialogDescription,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { GearIcon } from '@phosphor-icons/react'
+import { GearIcon, SketchLogoIcon } from '@phosphor-icons/react'
 import { authClient } from '@/lib/auth-client'
 import { HTTPException } from 'hono/http-exception'
 import toast from 'react-hot-toast'
+import { useRouter } from 'next/navigation'
 
 interface FeedSettingsModalProps {
   isOpen: boolean
@@ -30,7 +31,7 @@ interface FeedSettingsModalProps {
 export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsModalProps) {
   const queryClient = useQueryClient()
   const { data: userData } = authClient.useSession()
-
+  const router = useRouter()
   const [input, setInput] = useState<string>('')
   const [keywords, setKeywords] = useState<string[]>([])
 
@@ -86,6 +87,14 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
     }
   }
 
+  const handleSave = () => {
+    if (userData?.user.plan === 'pro') {
+      saveKeywords(keywords)
+    } else {
+      setIsOpen(false)
+    }
+  }
+
   const isAtLimit = Boolean(
     userData?.user.plan === 'pro' ? keywords.length >= 5 : keywords.length >= 1,
   )
@@ -102,12 +111,12 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
         className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-0"
         noClose
       >
-        <div className="p-8 pb-6">
+        <div className="p-8 pb-2">
           <DialogHeader className="mb-6">
             <div className="flex items-center justify-between">
               <div>
                 <DialogTitle className="text-2xl font-semibold text-gray-900 tracking-tight">
-                  Feed Settings
+                  Monitor Settings
                 </DialogTitle>
                 <DialogDescription className="sr-only text-sm text-gray-500 mt-1">
                   Customize your engagement feed preferences
@@ -130,13 +139,67 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
             </div>
           )} */}
 
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-3">
-                Keywords to Monitor ({keywords.length}/
-                {userData?.user.plan === 'pro' ? '5' : '1'})
-              </label>
+          <div className="space-y-2">
+            {keywords.length > 0 && (
+              <ul
+                role="list"
+                className="divide-y space-y-2 divide-gray-100 bg-gray-50 border border-black border-opacity-5 bg-clip-padding rounded-xl p-4"
+              >
+                <p className="mb-3 text-xs text-gray-500">
+                  Currently monitoring ({keywords.length}/
+                  {userData?.user.plan === 'pro' ? '5' : '1'})
+                </p>
 
+                {keywords.map((keyword, i) => (
+                  <li key={keyword} className="ml-2 relative flex items-center space-x-4">
+                    <div className="min-w-0 flex-auto">
+                      <div className="flex items-center gap-x-2">
+                        <div className="flex-none rounded-full bg-green-100 p-0.5 text-green-500">
+                          <div className="size-1.5 rounded-full bg-current" />
+                        </div>
+
+                        <div className="flex items-center gap-x-1">
+                          <p className="min-w-0 text-xs text-gray-900">{keyword}</p>
+                          <p className="text-xs text-gray-500">/</p>
+                          <p
+                            onClick={() => removeKeyword(i)}
+                            className="text-xs hover:underline text-gray-500 cursor-pointer"
+                          >
+                            remove
+                          </p>
+                        </div>
+                      </div>
+                      {/* <div className="mt-3 flex items-center gap-x-2.5 text-xs/5 text-gray-500">
+                        <p className="truncate">{deployment.description}</p>
+                        <svg
+                          viewBox="0 0 2 2"
+                          className="size-0.5 flex-none fill-gray-500"
+                        >
+                          <circle r={1} cx={1} cy={1} />
+                        </svg>
+                        <p className="whitespace-nowrap">{deployment.statusText}</p>
+                      </div> */}
+                    </div>
+                    {/* {deployment.environment === 'Preview' ? (
+                      <div className="flex-none rounded-full bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 inset-ring inset-ring-gray-500/10">
+                        {deployment.environment}
+                      </div>
+                    ) : null}
+                    {deployment.environment === 'Production' ? (
+                      <div className="flex-none rounded-full bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 inset-ring inset-ring-indigo-700/10">
+                        {deployment.environment}
+                      </div>
+                    ) : null} */}
+                    {/* <ChevronRightIcon
+                      aria-hidden="true"
+                      className="size-5 flex-none text-gray-400"
+                    /> */}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="space-y-1">
               <div className="flex gap-2">
                 <Input
                   placeholder="Add a keyword..."
@@ -146,42 +209,32 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
                   className="flex-1 h-12 px-4 text-base border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-indigo-500/20 transition-all duration-200"
                   disabled={isAtLimit}
                 />
-                <DuolingoButton
-                  onClick={addKeyword}
-                  disabled={!input.trim() || isAtLimit}
-                  variant="icon"
-                  size="icon"
-                  className="h-12 w-12 rounded-xl"
-                >
-                  <Plus className="w-4 h-4" />
-                </DuolingoButton>
               </div>
 
-              {keywords.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {keywords.map((keyword, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-lg border border-indigo-200"
-                    >
-                      <Hash className="w-3 h-3" />
-                      {keyword}
-                      <button
-                        onClick={() => removeKeyword(index)}
-                        className="ml-1 w-4 h-4 flex items-center justify-center text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 rounded-full transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <p className="text-xs text-gray-500 mt-2">
-                Press Enter or click + to add keywords
-              </p>
+              <p className="text-xs text-gray-500 mb-2">Press Enter to add a keyword</p>
             </div>
           </div>
+
+          {userData?.user.plan !== 'pro' && (
+            <div className="border-l-4 mt-6 border-indigo-400 bg-indigo-50 p-4">
+              <div className="flex">
+                <div className="shrink-0">
+                  <SketchLogoIcon aria-hidden="true" className="size-5 text-indigo-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-indigo-700">
+                    This is a Pro feature.{' '}
+                    <span
+                      onClick={() => router.push('/studio/settings')}
+                      className="font-medium cursor-pointer text-indigo-700 underline hover:text-indigo-600"
+                    >
+                      Upgrade your account to monitor multiple keywords.
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 p-8 pt-0">
@@ -193,7 +246,7 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
             Cancel
           </DuolingoButton>
           <DuolingoButton
-            onClick={() => saveKeywords(keywords)}
+            onClick={handleSave}
             loading={isPending}
             disabled={!canSave}
             variant={canSave ? 'primary' : 'disabled'}

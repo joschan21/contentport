@@ -40,7 +40,7 @@ export const LeftSidebar = () => {
   const { toggleSidebar } = useSidebar()
 
   return (
-    <Sidebar collapsible="icon" side="left" className="border-r border-border/40">
+    <Sidebar collapsible="icon" side="left" className="z-50 border-r border-border/40">
       <SidebarHeader className="border-b border-border/40 p-4">
         <div className="flex items-center justify-start gap-2">
           <button
