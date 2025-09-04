@@ -79,8 +79,6 @@ export const auth = betterAuth({
         'tweet.write',
         'users.read',
         'offline.access',
-        'block.read',
-        'follows.read',
         'media.write',
       ],
     },
