@@ -7,6 +7,7 @@ import MuxPlayer from '@mux/mux-player-react'
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import Script from 'next/script'
+import Pricing from '@/frontend/studio/components/Pricing'
 
 const Footer = () => {
   return (
@@ -17,7 +18,7 @@ const Footer = () => {
             Your content engine for growing on Twitter.
           </p>
           <p className="text-gray-500 text-sm">
-            © 2025 Contentport. 
+            © 2025 Contentport.
           </p>
         </div>
       </div>
@@ -598,6 +599,14 @@ const Page = async () => {
               </div>
             </div>
           </section>
+
+          {/* Pricing */}
+          <section className=" bg-white ">
+            <div className="mx-auto max-w-7xl px-6 lg:px-8">
+              <Pricing targetUrl="/login" />
+            </div>
+          </section>
+
         </div>
       </section>
 
