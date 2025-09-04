@@ -108,7 +108,11 @@ export const Calendar20 = ({
   const [date, setDate] = React.useState<Date | undefined>(getInitialDate())
   const [selectedTime, setSelectedTime] = React.useState<string | null>(getInitialTime())
 
-  const [ampm, setAmPm] = React.useState<'ALL' | 'AM' | 'PM'>('ALL')
+  const getInitialAmPm = (): 'AM' | 'PM' => {
+    return currentHour >= 12 ? 'PM' : 'AM'
+  }
+
+  const [ampm, setAmPm] = React.useState<'AM' | 'PM'>(getInitialAmPm())
 
   const isTimeSlotDisabled = (value: string) => {
     if (!date || date.toDateString() !== today.toDateString()) {
@@ -121,6 +125,43 @@ export const Calendar20 = ({
 
     return slotTime <= currentTime
   }
+
+  const hasAvailableSlots = React.useMemo(() => {
+    if (!date) return { AM: true, PM: true }
+
+    if (date.toDateString() !== today.toDateString()) {
+      return { AM: true, PM: true }
+    }
+
+    const currentTimeInMinutes = currentHour * 60 + currentMinute
+
+    const hasAMSlots = timeSlots.some((t) => {
+      const [hour, minute] = t.value.split(':').map(Number)
+      const slotTimeInMinutes = (hour ?? 0) * 60 + (minute ?? 0)
+      return (hour ?? 0) < 12 && slotTimeInMinutes > currentTimeInMinutes
+    })
+
+    const hasPMSlots = timeSlots.some((t) => {
+      const [hour, minute] = t.value.split(':').map(Number)
+      const slotTimeInMinutes = (hour ?? 0) * 60 + (minute ?? 0)
+      return (hour ?? 0) >= 12 && slotTimeInMinutes > currentTimeInMinutes
+    })
+
+    return {
+      AM: hasAMSlots,
+      PM: hasPMSlots,
+    }
+  }, [date, timeSlots, currentHour, currentMinute, today])
+
+  React.useEffect(() => {
+    if (!hasAvailableSlots[ampm]) {
+      if (ampm === 'AM' && hasAvailableSlots.PM) {
+        setAmPm('PM')
+      } else if (ampm === 'PM' && hasAvailableSlots.AM) {
+        setAmPm('AM')
+      }
+    }
+  }, [ampm, hasAvailableSlots])
 
   const selectedTimeLabel = React.useMemo(() => {
     const found = timeSlots.find((t) => t.value === selectedTime)
@@ -180,14 +221,15 @@ export const Calendar20 = ({
           />
         </div>
         <div className="no-scrollbar inset-y-0 right-0 flex max-h-72 w-full scroll-pb-6 flex-col gap-4 overflow-y-auto border-t p-6 md:absolute md:max-h-none md:w-56 md:border-t-0 md:border-l">
-          <div className="flex gap-2">
-            {(['ALL', 'AM', 'PM'] as const).map((opt) => (
+          <div className="flex gap-2 pb-4 border-b border-border">
+            {(['AM', 'PM'] as const).map((opt) => (
               <Button
                 key={opt}
                 size="sm"
                 variant={ampm === opt ? 'default' : 'outline'}
                 onClick={() => setAmPm(opt)}
                 className="flex-1"
+                disabled={!hasAvailableSlots[opt]}
               >
                 {opt}
               </Button>
@@ -196,7 +238,6 @@ export const Calendar20 = ({
           <div className="grid gap-2">
             {timeSlots
               .filter((t) => {
-                if (ampm === 'ALL') return true
                 const h = parseInt(t.value.split(':')[0] ?? '0', 10)
                 return ampm === 'AM' ? h < 12 : h >= 12
               })
@@ -240,39 +281,48 @@ export const Calendar20 = ({
               <p>
                 {data?.count === 2 ? (
                   <>
-                    Only <span className="text-indigo-600 font-medium">1 slot left</span>{' '}
+                    Only{' '}
+                    <span className="text-indigo-600 font-medium">
+                      1 scheduled tweet slot left
+                    </span>{' '}
                     (2/3 used). <br />
                     Upgrade to <span className="text-indigo-600 font-medium">
                       Pro
                     </span>{' '}
-                    for unlimited tweets.
+                    for unlimited scheduled tweets.
                   </>
                 ) : data?.count === 1 ? (
                   <>
-                    <span className="text-indigo-600 font-medium">2 slots left</span> (1/3
-                    used). <br />
+                    <span className="text-indigo-600 font-medium">
+                      2 scheduled tweet slots left
+                    </span>{' '}
+                    (1/3 used). <br />
                     Upgrade to <span className="text-indigo-600 font-medium">
                       Pro
                     </span>{' '}
-                    for unlimited tweets.
+                    for unlimited scheduled tweets.
                   </>
                 ) : data?.count === 0 ? (
                   <>
-                    <span className="text-indigo-600 font-medium">3 slots left</span> (0/3
-                    used). <br />
+                    <span className="text-indigo-600 font-medium">
+                      3 scheduled tweet slots left
+                    </span>{' '}
+                    (0/3 used). <br />
                     Upgrade to <span className="text-indigo-600 font-medium">
                       Pro
                     </span>{' '}
-                    for unlimited tweets.
+                    for unlimited scheduled tweets.
                   </>
                 ) : (
                   <>
-                    <span className="text-indigo-600 font-medium">No slots left</span>{' '}
+                    <span className="text-indigo-600 font-medium">
+                      No scheduled tweet slots left
+                    </span>{' '}
                     (3/3 used). <br />
                     Upgrade to <span className="text-indigo-600 font-medium">
                       Pro
                     </span>{' '}
-                    for unlimited tweets.
+                    for unlimited scheduled tweets.
                   </>
                 )}
               </p>
