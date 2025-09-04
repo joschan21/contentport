@@ -17,6 +17,12 @@ import { FeedSettingsModal } from './feed-settings-modal'
 import { Loader } from '@/components/ui/loader'
 import { authClient } from '@/lib/auth-client'
 import { useRouter } from 'next/navigation'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 const Page = () => {
   const queryClient = useQueryClient()
@@ -25,6 +31,7 @@ const Page = () => {
   const [newIds, setNewIds] = useState<string[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false)
+  const [excludedKeywords, setExcludedKeywords] = useState<Set<string>>(new Set())
   const { data: authData } = authClient.useSession()
   const router = useRouter()
 
@@ -43,10 +50,25 @@ const Page = () => {
     }
   }, [isKeywordsFetched, keywordData.keywords])
 
+  const toggleKeywordExclusion = (keyword: string) => {
+    setExcludedKeywords((prev) => {
+      const set = new Set(prev)
+      if (set.has(keyword)) {
+        set.delete(keyword)
+      } else {
+        set.add(keyword)
+      }
+      return set
+    })
+  }
+
   const { data, isPending, isLoading, isFetched } = useQuery({
-    queryKey: ['get-feed', sortBy],
+    queryKey: ['get-feed', sortBy, Array.from(excludedKeywords).sort()],
     queryFn: async () => {
-      const res = await client.feed.get_tweets.$get({ sortBy })
+      const res = await client.feed.get_tweets.$get({
+        sortBy,
+        exclude: Array.from(excludedKeywords),
+      })
       const data = await res.json()
 
       return data
@@ -117,23 +139,38 @@ const Page = () => {
             <h1 className="text-2xl font-semibold text-gray-900 mb-3">Topic monitor</h1>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-gray-500 text-sm">Showing relevant tweets for:</p>
-              {keywordData.keywords.map((keyword) => (
-                <div
-                  key={keyword}
-                  className={cn(
-                    'inline-flex items-center gap-x-1 rounded-md px-2 py-1 text-xs font-medium text-gray-900 inset-ring inset-ring-gray-200',
-                  )}
-                >
-                  <svg
-                    viewBox="0 0 6 6"
-                    aria-hidden="true"
-                    className="size-1.5 fill-green-500"
-                  >
-                    <circle r={3} cx={3} cy={3} />
-                  </svg>
-                  {keyword}
-                </div>
-              ))}
+              <TooltipProvider>
+                {keywordData.keywords.map((keyword) => {
+                  const isExcluded = excludedKeywords.has(keyword)
+                  return (
+                    <Tooltip key={keyword}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => toggleKeywordExclusion(keyword)}
+                          className={cn(
+                            'inline-flex group items-center gap-x-1 rounded-md px-2 py-1 text-xs font-medium inset-ring',
+                          )}
+                        >
+                          <svg
+                            viewBox="0 0 6 6"
+                            aria-hidden="true"
+                            className={cn(
+                              'size-1.5',
+                              isExcluded ? 'fill-red-500' : 'fill-green-500',
+                            )}
+                          >
+                            <circle r={3} cx={3} cy={3} />
+                          </svg>
+                          <span className="group-hover:underline">{keyword}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Click to filter</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                })}
+              </TooltipProvider>
 
               {authData?.user.plan === 'free' && isKeywordsFetched && (
                 <button
@@ -194,7 +231,10 @@ const Page = () => {
           <EmptyState onAddKeywords={() => setIsSettingsModalOpen(true)} />
         ) : data ? (
           <Feed
-            keywords={keywordData.keywords ?? []}
+            keywords={
+              keywordData.keywords.filter((keyword) => !excludedKeywords.has(keyword)) ??
+              []
+            }
             data={data}
             containerRef={containerRef}
           />

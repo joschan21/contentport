@@ -6,83 +6,7 @@ import { getTweet } from 'react-tweet/api'
 import superjson from 'superjson'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
-
-const levenshteinDistance = (str1: string, str2: string): number => {
-  const matrix = Array(str2.length + 1)
-    .fill(null)
-    .map(() => Array(str1.length + 1).fill(null))
-
-  for (let i = 0; i <= str1.length; i++) {
-    matrix[0]![i] = i
-  }
-
-  for (let j = 0; j <= str2.length; j++) {
-    matrix[j]![0] = j
-  }
-
-  for (let j = 1; j <= str2.length; j++) {
-    for (let i = 1; i <= str1.length; i++) {
-      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1
-      matrix[j]![i] = Math.min(
-        matrix[j]![i - 1]! + 1,
-        matrix[j - 1]![i]! + 1,
-        matrix[j - 1]![i - 1]! + indicator,
-      )
-    }
-  }
-
-  return matrix[str2.length]![str1.length]!
-}
-
-const fuzzyMatch = (text: string, keyword: string, tolerance: number = 3): boolean => {
-  const words = text.toLowerCase().split(/\s+/)
-  const keywordLower = keyword.toLowerCase()
-
-  return words.some((word) => {
-    if (word.includes(keywordLower) || keywordLower.includes(word)) {
-      return true
-    }
-
-    return levenshteinDistance(word, keywordLower) <= tolerance
-  })
-}
-
-const fuzzyIncludes = (text: string, keyword: string, tolerance: number = 1): boolean => {
-  const textLower = text.toLowerCase()
-  const keywordLower = keyword.toLowerCase()
-
-  if (textLower.includes(keywordLower)) {
-    return true
-  }
-
-  const words = textLower.split(/\s+/)
-
-  return words.some((word) => {
-    if (word.length < keywordLower.length - tolerance) {
-      return false
-    }
-
-    for (let i = 0; i <= word.length - keywordLower.length + tolerance; i++) {
-      for (
-        let j = keywordLower.length - tolerance;
-        j <= keywordLower.length + tolerance;
-        j++
-      ) {
-        if (i + j > word.length) continue
-
-        const substring = word.substring(i, i + j)
-        if (
-          substring.length >= keywordLower.length - tolerance &&
-          levenshteinDistance(substring, keywordLower) <= tolerance
-        ) {
-          return true
-        }
-      }
-    }
-
-    return false
-  })
-}
+import { fuzzyIncludes } from '@/lib/utils'
 
 const redis_raw = Redis.fromEnv({
   automaticDeserialization: false,
@@ -126,9 +50,15 @@ export const feedRouter = j.router({
   }),
 
   get_tweets: privateProcedure
-    .input(z.object({ sortBy: z.enum(['recent', 'popular']) }))
+    .input(
+      z.object({
+        sortBy: z.enum(['recent', 'popular']),
+        exclude: z.array(z.string()).optional(),
+      }),
+    )
     .get(async ({ c, ctx, input }) => {
       const { user } = ctx
+      const { exclude } = input
 
       let keywords: string[] = []
       if (user.plan === 'free') {
@@ -263,17 +193,77 @@ export const feedRouter = j.router({
         })
       }
 
-      let sorted: typeof data = []
+      const excludeKeywords = exclude?.filter(Boolean) ?? []
+      const includeKeywords = keywords?.filter((k) => !excludeKeywords.includes(k)) ?? []
+
+      const shouldExcludeTweet = (tweet: EnrichedTweet): boolean => {
+        if (excludeKeywords.length === 0) return false
+
+        const text = tweet.entities.reduce((acc, curr) => {
+          if (curr.type === 'text') {
+            return acc + curr.text
+          } else return acc
+        }, '')
+
+        const hasExcludedKeyword = excludeKeywords.some((keyword) => {
+          const relevantEntities = tweet.entities.filter(
+            (e) =>
+              e.type === 'mention' ||
+              e.type === 'hashtag' ||
+              (e.type === 'url' &&
+                fuzzyIncludes(e.text.toLowerCase(), keyword.toLowerCase())),
+          )
+
+          return (
+            Boolean(fuzzyIncludes(text.toLowerCase(), keyword.toLowerCase())) ||
+            Boolean(relevantEntities.length)
+          )
+        })
+
+        if (!hasExcludedKeyword) return false
+
+        const hasIncludedKeyword = includeKeywords.some((keyword) => {
+          const relevantEntities = tweet.entities.filter((e) => {
+            if (e.type === 'mention' || e.type === 'hashtag' || e.type === 'url') {
+              return fuzzyIncludes(e.text.toLowerCase(), keyword.toLowerCase())
+            }
+          })
+
+          return (
+            Boolean(fuzzyIncludes(text.toLowerCase(), keyword.toLowerCase())) ||
+            Boolean(relevantEntities.length)
+          )
+        })
+
+        return hasExcludedKeyword && !hasIncludedKeyword
+      }
+
+      const filteredData = data.filter((item) => {
+        const shouldExcludeMain = shouldExcludeTweet(item.main)
+        if (shouldExcludeMain) return false
+
+        const hasExcludedReplies = item.replyChains.some((chain) =>
+          chain.some((tweet) => {
+            return shouldExcludeTweet(tweet)
+          }),
+        )
+
+        if (hasExcludedReplies) return false
+
+        return true
+      })
+
+      let sorted: typeof filteredData = []
 
       if (input.sortBy === 'recent') {
-        sorted = data.sort((a, b) => {
+        sorted = filteredData.sort((a, b) => {
           const timeScore =
             new Date(b.main?.created_at || 0).getTime() -
             new Date(a.main?.created_at || 0).getTime()
           return timeScore
         })
       } else {
-        sorted = data.sort((a, b) => {
+        sorted = filteredData.sort((a, b) => {
           const favoriteScore =
             (b.main?.favorite_count || 0) - (a.main?.favorite_count || 0)
           return favoriteScore
