@@ -18,27 +18,30 @@ export const Feed = ({ keywords, data, containerRef }: FeedProps) => {
   const [lanes, setLanes] = useState(3)
   const [gap, setGap] = useState(16)
 
-  const calculateResponsiveLayout = useCallback((width: number) => {
-    let newLanes: number
-    let newGap: number
-    let newCardWidth: number
+  const calculateResponsiveLayout = useCallback(
+    throttle((width: number) => {
+      let newLanes: number
+      let newGap: number
+      let newCardWidth: number
 
-    if (width >= 1200) {
-      newLanes = 3
-      newGap = 16
-      newCardWidth = Math.min(384, (width - (newLanes - 1) * newGap) / newLanes)
-    } else if (width >= 768) {
-      newLanes = 2
-      newGap = 12
-      newCardWidth = Math.min(384, (width - (newLanes - 1) * newGap) / newLanes)
-    } else {
-      newLanes = 1
-      newGap = 8
-      newCardWidth = Math.min(384, width - 2 * newGap)
-    }
+      if (width >= 1200) {
+        newLanes = 3
+        newGap = 16
+        newCardWidth = Math.min(384, (width - (newLanes - 1) * newGap) / newLanes)
+      } else if (width >= 768) {
+        newLanes = 2
+        newGap = 12
+        newCardWidth = Math.min(384, (width - (newLanes - 1) * newGap) / newLanes)
+      } else {
+        newLanes = 1
+        newGap = 8
+        newCardWidth = Math.min(384, width - 2 * newGap)
+      }
 
-    return { lanes: newLanes, gap: newGap, cardWidth: newCardWidth }
-  }, [])
+      return { lanes: newLanes, gap: newGap, cardWidth: newCardWidth }
+    }, 50),
+    [],
+  )
 
   const virtualizer = useVirtualizer({
     count: data.length,
