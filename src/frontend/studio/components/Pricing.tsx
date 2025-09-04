@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
 import { CheckIcon } from '@phosphor-icons/react'
 import DuolingoButton from '@/components/ui/duolingo-button'
+import Link from 'next/link'
 
 interface PricingProps {
   targetUrl?: string
@@ -148,9 +149,11 @@ export default function Pricing({ targetUrl }: PricingProps) {
               ))}
             </ul>
             <div className="mt-10">
-              <DuolingoButton variant={tier.featured ? 'primary' : 'primary'} size="md">
-                Get Started Now!
-              </DuolingoButton>
+              <Link href="/login">
+                <DuolingoButton variant={tier.featured ? 'primary' : 'primary'} size="md">
+                  Get Started Now!
+                </DuolingoButton>
+              </Link>
             </div>
           </div>
         ))}
