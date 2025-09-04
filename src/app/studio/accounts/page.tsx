@@ -26,8 +26,8 @@ import DuolingoInput from '@/components/ui/duolingo-input'
 import DuolingoTextarea from '@/components/ui/duolingo-textarea'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AccountAvatar, mapToConnectedAccount, useAccount } from '@/hooks/account-ctx'
 import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
@@ -42,6 +42,7 @@ import {
   Link as LinkIcon,
   Loader2,
   Lock,
+  MoreHorizontal,
   Plus,
   RefreshCw,
   Save,
@@ -51,8 +52,9 @@ import {
   X,
 } from 'lucide-react'
 import posthog from 'posthog-js'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { UserIcon, UserSwitchIcon, XLogoIcon } from '@phosphor-icons/react'
 
 interface TweetCard {
   src?: string
@@ -110,10 +112,10 @@ export default function AccountsPage() {
     toast.success(checked ? 'Post confirmation disabled' : 'Post confirmation enabled')
   }
 
-  const { mutate: createOAuthLink, isPending: isCreatingOAuthLink } = useMutation({
-    mutationFn: async () => {
+  const { mutate: createOAuthLink, isPending: isCreatingOAuthLink, variables: isCreatingOAuthLinkVariables } = useMutation({
+    mutationFn: async ({ action }: { action: 'add-account' | 're-authenticate' }) => {
       const res = await client.auth_router.createTwitterLink.$get({
-        action: 'add-account',
+        action,
       })
       return await res.json()
     },
@@ -121,7 +123,7 @@ export default function AccountsPage() {
       toast.error('Error, please try again')
     },
     onSuccess: ({ url }) => {
-      window.location.href = url
+      window.open(url, '_blank')
     },
   })
 
@@ -240,13 +242,13 @@ export default function AccountsPage() {
           ...oldData,
           accounts: oldData.accounts.map((acc: Account) =>
             acc.id === accountId
-              ? { 
-                  ...acc, 
-                  profile_image_url, 
+              ? {
+                  ...acc,
+                  profile_image_url,
                   name: account.name,
-                  username: account.username 
+                  username: account.username,
                 }
-              : acc
+              : acc,
           ),
         }
       })
@@ -342,11 +344,9 @@ export default function AccountsPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-stone-800">
-              All Connected Accounts
-            </h2>
+            <h2 className="text-lg font-semibold text-stone-800">Your Accounts</h2>
             <p className="text-stone-600 text-sm">
-              Your personal accounts and accounts delegated to you
+              Personal accounts and accounts delegated to you
             </p>
           </div>
 
@@ -366,7 +366,7 @@ export default function AccountsPage() {
                 </DuolingoButton>
               </TooltipTrigger>
               <TooltipContent className="bg-gray-900 text-white border-gray-700">
-                <p className="font-medium">Upgrade to Pro to add unlimited accounts</p>
+                <p>Upgrade to Pro to add unlimited accounts</p>
               </TooltipContent>
             </Tooltip>
           ) : (
@@ -451,83 +451,122 @@ export default function AccountsPage() {
             {accounts.accounts.map((acc, i) => (
               <div key={acc.id}>
                 <div className="rounded-lg p-4">
-                  <div className="group w-full flex items-center justify-between gap-3">
-                    <div className="w-full flex items-center gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <Avatar className="size-10">
-                            <AvatarImage
-                              src={acc.profile_image_url}
-                              alt={`@${acc.username}`}
-                            />
-                            <AvatarFallback className="bg-primary/10 text-primary text-sm/6">
-                              {acc.name?.slice(0, 1).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="size-10">
+                        <AvatarImage
+                          src={acc.profile_image_url}
+                          alt={`@${acc.username}`}
+                        />
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm/6">
+                          {acc.name?.slice(0, 1).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{acc.name}</p>
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium">{acc.name}</p>
-                          </div>
-                          <p className="text-sm opacity-60">@{acc.username}</p>
-                        </div>
+                        <p className="text-sm opacity-60">@{acc.username}</p>
                       </div>
-                      {acc.isActive ? (
-                        <div className="flex items-end flex-col w-full flex-1">
-                          <div className="flex items-center gap-2">
-                            <DuolingoBadge variant="achievement" className="text-xs px-2">
-                              <Check className="size-3 mr-1" />
-                              Active
-                            </DuolingoBadge>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <DuolingoButton
-                                  onClick={() => refreshProfileData({ accountId: acc.id })}
-                                  variant="secondary"
-                                  size="icon"
-                                  className="h-6 w-6 p-1"
-                                  loading={
-                                    isRefreshingProfile && 
-                                    refreshProfileVariables?.accountId === acc.id
-                                  }
-                                >
-                                  <RefreshCw className="size-3" />
-                                </DuolingoButton>
-                              </TooltipTrigger>
-                              <TooltipContent className="bg-gray-900 text-white border-gray-700">
-                                <p className="text-xs">Refresh profile data</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      ) : null}
                     </div>
-                    {acc.isActive ? null : (
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
-                        <DuolingoButton
-                          onClick={() => switchAccount({ accountId: acc.id })}
-                          variant="secondary"
-                          size="sm"
-                          className="w-fit"
-                          loading={
-                            isSwitching && switchAccountVariables?.accountId === acc.id
-                          }
-                        >
-                          Switch
-                        </DuolingoButton>
-                        <DuolingoButton
-                          onClick={() => deleteAccount({ accountId: acc.id })}
-                          variant="destructive"
-                          size="icon"
-                          loading={
-                            isDeletingAccount &&
-                            deleteAccountVariables?.accountId === acc.id
-                          }
-                        >
-                          <Trash2 className="size-4" />
-                        </DuolingoButton>
-                      </div>
-                    )}
+
+                    <div className="flex items-center gap-2.5">
+                      {acc.isActive && (
+                        <DuolingoBadge variant="achievement" className="text-xs px-2">
+                          <Check className="size-3 mr-1" />
+                          Active
+                        </DuolingoBadge>
+                      )}
+
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <DuolingoButton
+                            variant="secondary"
+                            size="icon"
+                            className="size-8"
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </DuolingoButton>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-60 p-1" align="end">
+                          <div className="space-y-1">
+                            <button
+                              onClick={() => switchAccount({ accountId: acc.id })}
+                              disabled={
+                                acc.isActive ||
+                                (isSwitching &&
+                                  switchAccountVariables?.accountId === acc.id)
+                              }
+                              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-stone-100 transition-colors disabled:opacity-50"
+                            >
+                              {isSwitching &&
+                              switchAccountVariables?.accountId === acc.id ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <UserSwitchIcon className="size-4 shrink-0" />
+                              )}
+                              <span className="truncate">Switch to <span className="text-indigo-600 font-medium">@{account?.username}</span></span>
+                            </button>
+
+                            <Separator />
+
+                            <button
+                              onClick={() => refreshProfileData({ accountId: acc.id })}
+                              disabled={
+                                isRefreshingProfile &&
+                                refreshProfileVariables?.accountId === acc.id
+                              }
+                              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-stone-100 transition-colors disabled:opacity-50"
+                            >
+                              {isRefreshingProfile &&
+                              refreshProfileVariables?.accountId === acc.id ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="size-4" />
+                              )}
+                              Refresh Profile
+                            </button>
+
+                            <button
+                              onClick={() => createOAuthLink({ action: 're-authenticate' }  )}
+                              disabled={
+                                isRefreshingProfile &&
+                                refreshProfileVariables?.accountId === acc.id
+                              }
+                              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-stone-100 transition-colors disabled:opacity-50"
+                            >
+                              {isCreatingOAuthLink &&
+                              isCreatingOAuthLinkVariables?.action === 're-authenticate' ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <XLogoIcon className="size-[18px]" />
+                              )}
+                              Re-authenticate
+                            </button>
+
+                            <Separator />
+
+                            <button
+                              onClick={() => deleteAccount({ accountId: acc.id })}
+                              disabled={
+                                acc.isActive ||
+                                (isDeletingAccount &&
+                                  deleteAccountVariables?.accountId === acc.id)
+                              }
+                              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-red-50 text-red-600 transition-colors disabled:opacity-50"
+                            >
+                              {isDeletingAccount &&
+                              deleteAccountVariables?.accountId === acc.id ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="size-4" />
+                              )}
+                              Delete Account
+                            </button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
                 </div>
                 {i < accounts.accounts.length - 1 && <Separator />}
@@ -727,7 +766,7 @@ export default function AccountsPage() {
             </DuolingoButton>
             <DuolingoButton
               onClick={() => {
-                createOAuthLink()
+                createOAuthLink({ action: 'add-account' })
                 setShowConnectDialog(false)
               }}
               size="sm"

@@ -27,7 +27,7 @@ const consumerSecret = process.env.TWITTER_CONSUMER_SECRET as string
 
 const client = new TwitterApi({ appKey: consumerKey, appSecret: consumerSecret })
 
-type AuthAction = 'onboarding' | 'invite' | 'add-account'
+type AuthAction = 'onboarding' | 'invite' | 'add-account' | 're-authenticate'
 
 const clientV2 = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
 
@@ -46,10 +46,8 @@ export const authRouter = j.router({
     }),
 
   createTwitterLink: privateProcedure
-    .input(z.object({ action: z.enum(['onboarding', 'add-account']) }))
+    .input(z.object({ action: z.enum(['onboarding', 'add-account', 're-authenticate']) }))
     .query(async ({ c, input, ctx }) => {
-      console.log('⚠️⚠️⚠️ callback url:', `${getBaseUrl()}/api/auth_router/callback`)
-
       if (input.action === 'add-account' && ctx.user.plan !== 'pro') {
         throw new HTTPException(402, {
           message: 'Upgrade to Pro to connect more accounts.',
@@ -172,8 +170,6 @@ export const authRouter = j.router({
 
     const accounts = await redis.scan(0, { match: `account:${user.email}:*` })
 
-    console.log('accounts', accounts)
-
     const [, accountKeys] = accounts
     for (const accountKey of accountKeys) {
       const existingAccount = await redis.json.get<Account>(accountKey)
@@ -182,7 +178,16 @@ export const authRouter = j.router({
           return c.redirect(`${getBaseUrl()}/invite/success?id=${inviteId}`)
         }
 
-        if (authAction === 'add-account') {
+        if (authAction === 'add-account' || authAction === 're-authenticate') {
+          await db
+            .update(account)
+            .set({
+              accessToken,
+              accessSecret,
+              updatedAt: new Date(),
+            })
+            .where(eq(account.id, existingAccount.id))
+
           return c.redirect(`${getBaseUrl()}/studio/accounts`)
         }
 
