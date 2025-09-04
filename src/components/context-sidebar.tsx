@@ -19,6 +19,7 @@ import {
   SidebarHeader,
   useSidebar,
 } from './ui/sidebar'
+import { Icons } from '@/components/icons'
 
 const searchParams = {
   tweetId: parseAsString,
@@ -70,7 +71,10 @@ export const LeftSidebar = () => {
 
       <SidebarContent>
         {/* Create Group */}
-        <SidebarGroup>
+        <SidebarGroup className="relative">
+          {isCollapsed && (
+            <div className="absolute bottom-0 left-4 right-4 h-px bg-border/40" />
+          )}
           <SidebarGroupLabel
             className={cn(
               'transition-all duration-200 ease-out px-3',
@@ -94,8 +98,8 @@ export const LeftSidebar = () => {
                   'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
               )}
             >
-              <div className="size-6 flex items-center justify-center flex-shrink-0">
-                ✏️
+              <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
+                <Icons.pencil className="size-6" />
               </div>
               <span
                 className={cn(
@@ -110,7 +114,10 @@ export const LeftSidebar = () => {
         </SidebarGroup>
 
         {/* Discover Group */}
-        <SidebarGroup>
+        <SidebarGroup className="relative">
+          {isCollapsed && (
+            <div className="absolute bottom-0 left-4 right-4 h-px bg-border/40" />
+          )}
           <SidebarGroupLabel
             className={cn(
               'transition-all duration-200 ease-out px-3',
@@ -134,8 +141,8 @@ export const LeftSidebar = () => {
                   'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
               )}
             >
-              <div className="size-6 flex items-center justify-center flex-shrink-0">
-                👀
+              <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
+                <Icons.magnifier className="size-5" />
               </div>
               <span
                 className={cn(
@@ -143,14 +150,17 @@ export const LeftSidebar = () => {
                   isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
                 )}
               >
-                Feed
+                Keyword Monitor
               </span>
             </Link>
           </SidebarGroupContent>
         </SidebarGroup>
 
         {/* Content Group */}
-        <SidebarGroup>
+        <SidebarGroup className="relative">
+          {isCollapsed && (
+            <div className="absolute bottom-0 left-4 right-4 h-px bg-border/40" />
+          )}
           <SidebarGroupLabel
             className={cn(
               'transition-all duration-200 ease-out px-3',
@@ -175,8 +185,8 @@ export const LeftSidebar = () => {
                     'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
                 )}
               >
-                <div className="size-6 flex items-center justify-center flex-shrink-0">
-                  🧠
+                <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
+                  <Icons.brain className="size-6" />
                 </div>
                 <span
                   className={cn(
@@ -202,8 +212,8 @@ export const LeftSidebar = () => {
                     'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
                 )}
               >
-                <div className="size-6 flex items-center justify-center flex-shrink-0">
-                  📅
+                <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
+                  <Icons.calendar className="size-6" />
                 </div>
                 <span
                   className={cn(
@@ -229,8 +239,8 @@ export const LeftSidebar = () => {
                     'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
                 )}
               >
-                <div className="size-6 flex items-center justify-center flex-shrink-0">
-                  📤
+                <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
+                  <Icons.outboxTray className="size-6" />
                 </div>
                 <span
                   className={cn(
@@ -246,7 +256,10 @@ export const LeftSidebar = () => {
         </SidebarGroup>
 
         {/* Account Group */}
-        <SidebarGroup>
+        <SidebarGroup className="relative">
+          {isCollapsed && (
+            <div className="absolute bottom-0 left-4 right-4 h-px bg-border/40" />
+          )}
           <SidebarGroupLabel
             className={cn(
               'transition-all duration-200 ease-out px-3',
@@ -270,8 +283,8 @@ export const LeftSidebar = () => {
                   'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
               )}
             >
-              <div className="size-6 flex items-center justify-center flex-shrink-0">
-                👤
+              <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
+                <Icons.imageIcon className="size-6" />
               </div>
               <span
                 className={cn(
