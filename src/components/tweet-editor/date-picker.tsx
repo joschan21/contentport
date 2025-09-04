@@ -9,6 +9,8 @@ import { DayFlag, DayPicker, SelectionState, UI } from 'react-day-picker'
 import { cn } from '@/lib/utils'
 import DuolingoButton from '../ui/duolingo-button'
 import { authClient } from '@/lib/auth-client'
+import { useQuery } from '@tanstack/react-query'
+import { client } from '@/lib/client'
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
   onSchedule?: (date: Date, time: string) => void
@@ -33,18 +35,31 @@ export const Calendar20 = ({
 
   const session = authClient.useSession()
 
+  const { data } = useQuery({
+    queryKey: ['get-scheduled-tweet-count'],
+    queryFn: async () => {
+      const res = await client.tweet.get_scheduled_count.$get()
+      const data = await res.json()
+
+      return data
+    },
+  })
+
   const timeSlots = React.useMemo(() => {
     const isAdmin = session?.data?.user?.isAdmin
-    const slots: { value: string; label: string }[] = Array.from({ length: 96 }, (_, i) => {
-      const totalMinutes = i * 15
-      const hour = Math.floor(totalMinutes / 60)
-      const minute = totalMinutes % 60
-      const value = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-      const displayHour = hour % 12 || 12
-      const ampm = hour >= 12 ? 'PM' : 'AM'
-      const label = `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`
-      return { value, label }
-    })
+    const slots: { value: string; label: string }[] = Array.from(
+      { length: 96 },
+      (_, i) => {
+        const totalMinutes = i * 15
+        const hour = Math.floor(totalMinutes / 60)
+        const minute = totalMinutes % 60
+        const value = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+        const displayHour = hour % 12 || 12
+        const ampm = hour >= 12 ? 'PM' : 'AM'
+        const label = `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`
+        return { value, label }
+      },
+    )
 
     if (isAdmin) {
       const now = new Date()
@@ -54,7 +69,10 @@ export const Calendar20 = ({
       const value = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
       const displayHour = h % 12 || 12
       const ampm = h >= 12 ? 'PM' : 'AM'
-      slots.unshift({ value, label: `${displayHour}:${m.toString().padStart(2, '0')} ${ampm}` })
+      slots.unshift({
+        value,
+        label: `${displayHour}:${m.toString().padStart(2, '0')} ${ampm}`,
+      })
     }
 
     return slots
@@ -161,7 +179,7 @@ export const Calendar20 = ({
             }}
           />
         </div>
-        <div className="no-scrollbar inset-y-0 right-0 flex max-h-72 w-full scroll-pb-6 flex-col gap-4 overflow-y-auto border-t p-6 md:absolute md:max-h-none md:w-48 md:border-t-0 md:border-l">
+        <div className="no-scrollbar inset-y-0 right-0 flex max-h-72 w-full scroll-pb-6 flex-col gap-4 overflow-y-auto border-t p-6 md:absolute md:max-h-none md:w-56 md:border-t-0 md:border-l">
           <div className="flex gap-2">
             {(['ALL', 'AM', 'PM'] as const).map((opt) => (
               <Button
@@ -197,24 +215,81 @@ export const Calendar20 = ({
         </div>
       </CardContent>
       <CardFooter className="flex flex-col gap-4 border-t py-4 md:flex-row">
-        <div className="text-sm">
-          {date && selectedTime ? (
-            <>
-              {editMode ? 'Reschedule for' : 'Scheduled for'}{' '}
-              <span className="font-medium">
-                {' '}
-                {date?.toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                })}{' '}
-              </span>
-              at <span className="font-medium">{selectedTimeLabel}</span>.
-            </>
+        <div className="flex flex-col">
+          <div className="text-sm">
+            {date && selectedTime ? (
+              <>
+                {editMode ? 'Reschedule for' : 'Scheduled for'}{' '}
+                <span className="font-medium">
+                  {' '}
+                  {date?.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                  })}{' '}
+                </span>
+                at <span className="font-medium">{selectedTimeLabel}</span>.
+              </>
+            ) : (
+              <>Select a date and time for your meeting.</>
+            )}
+          </div>
+          {session?.data?.user?.plan === 'free' ? (
+            <div className="text-xs">
+              <br />
+              <p>
+                {data?.count === 2 ? (
+                  <>
+                    Only <span className="text-indigo-600 font-medium">1 slot left</span>{' '}
+                    (2/3 used). <br />
+                    Upgrade to <span className="text-indigo-600 font-medium">
+                      Pro
+                    </span>{' '}
+                    for unlimited tweets.
+                  </>
+                ) : data?.count === 1 ? (
+                  <>
+                    <span className="text-indigo-600 font-medium">2 slots left</span> (1/3
+                    used). <br />
+                    Upgrade to <span className="text-indigo-600 font-medium">
+                      Pro
+                    </span>{' '}
+                    for unlimited tweets.
+                  </>
+                ) : data?.count === 0 ? (
+                  <>
+                    <span className="text-indigo-600 font-medium">3 slots left</span> (0/3
+                    used). <br />
+                    Upgrade to <span className="text-indigo-600 font-medium">
+                      Pro
+                    </span>{' '}
+                    for unlimited tweets.
+                  </>
+                ) : (
+                  <>
+                    <span className="text-indigo-600 font-medium">No slots left</span>{' '}
+                    (3/3 used). <br />
+                    Upgrade to <span className="text-indigo-600 font-medium">
+                      Pro
+                    </span>{' '}
+                    for unlimited tweets.
+                  </>
+                )}
+              </p>
+            </div>
           ) : (
-            <>Select a date and time for your meeting.</>
+            <>
+              <br></br>
+              <div className="text-xs">
+                <p>
+                  You can schedule{' '}
+                  <span className="text-indigo-600 font-medium">unlimited</span> tweets.
+                </p>
+              </div>
+            </>
           )}
         </div>
+
         <DuolingoButton
           loading={isPending}
           size="sm"

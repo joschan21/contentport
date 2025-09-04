@@ -103,6 +103,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     onSuccess({ scheduledUnix }) {
       reset()
       queryClient.invalidateQueries({ queryKey: ['next-queue-slot'] })
+      queryClient.invalidateQueries({ queryKey: ['get-scheduled-tweet-count'] })
 
       const scheduledDate = new Date(scheduledUnix)
 
@@ -136,6 +137,13 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         particleCount: 200,
         spread: 160,
       })
+    },
+    onError: (err) => {
+      if (err instanceof HTTPException) {
+        toast.error(err.message)
+        return
+      }
+      toast.error('Something went wrong. Please try again!')
     },
   })
 
@@ -193,6 +201,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
 
       queryClient.invalidateQueries({ queryKey: ['next-queue-slot'] })
       queryClient.invalidateQueries({ queryKey: ['scheduled-and-published-tweets'] })
+      queryClient.invalidateQueries({ queryKey: ['get-scheduled-tweet-count'] })
     },
     onError: (error: HTTPException) => {
       if (error.status === 402) {

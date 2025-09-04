@@ -7,7 +7,7 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { waitUntil } from '@vercel/functions'
 import { addDays, isFuture, isSameDay, setHours, startOfDay, startOfHour } from 'date-fns'
 import { fromZonedTime } from 'date-fns-tz'
-import { and, desc, eq, isNotNull, lte, or } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, isNull, lte, or, gt } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { ContentfulStatusCode } from 'hono/utils/http-status'
 import { ApiResponseError, SendTweetV2Params, TwitterApi } from 'twitter-api-v2'
@@ -19,6 +19,27 @@ import { ensureValidMedia } from '../utils/upload-media-to-twitter'
 import { fetchMediaFromS3 } from './fetch-media-from-s3'
 
 import { getNextAvailableQueueSlot } from './queue-utils'
+
+async function getFutureScheduledTweetsCount(
+  userId: string,
+  accountId: string,
+): Promise<number> {
+  const currentTime = new Date().getTime()
+
+  const futureScheduledTweets = await db.query.tweets.findMany({
+    where: and(
+      eq(tweets.userId, userId),
+      eq(tweets.accountId, accountId),
+      eq(tweets.isScheduled, true),
+      eq(tweets.isError, false),
+      gt(tweets.scheduledUnix, currentTime),
+      isNull(tweets.isReplyTo),
+    ),
+    columns: { id: true },
+  })
+
+  return futureScheduledTweets.length
+}
 
 const consumerKey = process.env.TWITTER_CONSUMER_KEY as string
 const consumerSecret = process.env.TWITTER_CONSUMER_SECRET as string
@@ -82,6 +103,19 @@ const postWithQStash = async (args: PostWithQStashArgs) => {
 }
 
 export const tweetRouter = j.router({
+  get_scheduled_count: privateProcedure.get(async ({ c, ctx, input }) => {
+    const { user } = ctx
+    const account = await getAccount({ email: user.email })
+    if (!account) {
+      throw new HTTPException(400, {
+        message: 'No account found',
+      })
+    }
+    const scheduledTweetsCount = await getFutureScheduledTweetsCount(user.id, account.id)
+
+    return c.json({ count: scheduledTweetsCount })
+  }),
+
   getThread: privateProcedure
     .input(z.object({ baseTweetId: z.string() }))
     .get(async ({ c, ctx, input }) => {
@@ -349,17 +383,14 @@ export const tweetRouter = j.router({
       }
 
       if (user.plan !== 'pro') {
-        const limiter = new Ratelimit({
-          redis,
-          limiter: Ratelimit.slidingWindow(1, '7d'),
-        })
-
-        const { success } = await limiter.limit(user.email)
-
-        if (!success) {
+        const currentScheduledCount = await getFutureScheduledTweetsCount(
+          user.id,
+          account.id,
+        )
+        if (currentScheduledCount >= 3) {
           throw new HTTPException(402, {
             message:
-              'Free plan scheduling limit reached. Upgrade to Pro to schedule unlimited tweets.',
+              'Free plan scheduling limit reached. You can only have 3 scheduled posts at a time. Upgrade to Pro to schedule unlimited tweets.',
           })
         }
       }
@@ -878,6 +909,19 @@ export const tweetRouter = j.router({
         throw new HTTPException(400, {
           message: 'Please connect your Twitter account',
         })
+      }
+
+      if (user.plan !== 'pro') {
+        const currentScheduledCount = await getFutureScheduledTweetsCount(
+          user.id,
+          account.id,
+        )
+        if (currentScheduledCount >= 3) {
+          throw new HTTPException(402, {
+            message:
+              'Free plan scheduling limit reached. You can only have 3 scheduled posts at a time. Upgrade to Pro to schedule unlimited tweets.',
+          })
+        }
       }
 
       const dbAccount = await db.query.account.findFirst({
