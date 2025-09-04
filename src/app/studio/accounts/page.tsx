@@ -112,7 +112,11 @@ export default function AccountsPage() {
     toast.success(checked ? 'Post confirmation disabled' : 'Post confirmation enabled')
   }
 
-  const { mutate: createOAuthLink, isPending: isCreatingOAuthLink, variables: isCreatingOAuthLinkVariables } = useMutation({
+  const {
+    mutate: createOAuthLink,
+    isPending: isCreatingOAuthLink,
+    variables: isCreatingOAuthLinkVariables,
+  } = useMutation({
     mutationFn: async ({ action }: { action: 'add-account' | 're-authenticate' }) => {
       const res = await client.auth_router.createTwitterLink.$get({
         action,
@@ -488,7 +492,7 @@ export default function AccountsPage() {
                             <MoreHorizontal className="size-4" />
                           </DuolingoButton>
                         </PopoverTrigger>
-                        <PopoverContent className="w-60 p-1" align="end">
+                        <PopoverContent className="w-[280px] p-1" align="end">
                           <div className="space-y-1">
                             <button
                               onClick={() => switchAccount({ accountId: acc.id })}
@@ -505,7 +509,12 @@ export default function AccountsPage() {
                               ) : (
                                 <UserSwitchIcon className="size-4 shrink-0" />
                               )}
-                              <span className="truncate">Switch to <span className="text-indigo-600 font-medium">@{acc?.username}</span></span>
+                              <span className="truncate">
+                                Switch to{' '}
+                                <span className="text-indigo-600 font-medium">
+                                  {acc?.name}
+                                </span>
+                              </span>
                             </button>
 
                             <Separator />
@@ -524,11 +533,18 @@ export default function AccountsPage() {
                               ) : (
                                 <RefreshCw className="size-4" />
                               )}
-                              Refresh Profile
+                              <p className="truncate inline-flex items-start flex-col">
+                                <span>Refresh Profile</span>
+                                <span className="text-xs text-stone-500">
+                                  Refresh profile picture and name
+                                </span>
+                              </p>
                             </button>
 
                             <button
-                              onClick={() => createOAuthLink({ action: 're-authenticate' }  )}
+                              onClick={() =>
+                                createOAuthLink({ action: 're-authenticate' })
+                              }
                               disabled={
                                 isRefreshingProfile &&
                                 refreshProfileVariables?.accountId === acc.id
@@ -536,12 +552,18 @@ export default function AccountsPage() {
                               className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-stone-100 transition-colors disabled:opacity-50"
                             >
                               {isCreatingOAuthLink &&
-                              isCreatingOAuthLinkVariables?.action === 're-authenticate' ? (
+                              isCreatingOAuthLinkVariables?.action ===
+                                're-authenticate' ? (
                                 <Loader2 className="size-4 animate-spin" />
                               ) : (
                                 <XLogoIcon className="size-[18px]" />
                               )}
-                              Re-authenticate
+                              <p className="truncate inline-flex items-start flex-col">
+                                <span>Re-authenticate</span>
+                                <span className="text-xs text-stone-500">
+                                  Restore posting permissions
+                                </span>
+                              </p>
                             </button>
 
                             <Separator />
@@ -561,7 +583,9 @@ export default function AccountsPage() {
                               ) : (
                                 <Trash2 className="size-4" />
                               )}
-                              Delete Account
+                              <p className="truncate inline-flex items-start flex-col">
+                                <span>Delete Account</span>
+                              </p>
                             </button>
                           </div>
                         </PopoverContent>
