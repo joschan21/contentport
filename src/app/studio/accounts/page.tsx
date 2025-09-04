@@ -505,7 +505,7 @@ export default function AccountsPage() {
                               ) : (
                                 <UserSwitchIcon className="size-4 shrink-0" />
                               )}
-                              <span className="truncate">Switch to <span className="text-indigo-600 font-medium">@{account?.username}</span></span>
+                              <span className="truncate">Switch to <span className="text-indigo-600 font-medium">@{acc?.username}</span></span>
                             </button>
 
                             <Separator />
