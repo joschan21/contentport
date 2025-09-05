@@ -165,7 +165,7 @@ const Page = () => {
                         </button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Click to filter</p>
+                        <p>Click to turn {isExcluded ? 'on' : 'off'}</p>
                       </TooltipContent>
                     </Tooltip>
                   )

@@ -1,5 +1,6 @@
 import { Icons } from '@/components/icons'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import { highlightText } from '@/lib/highlight-utils'
 import { cn } from '@/lib/utils'
 import { InferOutput } from '@/server'
 import { ChatCircleIcon, HeartIcon, XLogoIcon } from '@phosphor-icons/react'
@@ -24,8 +25,19 @@ export const TweetCard = ({ keywords, isNew, threadGroup }: TweetCardProps) => {
       <div className="flex items-center gap-1.5 mb-3">
         <div className="flex flex-col gap-px">
           <span className="font-semibold truncate inline-flex items-center gap-1.5 text-gray-900 leading-none">
-            <p className="text-sm">{tweet.user.name.slice(0, 20)}</p>
-            {tweet.user.name.length > 20 ? '...' : ''}
+            <div className="text-sm truncate">
+              {keywords.length > 0 
+                ? highlightText(tweet.user.name.slice(0, 20), keywords).map((content, idx) => 
+                    typeof content === 'string' ? (
+                      <span key={`name-${idx}`}>{content}</span>
+                    ) : (
+                      content
+                    )
+                  )
+                : tweet.user.name.slice(0, 20)
+              }
+              {tweet.user.name.length > 20 ? '...' : ''}
+            </div>
             {tweet.user.is_blue_verified ? (
               <Icons.verificationBadge className="size-3.5" />
             ) : null}
@@ -37,7 +49,16 @@ export const TweetCard = ({ keywords, isNew, threadGroup }: TweetCardProps) => {
             </span>
           </span>
           <span className="text-gray-500 text-sm leading-none">
-            @{tweet.user.screen_name}
+            {keywords.length > 0 
+              ? highlightText(`@${tweet.user.screen_name}`, keywords).map((content, idx) => 
+                  typeof content === 'string' ? (
+                    <span key={`screen-${idx}`}>{content}</span>
+                  ) : (
+                    content
+                  )
+                )
+              : `@${tweet.user.screen_name}`
+            }
           </span>
         </div>
       </div>

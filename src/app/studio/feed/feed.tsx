@@ -13,8 +13,6 @@ interface FeedProps {
 
 export const Feed = ({ keywords, data, containerRef }: FeedProps) => {
   const parentRef = useRef<HTMLDivElement>(null)
-  const [cardWidth, setCardWidth] = useState(384)
-  const [containerWidth, setContainerWidth] = useState(0)
   const [lanes, setLanes] = useState(3)
   const [gap, setGap] = useState(16)
 
@@ -63,7 +61,6 @@ export const Feed = ({ keywords, data, containerRef }: FeedProps) => {
       throttle((entries) => {
         for (const entry of entries) {
           const { width } = entry.contentRect
-          setContainerWidth(width)
 
           const {
             lanes: newLanes,
@@ -73,7 +70,6 @@ export const Feed = ({ keywords, data, containerRef }: FeedProps) => {
 
           setLanes(newLanes)
           setGap(newGap)
-          setCardWidth(newCardWidth)
         }
       }, 100),
     )
@@ -84,8 +80,6 @@ export const Feed = ({ keywords, data, containerRef }: FeedProps) => {
       resizeObserver.disconnect()
     }
   }, [containerRef, calculateResponsiveLayout])
-
-  const totalContentWidth = lanes * cardWidth + (lanes - 1) * gap
 
   const getJustifyClass = (lane: number) => {
     if (lanes === 1) return 'justify-center'
