@@ -116,7 +116,7 @@ export const testimonials: Testimonial[] = [
     name: 'Vikas Wakde',
     username: '@VikasWakde42',
     body: 'Loving ContentPort by @joshtriedcoding! The UI/UX is amazing and the features are so clean. Thank you for building this open source! \n\nPS: this tweet is drafted and posted by @contentport',
-    img: '/images/user/vikas_128.jpg',
+    img: '/images/user/Vikas_128.jpg',
     href: 'https://x.com/VikasWakde42/status/1951668308995911725',
     title: 'SWE',
   },
