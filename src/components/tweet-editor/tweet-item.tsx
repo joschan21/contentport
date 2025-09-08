@@ -268,6 +268,10 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
 
   // Move all the individual tweet logic here
   const handlePaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
+    if (isDrawerOpen) {
+      return
+    }
+
     const items = e.clipboardData?.items
     if (!items) return
 
