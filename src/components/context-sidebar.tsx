@@ -73,7 +73,7 @@ export const LeftSidebar = () => {
         {/* Create Group */}
         <SidebarGroup className="relative">
           {isCollapsed && (
-            <div className="absolute bottom-0 left-4 right-4 h-px bg-border/40" />
+            <div className="absolute bottom-0 left-0 right-0 border-b border-border/40" />
           )}
           <SidebarGroupLabel
             className={cn(
@@ -116,7 +116,7 @@ export const LeftSidebar = () => {
         {/* Discover Group */}
         <SidebarGroup className="relative">
           {isCollapsed && (
-            <div className="absolute bottom-0 left-4 right-4 h-px bg-border/40" />
+            <div className="absolute bottom-0 left-0 right-0 border-b border-border/40" />
           )}
           <SidebarGroupLabel
             className={cn(
@@ -159,7 +159,7 @@ export const LeftSidebar = () => {
         {/* Content Group */}
         <SidebarGroup className="relative">
           {isCollapsed && (
-            <div className="absolute bottom-0 left-4 right-4 h-px bg-border/40" />
+            <div className="absolute bottom-0 left-0 right-0 border-b border-border/40" />
           )}
           <SidebarGroupLabel
             className={cn(
@@ -257,9 +257,6 @@ export const LeftSidebar = () => {
 
         {/* Account Group */}
         <SidebarGroup className="relative">
-          {isCollapsed && (
-            <div className="absolute bottom-0 left-4 right-4 h-px bg-border/40" />
-          )}
           <SidebarGroupLabel
             className={cn(
               'transition-all duration-200 ease-out px-3',
