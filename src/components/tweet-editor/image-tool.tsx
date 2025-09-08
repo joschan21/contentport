@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Toggle } from '@/components/ui/toggle'
 import { cn } from '@/lib/utils'
 import domtoimage from 'dom-to-image'
-import { Grip, ImagePlus } from 'lucide-react'
+import { Grip, ImagePlus, MousePointer } from 'lucide-react'
 import { PropsWithChildren, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { EnhancedSlider } from '../ui/enhanced-slider'
@@ -566,6 +566,12 @@ export function ImageTool({
     graphpaper: '225%',
   }
 
+  const handleClickExampleImage = () => {
+    setBlob({
+      src: '/images/image-example-image-editor.png',
+    })
+  }
+
   return (
     <div className="flex flex-col pt-1" data-vaul-no-drag>
       <div className="relative w-full flex justify-between gap-6">
@@ -869,6 +875,16 @@ export function ImageTool({
                         ⌘V
                       </span>
                       <span>to paste</span>
+                    </div>
+                    <div className="border-b border-stone-200 w-[300px]"></div>
+                    <div
+                      className="w-[150px] flex flex-col items-center gap-2 text-xs text-stone-400 "
+                      onClick={() => handleClickExampleImage()}
+                    >
+                      <div className="mt-2 border border-dashed border-stone-300 rounded-full p-3 w-12 h-12 flex items-center justify-center group">
+                        <MousePointer className="size-6 text-stone-300 group-hover:scale-125 group-hover:text-indigo-500 transition-all duration-100"></MousePointer>
+                      </div>
+                      <span>Try demo image</span>
                     </div>
                   </div>
                 </div>
