@@ -1,8 +1,8 @@
 'use client'
 
-import { ConfettiProvider } from '@/hooks/use-confetti'
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HTTPException } from 'hono/http-exception'
+import { ThemeProvider as NextThemesProvider } from "next-themes"
 import { ReactNode, useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -11,6 +11,30 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
+  return (
+    <QueryProvider>
+      <ThemeProvider>
+        {children}
+      </ThemeProvider>
+    </QueryProvider>
+  )
+}
+
+function ThemeProvider({
+  children,
+}: { children: ReactNode }) {
+  return (
+    <NextThemesProvider 
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange>
+      {children}
+    </NextThemesProvider>
+  )
+}
+
+function QueryProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({

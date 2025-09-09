@@ -43,11 +43,11 @@ const testimonials = organizeTestimonials(transformedTestimonials)
 
 export default function Example() {
   return (
-    <div className="relative isolate bg-white">
+    <div className="relative isolate bg-white dark:bg-zinc-900">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 grid-rows-1 gap-8 text-sm/6 text-gray-900 sm:mt-20 sm:grid-cols-2 xl:mx-0 xl:max-w-none xl:grid-flow-col xl:grid-cols-4">
-          <figure className="rounded-2xl bg-white shadow-lg ring-1 ring-gray-900/5 sm:col-span-2 xl:col-start-2 xl:row-end-1">
-            <blockquote className="p-6 space-y-4 whitespace-pre-wrap text-lg font-semibold tracking-tight text-gray-900 sm:p-10 sm:text-xl/8">
+        <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 grid-rows-1 gap-8 text-sm/6 text-gray-900 dark:text-white sm:mt-20 sm:grid-cols-2 xl:mx-0 xl:max-w-none xl:grid-flow-col xl:grid-cols-4">
+          <figure className="rounded-2xl bg-white dark:bg-zinc-800 shadow-lg ring-1 ring-gray-900/5 dark:ring-zinc-700 sm:col-span-2 xl:col-start-2 xl:row-end-1">
+            <blockquote className="p-6 space-y-4 whitespace-pre-wrap text-lg font-semibold tracking-tight text-gray-900 dark:text-white sm:p-10 sm:text-xl/8">
               {featuredTestimonial.body.split('\n\n').map((part, index) => (
                 <p key={index}>{part}</p>
               ))}
@@ -59,10 +59,10 @@ export default function Example() {
                 className="size-10 flex-none rounded-full bg-gray-50"
               />
               <div className="flex-auto">
-                <p className="font-semibold text-gray-900 leading-none">
+                <p className="font-semibold text-gray-900 dark:text-white leading-none">
                   {featuredTestimonial.author.name}
                 </p>
-                <p className="text-gray-600">{`@${featuredTestimonial.author.handle} `}</p>
+                <p className="text-gray-600 dark:text-zinc-500">{`@${featuredTestimonial.author.handle} `}</p>
               </div>
             </figcaption>
           </figure>
@@ -83,9 +83,9 @@ export default function Example() {
                   {column.map((testimonial) => (
                     <figure
                       key={testimonial.author.handle}
-                      className="rounded-2xl bg-white p-6 shadow-lg ring-1 ring-gray-900/5"
+                      className="rounded-2xl bg-white dark:bg-zinc-800 p-6 shadow-lg ring-1 ring-gray-900/5 dark:ring-zinc-700"
                     >
-                      <blockquote className="text-gray-900">
+                      <blockquote className="text-gray-900 dark:text-white">
                         <p className="whitespace-pre-wrap">{testimonial.body}</p>
                       </blockquote>
                       <figcaption className="mt-6 flex items-center gap-x-4">
@@ -95,10 +95,10 @@ export default function Example() {
                           className="size-10 rounded-full bg-gray-50"
                         />
                         <div>
-                          <p className="font-semibold text-gray-900 leading-none">
+                          <p className="font-semibold text-gray-900 dark:text-white leading-none">
                             {testimonial.author.name}
                           </p>
-                          <p className="text-gray-600">{`@${testimonial.author.handle} `}</p>
+                          <p className="text-gray-600 dark:text-zinc-500">{`@${testimonial.author.handle} `}</p>
                         </div>
                       </figcaption>
                     </figure>
