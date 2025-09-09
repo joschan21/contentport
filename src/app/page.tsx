@@ -1,23 +1,22 @@
-import TestimonialCard from '@/frontend/studio/components/TestimonialCard'
 import { LogoCloud } from '@/components/logo-cloud'
 import Navbar from '@/components/navbar'
 import DuolingoButton from '@/components/ui/duolingo-button'
+import Pricing from '@/frontend/studio/components/Pricing'
+import TestimonialCard from '@/frontend/studio/components/TestimonialCard'
 import { auth } from '@/lib/auth'
 import MuxPlayer from '@mux/mux-player-react'
 import { headers } from 'next/headers'
 import Link from 'next/link'
-import Script from 'next/script'
-import Pricing from '@/frontend/studio/components/Pricing'
 
 const Footer = () => {
   return (
-    <footer className="bg-white border-t border-gray-200">
+    <footer className="bg-white dark:bg-zinc-900 border-t border-gray-200 dark:border-zinc-800">
       <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12">
         <div className="text-center space-y-4">
-          <p className="text-gray-600 text-base">
+          <p className="text-gray-600 dark:text-zinc-500 text-base">
             Your content engine for growing on Twitter.
           </p>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-500 dark:text-zinc-600  text-sm">
             © 2025 Contentport.
           </p>
         </div>
@@ -33,17 +32,17 @@ const Page = async () => {
 
   return (
     <>
-      <section className="bg-gray-100">
+      <section className="bg-gray-100 dark:bg-zinc-900">
         <div className="relative max-w-7xl mx-auto">
           <Navbar title={session ? 'Studio' : 'Get Started'} />
         </div>
 
-        <div className="relative isolate pt-20">
+        <div className="relative isolate pt-32">
           <section className="py-24">
             <div className="mx-auto max-w-7xl px-6 lg:px-8 space-y-20">
               <div className="max-w-4xl mx-auto text-center">
                 <div className="flex flex-col justify-center items-center">
-                  <h1 className="text-5xl font-semibold tracking-tight text-balance text-gray-900 sm:text-6xl">
+                  <h1 className="text-5xl font-semibold tracking-tight text-balance text-gray-900 dark:text-white sm:text-6xl">
                     Your{' '}
                     <span className="relative whitespace-nowrap text-indigo-600">
                       <span className="absolute z-0 bg-indigo-500/10 w-[103%] h-[100%] -left-[1%] -top-[2.5%] -rotate-1" />
@@ -51,9 +50,9 @@ const Page = async () => {
                     </span>{' '}
                     for growing on Twitter
                   </h1>
-                  <p className="mt-6 text-gray-500 text-lg sm:text-xl max-w-2xl">
+                  <p className="mt-6 text-gray-500 dark:text-zinc-500 text-lg sm:text-xl max-w-2xl">
                     Contentport helps you{' '}
-                    <span className="text-gray-900">
+                    <span className="text-gray-900 dark:text-white">
                       create, schedule & manage twitter content
                     </span>{' '}
                     at scale. Perfect for busy founders & content managers.
@@ -79,27 +78,27 @@ const Page = async () => {
                     <div className="mt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
                       <div className="flex -space-x-2">
                         <img
-                          className="h-10 w-10 rounded-full ring-2 ring-white"
+                          className="h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-800"
                           src="/images/user/ahmet_128.png"
                           alt="User testimonial"
                         />
                         <img
-                          className="h-10 w-10 rounded-full ring-2 ring-white"
+                          className="h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-800"
                           src="/images/user/chris_128.png"
                           alt="User testimonial"
                         />
                         <img
-                          className="h-10 w-10 rounded-full ring-2 ring-white"
+                          className="h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-800"
                           src="/images/user/justin_128.png"
                           alt="User testimonial"
                         />
                         <img
-                          className="h-10 w-10 rounded-full ring-2 ring-white"
+                          className="h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-800"
                           src="/images/user/rohit_128.png"
                           alt="User testimonial"
                         />
                         <img
-                          className="h-10 w-10 rounded-full ring-2 ring-white"
+                          className="h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-800"
                           src="/images/user/vladan_128.png"
                           alt="User testimonial"
                         />
@@ -116,9 +115,9 @@ const Page = async () => {
                             </svg>
                           ))}
                         </div>
-                        <p className="text-base text-left text-gray-600">
+                        <p className="text-base text-left text-gray-600 dark:text-zinc-500">
                           Trusted by{' '}
-                          <span className="font-medium text-gray-900">1.370</span>{' '}
+                          <span className="font-medium text-gray-900 dark:text-white">1.370</span>{' '}
                           founders
                         </p>
                       </div>
@@ -127,11 +126,10 @@ const Page = async () => {
                 </div>
               </div>
 
-              <div className="relative flex items-center h-fit -m-2 rounded-xl bg-gray-900/5 p-2 ring-1 ring-gray-900/10 ring-inset lg:-m-4 lg:rounded-2xl lg:p-4 shadow-2xl">
+              <div className="relative z-0 flex items-center h-fit -m-2 rounded-xl bg-white/15 dark:bg-white/5 p-2 ring-1 ring-zinc-300/50 dark:ring-white/10 ring-inset lg:-m-4 lg:rounded-2xl lg:p-2.5 shadow-2xl backdrop-blur-sm after:absolute after:inset-0 after:bg-indigo-500 after:-z-10 after:rounded-xl after:filter after:blur-xl after:opacity-25">
                 <MuxPlayer
                   accentColor="#4f46e5"
-                  style={{ aspectRatio: 16 / 9 }}
-                  className="w-full h-full overflow-hidden rounded-lg lg:rounded-xl shadow-lg"
+                  className="w-full h-full overflow-hidden rounded-lg lg:rounded-xl shadow-lg aspect-video border dark:border-white/10"
                   poster="https://image.mux.com/01ddBxgG7W53ZCMZ02LLP692sLD4w009XzUtoCd00NcSBO8/thumbnail.png?time=10"
                   playbackId="01ddBxgG7W53ZCMZ02LLP692sLD4w009XzUtoCd00NcSBO8"
                   playsInline
@@ -142,17 +140,17 @@ const Page = async () => {
             </div>
           </section>
 
-          <section className="py-24 bg-white">
+          <section className="py-24 bg-white dark:bg-zinc-800">
             <div className="mx-auto max-w-7xl px-6 lg:px-8">
               <div className="text-center mb-16">
-                <h2 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+                <h2 className="text-4xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
                   How does Contentport compare?
                 </h2>
               </div>
 
               <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
                 <div className="relative">
-                  <div className="rounded-3xl border-4 border-gray-200 bg-gray-100 p-8 h-full">
+                  <div className="rounded-3xl border-4 border-gray-200 dark:border-zinc-600 bg-gray-100 dark:bg-zinc-700 p-8 h-full">
                     <div className="text-left">
                       <div className="w-full h-80 bg-gray-100 rounded-2xl mb-6 overflow-hidden">
                         <img
@@ -161,7 +159,7 @@ const Page = async () => {
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <h3 className="text-2xl sm:text-3xl  font-semibold text-gray-900 mb-6">
+                      <h3 className="text-2xl sm:text-3xl  font-semibold text-gray-900 dark:text-white mb-6">
                         Competitors
                       </h3>
                     </div>
@@ -179,7 +177,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 dark:text-zinc-300">
                           Can't manage multiple accounts / pay per account
                         </p>
                       </div>
@@ -195,7 +193,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 dark:text-zinc-300">
                           Tweets look boring & perform poorly
                         </p>
                       </div>
@@ -211,7 +209,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">Outdated AI models from 2024</p>
+                        <p className="text-gray-600 dark:text-zinc-300">Outdated AI models from 2024</p>
                       </div>
                       <div className="flex items-start gap-3">
                         <svg
@@ -225,7 +223,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">Closed source, zero transparency</p>
+                        <p className="text-gray-600 dark:text-zinc-300">Closed source, zero transparency</p>
                       </div>
                       <div className="flex items-start gap-3">
                         <svg
@@ -239,7 +237,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 dark:text-zinc-300">
                           Generic output that tries to work for everyone
                         </p>
                       </div>
@@ -248,7 +246,7 @@ const Page = async () => {
                 </div>
 
                 <div className="relative">
-                  <div className="rounded-3xl border-4 border-indigo-600 bg-gray-100 p-8 h-full text-white">
+                  <div className="rounded-3xl border-4 border-indigo-600 dark:border-indigo-500 bg-gray-100 dark:bg-zinc-700 p-8 h-full text-white">
                     <div className="text-left">
                       <div className="w-full h-80 bg-purple-800/30 rounded-2xl mb-6 overflow-hidden border border-purple-400/20">
                         <img
@@ -257,7 +255,7 @@ const Page = async () => {
                           className="w-full h-full object-cover object-top opacity-90"
                         />
                       </div>
-                      <h3 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-6">
+                      <h3 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-6">
                         Contentport
                       </h3>
                     </div>
@@ -275,7 +273,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 dark:text-zinc-400">
                           All personal & company accounts in one place
                         </p>
                       </div>
@@ -291,7 +289,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 dark:text-zinc-400">
                           Create beautiful tweet visuals without design skills
                         </p>
                       </div>
@@ -307,7 +305,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 dark:text-zinc-400">
                           The most modern AI models available
                         </p>
                       </div>
@@ -323,7 +321,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 dark:text-zinc-400">
                           100% open-source, transparent & auditable
                         </p>
                       </div>
@@ -339,7 +337,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 dark:text-zinc-400">
                           Designed for technical founders & content managers
                         </p>
                       </div>
@@ -352,12 +350,12 @@ const Page = async () => {
 
           <section className="py-24">
             <div className="space-y-12">
-              <h2 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl text-center">
+              <h2 className="text-4xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-5xl text-center">
                 <span className="relative text-indigo-600">
                   <span className="absolute z-0 bg-indigo-500/10 w-[105%] h-[105%] -left-[2.5%] -top-[2.5%] -rotate-1" />
                   Within 60 seconds:
                 </span>
-                <span className="block mt-4 text-gray-800 text-3xl sm:text-4xl space-y-2">
+                <span className="block mt-4 text-gray-800 dark:text-zinc-200 text-3xl sm:text-4xl space-y-2">
                   <span className="block opacity-70">get an idea.</span>
                   <span className="block opacity-80">draft a tweet.</span>
                   <span className="block opacity-90">add a beautiful visual.</span>
@@ -376,10 +374,10 @@ const Page = async () => {
             </div>
           </section>
 
-          <section className="py-24 bg-white">
+          <section className="py-24 bg-white dark:bg-zinc-900">
             <div className="space-y-12">
               <div className="text-center max-w-3xl mx-auto">
-                <h2 className="text-4xl text-balance font-semibold tracking-tight text-gray-900 sm:text-5xl">
+                <h2 className="text-4xl text-balance font-semibold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
                   Used by busy founders & content managers
                 </h2>
               </div>
@@ -399,7 +397,7 @@ const Page = async () => {
             <div className="mx-auto max-w-7xl px-6 lg:px-8">
               <div className="space-y-6">
                 <div className="text-center max-w-3xl mx-auto">
-                  <h2 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+                  <h2 className="text-4xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
                     What you can achieve with Contentport{' '}
                     <span className="relative text-indigo-600">
                       <span className="absolute z-0 bg-indigo-500/10 w-[105%] h-[105%] -left-[2.5%] -top-[2.5%] -rotate-1" />
@@ -413,8 +411,8 @@ const Page = async () => {
                     <div className="px-8 py-3 bg-gray-800 text-white rounded-full text-sm font-medium mb-4 w-fit mx-auto">
                       Today
                     </div>
-                    <div className="bg-white border border-gray-200 rounded-2xl p-8 space-y-6">
-                      <h3 className="text-xl font-semibold text-gray-900">
+                    <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl p-8 space-y-6">
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                         Start creating
                       </h3>
                       <div className="space-y-4">
@@ -430,7 +428,7 @@ const Page = async () => {
                               clipRule="evenodd"
                             />
                           </svg>
-                          <p className="text-gray-600">Contentport learns your style</p>
+                          <p className="text-gray-600 dark:text-zinc-400">Contentport learns your style</p>
                         </div>
                         <div className="flex items-start gap-3">
                           <svg
@@ -444,7 +442,7 @@ const Page = async () => {
                               clipRule="evenodd"
                             />
                           </svg>
-                          <p className="text-gray-600">
+                          <p className="text-gray-600 dark:text-zinc-400">
                             Go from idea to ready-to-post tweets
                           </p>
                         </div>
@@ -460,7 +458,7 @@ const Page = async () => {
                               clipRule="evenodd"
                             />
                           </svg>
-                          <p className="text-gray-600">
+                          <p className="text-gray-600 dark:text-zinc-400">
                             Queue 3+ days of content so you're instantly consistent
                           </p>
                         </div>
@@ -469,11 +467,11 @@ const Page = async () => {
                   </div>
 
                   <div>
-                    <div className="px-8 py-3 bg-gray-200 text-gray-600 rounded-full text-sm font-medium mb-4 w-fit mx-auto">
+                    <div className="px-8 py-3 bg-gray-200 dark:bg-zinc-700 text-gray-600 dark:text-zinc-300 rounded-full text-sm font-medium mb-4 w-fit mx-auto">
                       Day 3
                     </div>
-                    <div className="bg-white border border-gray-200 rounded-2xl p-8 space-y-6">
-                      <h3 className="text-xl font-semibold text-gray-900">
+                    <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl p-8 space-y-6">
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                         Grow without losing focus
                       </h3>
                       <div className="space-y-4">
@@ -489,7 +487,7 @@ const Page = async () => {
                               clipRule="evenodd"
                             />
                           </svg>
-                          <p className="text-gray-600">
+                          <p className="text-gray-600 dark:text-zinc-400">
                             Multiple posts lined up and scheduled
                           </p>
                         </div>
@@ -505,7 +503,7 @@ const Page = async () => {
                               clipRule="evenodd"
                             />
                           </svg>
-                          <p className="text-gray-600">
+                          <p className="text-gray-600 dark:text-zinc-400">
                             You keep posting, even when you're busy coding
                           </p>
                         </div>
@@ -521,18 +519,18 @@ const Page = async () => {
                               clipRule="evenodd"
                             />
                           </svg>
-                          <p className="text-gray-600">Engagement starts building</p>
+                          <p className="text-gray-600 dark:text-zinc-400">Engagement starts building</p>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <div className="px-8 py-3 bg-gray-200 text-gray-600 rounded-full text-sm font-medium mb-4 w-fit mx-auto">
+                    <div className="px-8 py-3 bg-gray-200 dark:bg-zinc-700 text-gray-600 dark:text-zinc-300 rounded-full text-sm font-medium mb-4 w-fit mx-auto">
                       Day 7
                     </div>
-                    <div className="bg-white border border-gray-200 rounded-2xl p-8 space-y-6">
-                      <h3 className="text-xl font-semibold text-gray-900">
+                    <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl p-8 space-y-6">
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                         Build a system
                       </h3>
                       <div className="space-y-4">
@@ -548,7 +546,7 @@ const Page = async () => {
                               clipRule="evenodd"
                             />
                           </svg>
-                          <p className="text-gray-600">
+                          <p className="text-gray-600 dark:text-zinc-400">
                             Save 5+ hours per week on content creation{' '}
                           </p>
                         </div>
@@ -564,7 +562,7 @@ const Page = async () => {
                               clipRule="evenodd"
                             />
                           </svg>
-                          <p className="text-gray-600">
+                          <p className="text-gray-600 dark:text-zinc-400">
                             Post consistently, even on busy days
                           </p>
                         </div>
@@ -580,7 +578,7 @@ const Page = async () => {
                               clipRule="evenodd"
                             />
                           </svg>
-                          <p className="text-gray-600">Repeatable, proven workflow</p>
+                          <p className="text-gray-600 dark:text-zinc-400">Repeatable, proven workflow</p>
                         </div>
                       </div>
                     </div>
@@ -601,7 +599,7 @@ const Page = async () => {
           </section>
 
           {/* Pricing */}
-          <section className=" bg-white ">
+          <section className=" bg-white dark:bg-zinc-900">
             <div className="mx-auto max-w-7xl px-6 lg:px-8">
               <Pricing targetUrl="/login" />
             </div>

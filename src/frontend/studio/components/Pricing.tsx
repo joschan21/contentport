@@ -1,8 +1,7 @@
 'use client'
-import { cn } from '@/lib/utils'
-import dynamic from 'next/dynamic'
-import { CheckIcon } from '@phosphor-icons/react'
 import DuolingoButton from '@/components/ui/duolingo-button'
+import { cn } from '@/lib/utils'
+import { CheckIcon } from '@phosphor-icons/react'
 import Link from 'next/link'
 
 interface PricingProps {
@@ -49,7 +48,7 @@ export default function Pricing({ targetUrl }: PricingProps) {
     },
   ]
   return (
-    <div className="relative isolate bg-white px-6 py-24">
+    <div className="relative isolate bg-white dark:bg-zinc-900 px-6 py-24">
       <div
         aria-hidden="true"
         className="absolute inset-x-0 -top-3 -z-10 transform-gpu overflow-hidden px-36 blur-3xl"
@@ -64,7 +63,7 @@ export default function Pricing({ targetUrl }: PricingProps) {
       </div>
       <div className="mx-auto max-w-4xl text-center">
         <h2 className="text-base/7 font-semibold text-indigo-600">Pricing</h2>
-        <p className="mt-2 text-5xl font-semibold tracking-tight text-balance text-gray-900 sm:text-6xl">
+        <p className="mt-2 text-5xl font-semibold tracking-tight text-balance text-gray-900 dark:text-white sm:text-6xl">
           Get started with Contentport
         </p>
       </div>
@@ -73,15 +72,20 @@ export default function Pricing({ targetUrl }: PricingProps) {
           <div
             key={tier.id}
             className={cn(
-              tier.featured
-                ? 'relative bg-gray-900 shadow-2xl'
-                : 'bg-white/60 sm:mx-8 lg:mx-0',
+              {
+                'relative bg-gray-900 dark:bg-slate-800 shadow-2xl': tier.featured,
+                'bg-white/60 dark:bg-zinc-800 sm:mx-8 lg:mx-0': !tier.featured,
+              },
               tier.featured
                 ? ''
                 : tierIdx === 0
                   ? 'rounded-t-3xl sm:rounded-b-none lg:rounded-tr-none lg:rounded-bl-3xl'
                   : 'sm:rounded-t-none lg:rounded-tr-3xl lg:rounded-bl-none',
-              'rounded-3xl p-8 ring-1 ring-gray-900/10 sm:p-10',
+              'rounded-3xl p-8 ring-1 ring-gray-900/10  sm:p-10',
+              {
+                'dark:ring-slate-700': tier.featured,
+                'dark:ring-zinc-700': !tier.featured,
+              }
             )}
           >
             {/* Most value badge for Pro plan */}
@@ -105,7 +109,7 @@ export default function Pricing({ targetUrl }: PricingProps) {
             <p className="mt-4 flex items-baseline gap-x-2">
               <span
                 className={cn(
-                  tier.featured ? 'text-white' : 'text-gray-900',
+                  tier.featured ? 'text-white' : 'text-gray-900 dark:text-zinc-300',
                   'text-5xl font-semibold tracking-tight',
                 )}
               >
@@ -113,7 +117,7 @@ export default function Pricing({ targetUrl }: PricingProps) {
               </span>
               <span
                 className={cn(
-                  tier.featured ? 'text-gray-400' : 'text-gray-500',
+                  tier.featured ? 'text-gray-400' : 'text-gray-500 dark:text-zinc-500',
                   'text-base',
                 )}
               >
@@ -122,7 +126,7 @@ export default function Pricing({ targetUrl }: PricingProps) {
             </p>
             <p
               className={cn(
-                tier.featured ? 'text-gray-300' : 'text-gray-600',
+                tier.featured ? 'text-gray-300 dark:text-white' : 'text-gray-600 dark:text-zinc-400',
                 'mt-6 text-base/7',
               )}
             >
@@ -131,7 +135,7 @@ export default function Pricing({ targetUrl }: PricingProps) {
             <ul
               role="list"
               className={cn(
-                tier.featured ? 'text-gray-300' : 'text-gray-600',
+                tier.featured ? 'text-gray-300 dark:text-zinc-200' : 'text-gray-600 dark:text-zinc-400',
                 'mt-8 space-y-3 text-sm/6 sm:mt-10',
               )}
             >

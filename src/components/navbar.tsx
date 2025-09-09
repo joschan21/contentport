@@ -1,13 +1,13 @@
 'use client'
 
-import * as React from 'react'
 import { Icons } from '@/components/icons'
 import { baseStyles, sizeStyles, variantStyles } from '@/components/ui/duolingo-button'
+import { GITHUB_REPO } from '@/constants/misc'
+import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 import { Menu, X } from 'lucide-react'
 import Link from 'next/link'
-import { GITHUB_REPO } from '@/constants/misc'
-import { authClient } from '@/lib/auth-client'
+import * as React from 'react'
 
 const Logo = ({ className }: { className?: string }) => (
   <Link href="/" className={cn('-m-1.5 p-1.5 flex items-center gap-1.5', className)}>
@@ -28,7 +28,7 @@ const NavigationLinks = ({
       href={`https://github.com/${GITHUB_REPO}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-gray-700 w-fit hover:text-gray-900 transition-colors font-medium"
+      className="text-gray-700 dark:text-white w-fit hover:text-gray-900 transition-colors font-medium"
     >
       GitHub
     </Link>
@@ -80,9 +80,9 @@ const Navbar = ({ title }: { title: string }) => {
   return (
     <>
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-[50] bg-black bg-opacity-50" />
+        <div className="fixed inset-0 z-[50] bg-black bg-opacity-50 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
       )}
-      <header className="fixed inset-x-0 top-0 z-50 bg-white/80 backdrop-blur-md border-b border-black border-opacity-[0.1] h-16">
+      <header className="fixed inset-x-0 top-0 z-50 bg-white/80 dark:bg-zinc-800/60 backdrop-blur-md border-b dark:border-zinc-700/60 h-16">
         <nav className="max-w-7xl mx-auto h-full flex items-center px-6 lg:px-8">
           <div className="flex sm:flex-1">
             <Logo />
@@ -91,7 +91,7 @@ const Navbar = ({ title }: { title: string }) => {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
+              className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700 dark:text-white"
             >
               <span className="sr-only">Open main menu</span>
               <Menu aria-hidden="true" className="size-6" />
@@ -108,13 +108,13 @@ const Navbar = ({ title }: { title: string }) => {
               mobileMenuOpen ? 'fixed inset-0 z-[100]' : 'hidden',
             )}
           >
-            <div className="absolute top-0 inset-x-0 bg-white right-0 z-[100] w-full overflow-y-auto px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
+            <div className="absolute top-0 inset-x-0 bg-white dark:bg-zinc-900 right-0 z-[100] w-full overflow-y-auto px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
               <div className="flex items-center justify-between">
                 <Logo />
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="-m-2.5 rounded-md p-2.5 text-gray-700"
+                  className="-m-2.5 rounded-md p-2.5 text-gray-700 dark:text-zinc-400"
                 >
                   <span className="sr-only">Close menu</span>
                   <X aria-hidden="true" className="size-6" />
