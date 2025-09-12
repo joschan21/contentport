@@ -2,16 +2,6 @@
 
 import { ArrowUp, History, Paperclip, Plus, RotateCcw, Square, X } from 'lucide-react'
 import { useCallback, useContext, useEffect, useState } from 'react'
-
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarHeader,
-  SidebarRail,
-  useSidebar,
-} from '@/components/ui/sidebar'
 import { useAttachments } from '@/hooks/use-attachments'
 import { useChatContext } from '@/hooks/use-chat'
 import { client } from '@/lib/client'
@@ -52,17 +42,29 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { MemoryTweet, PayloadTweet, useTweetsV2 } from '@/hooks/use-tweets-v2'
+import Link from 'next/link'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarRail,
+  useSidebar,
+} from './ui/sidebar'
 
 const ChatInput = ({
   onSubmit,
   onStop,
   disabled,
   handleFilesAdded,
+  aiChatLimitData,
 }: {
   onSubmit: (text: string) => void
   onStop: () => void
   disabled: boolean
   handleFilesAdded: (files: File[]) => void
+  aiChatLimitData?: { remaining: number; reset: number }
 }) => {
   const [editor] = useLexicalComposerContext()
   const { isDragging } = useContext(FileUploadContext)
@@ -208,7 +210,7 @@ const ChatInput = ({
               </p>
             </div>
           )}
-          <div className="relative">
+          <div className="flex flex-col justify-start">
             <div
               className={`rounded-xl bg-white border-2 shadow-[0_2px_0_#E5E7EB] font-medium transition-all duration-300 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-600 ${
                 isDragging
@@ -242,26 +244,46 @@ const ChatInput = ({
                   <KnowledgeSelector onSelectDocument={handleAddKnowledgeDoc} />
                 </div>
 
-                {disabled ? (
-                  <DuolingoButton
-                    onClick={onStop}
-                    variant="icon"
-                    size="icon"
-                    aria-label="Stop message"
-                  >
-                    <Square className="size-3 fill-white" />
-                  </DuolingoButton>
-                ) : (
-                  <DuolingoButton
-                    disabled={hasUploading}
-                    onClick={handleSubmit}
-                    variant="icon"
-                    size="icon"
-                    aria-label="Send message"
-                  >
-                    <ArrowUp className="size-5" />
-                  </DuolingoButton>
-                )}
+                <div className="flex items-center gap-2">
+                  <div className="text-right text-balance text-xs text-gray-500">
+                    {aiChatLimitData &&
+                      (aiChatLimitData.remaining === 0 ? (
+                        <>
+                          Out of credits. Unlock unlimited AI with{' '}
+                          <Link
+                            href="/studio/settings"
+                            className="text-indigo-600 hover:text-indigo-700"
+                          >
+                            Pro
+                          </Link>
+                          !
+                        </>
+                      ) : (
+                        `${aiChatLimitData.remaining} ${aiChatLimitData.remaining === 1 ? 'credit' : 'credits'} remaining today`
+                      ))}
+                  </div>
+
+                  {disabled ? (
+                    <DuolingoButton
+                      onClick={onStop}
+                      variant="icon"
+                      size="icon"
+                      aria-label="Stop message"
+                    >
+                      <Square className="size-3 fill-white" />
+                    </DuolingoButton>
+                  ) : (
+                    <DuolingoButton
+                      disabled={hasUploading}
+                      onClick={handleSubmit}
+                      variant="icon"
+                      size="icon"
+                      aria-label="Send message"
+                    >
+                      <ArrowUp className="size-5" />
+                    </DuolingoButton>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -286,6 +308,15 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     },
     enabled: isHistoryOpen,
   })
+
+  const { data: aiChatLimitData } = useQuery({
+    queryKey: ['ai-usage-credits'],
+    queryFn: async () => {
+      const res = await client.chat.getLimit.$get()
+      return await res.json()
+    },
+  })
+
   const { tweets, toPayloadTweet } = useTweetsV2()
 
   const { messages, status, sendMessage, startNewChat, id, stop } = useChatContext()
@@ -302,9 +333,21 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     [router],
   )
 
+  const queryClient = useQueryClient()
+
   const handleSubmit = useCallback(
     async (text: string) => {
       if (!text.trim()) return
+
+      queryClient.setQueryData(['ai-usage-credits'], (oldData: any) => {
+        if (oldData) {
+          return {
+            ...oldData,
+            remaining: Math.max(0, oldData.remaining - 1),
+          }
+        }
+        return oldData
+      })
 
       if (!Boolean(searchParams.get('chatId'))) {
         updateURL('chatId', id)
@@ -544,6 +587,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
               onSubmit={handleSubmit}
               handleFilesAdded={handleFilesAdded}
               disabled={status === 'submitted' || status === 'streaming'}
+              aiChatLimitData={aiChatLimitData}
             />
           </FileUpload>
         </SidebarFooter>

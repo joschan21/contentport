@@ -1,11 +1,19 @@
 import { client } from '@/lib/client'
 import { MyUIMessage } from '@/server/routers/chat/chat-router'
 import { useChat } from '@ai-sdk/react'
-import { useQuery } from '@tanstack/react-query'
+import { QueryClient, useQuery } from '@tanstack/react-query'
 import { DefaultChatTransport } from 'ai'
 import { nanoid } from 'nanoid'
 import { Options, useQueryState } from 'nuqs'
-import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  createContext,
+  PropsWithChildren,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react'
 import toast from 'react-hot-toast'
 
 interface ChatContext extends ReturnType<typeof useChat<MyUIMessage>> {
@@ -21,6 +29,8 @@ const ChatContext = createContext<ChatContext | null>(null)
 const defaultValue = nanoid()
 
 export const ChatProvider = ({ children }: PropsWithChildren) => {
+  const queryClient = useQueryClient()
+
   const [id, setId] = useQueryState('chatId', {
     defaultValue,
   })
@@ -41,6 +51,9 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
     onError: ({ message }) => {
       toast.error(message)
     },
+    onFinish: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-usage-credits'] })
+    },
   })
 
   const { data } = useQuery({
@@ -58,17 +71,16 @@ export const ChatProvider = ({ children }: PropsWithChildren) => {
     chat.setMessages(data.messages)
   }, [data])
 
-  const contextValue = useMemo(() => ({ 
-    ...chat, 
-    startNewChat, 
-    setId 
-  }), [chat, startNewChat, setId])
-
-  return (
-    <ChatContext.Provider value={contextValue}>
-      {children}
-    </ChatContext.Provider>
+  const contextValue = useMemo(
+    () => ({
+      ...chat,
+      startNewChat,
+      setId,
+    }),
+    [chat, startNewChat, setId],
   )
+
+  return <ChatContext.Provider value={contextValue}>{children}</ChatContext.Provider>
 }
 
 export function useChatContext() {

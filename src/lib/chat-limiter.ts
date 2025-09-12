@@ -1,7 +1,12 @@
-import { Ratelimit } from "@upstash/ratelimit"
-import { redis } from "./redis"
+import { Ratelimit } from '@upstash/ratelimit'
+import { redis } from './redis'
 
-export const chatLimiter = new Ratelimit({
+export const freeChatLimiter = new Ratelimit({
   redis,
-  limiter: Ratelimit.fixedWindow(20, "1d"),
+  limiter: Ratelimit.fixedWindow(5, '1d'),
+})
+
+export const proChatLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(80, '4h'),
 })
