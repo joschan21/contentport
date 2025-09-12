@@ -1,6 +1,5 @@
 import { db } from '@/db'
 import { account as accountSchema } from '@/db/schema'
-import { chatLimiter } from '@/lib/chat-limiter'
 import { redis } from '@/lib/redis'
 import { and, desc, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
@@ -18,13 +17,6 @@ export type Account = {
 }
 
 export const settingsRouter = j.router({
-  limit: privateProcedure.get(async ({ c, ctx }) => {
-    const { user } = ctx
-    const { remaining, reset } = await chatLimiter.getRemaining(user.email)
-
-    return c.json({ remaining, reset })
-  }),
-
   delete_account: privateProcedure
     .input(
       z.object({

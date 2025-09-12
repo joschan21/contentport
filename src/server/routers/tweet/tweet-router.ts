@@ -41,6 +41,26 @@ async function getFutureScheduledTweetsCount(
   return futureScheduledTweets.length
 }
 
+const CHARACTER_LIMIT_FREE_PLAN_TWITTER_USER = 280
+
+const assertTweetsWithinLimit = (thread: { content: string }[]): boolean => {
+  for (const currentTweet of thread) {
+    const lengthOfCurrentTweet = (currentTweet.content ?? '').length
+    if (lengthOfCurrentTweet > CHARACTER_LIMIT_FREE_PLAN_TWITTER_USER) {
+      return false
+    }
+  }
+  return true
+}
+
+const assertScheduledTweetsWithinLimit = async (
+  userId: string,
+  accountId: string,
+): Promise<boolean> => {
+  const currentScheduledCount = await getFutureScheduledTweetsCount(userId, accountId)
+  return currentScheduledCount < 3
+}
+
 const consumerKey = process.env.TWITTER_CONSUMER_KEY as string
 const consumerSecret = process.env.TWITTER_CONSUMER_SECRET as string
 
@@ -383,16 +403,18 @@ export const tweetRouter = j.router({
       }
 
       if (user.plan !== 'pro') {
-        const currentScheduledCount = await getFutureScheduledTweetsCount(
-          user.id,
-          account.id,
-        )
-        if (currentScheduledCount >= 3) {
+        if (!(await assertScheduledTweetsWithinLimit(user.id, account.id))) {
           throw new HTTPException(402, {
             message:
               'Free plan scheduling limit reached. You can only have 3 scheduled posts at a time. Upgrade to Pro to schedule unlimited tweets.',
           })
         }
+      }
+
+      if (!account.verified && !assertTweetsWithinLimit(thread)) {
+        throw new HTTPException(400, {
+          message: `Twitter limit is 280 characters. One of your tweets in the thread exceeds this limit. Upgrade to X Premium for longer posts.`,
+        })
       }
 
       const tweetId = crypto.randomUUID()
@@ -829,6 +851,13 @@ export const tweetRouter = j.router({
         })
       }
 
+      if (user.plan !== 'pro' && !assertTweetsWithinLimit(thread)) {
+        throw new HTTPException(400, {
+          message:
+            'Twitter limit is 280 characters. One of your tweets in the thread exceeds this limit. Upgrade to X Premium for longer posts.',
+        })
+      }
+
       try {
         const generatedIds = thread.map(() => crypto.randomUUID())
 
@@ -912,14 +941,16 @@ export const tweetRouter = j.router({
       }
 
       if (user.plan !== 'pro') {
-        const currentScheduledCount = await getFutureScheduledTweetsCount(
-          user.id,
-          account.id,
-        )
-        if (currentScheduledCount >= 3) {
+        if (!(await assertScheduledTweetsWithinLimit(user.id, account.id))) {
           throw new HTTPException(402, {
             message:
               'Free plan scheduling limit reached. You can only have 3 scheduled posts at a time. Upgrade to Pro to schedule unlimited tweets.',
+          })
+        }
+
+        if (!assertTweetsWithinLimit(thread)) {
+          throw new HTTPException(400, {
+            message: `Twitter limit is 280 characters. One of your tweets in the thread exceeds this limit. Upgrade to X Premium for longer posts.`,
           })
         }
       }

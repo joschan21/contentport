@@ -26,6 +26,7 @@ import { getAccount } from '../utils/get-account'
 import { createTweetTool } from './tools/create-tweet-tool'
 import { Ratelimit } from '@upstash/ratelimit'
 import { PayloadTweet } from '@/hooks/use-tweets-v2'
+import { freeChatLimiter, proChatLimiter } from '@/lib/chat-limiter'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -158,6 +159,16 @@ export const chatRouter = j.router({
     })
   }),
 
+  getLimit: privateProcedure.get(async ({ c, ctx }) => {
+    const { user } = ctx
+
+    const limiter = user.plan === 'pro' ? proChatLimiter : freeChatLimiter
+
+    const { remaining, reset } = await limiter.getRemaining(user.email)
+
+    return c.json({ remaining, reset })
+  }),
+
   chat: privateProcedure
     .input(
       z.object({
@@ -169,10 +180,7 @@ export const chatRouter = j.router({
       const { user } = ctx
       const { id, message } = input as { message: MyUIMessage; id: string }
 
-      const limiter =
-        user.plan === 'pro'
-          ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(80, '4h') })
-          : new Ratelimit({ redis, limiter: Ratelimit.fixedWindow(5, '1d') })
+      const limiter = user.plan === 'pro' ? proChatLimiter : freeChatLimiter
 
       const [account, history, parsedAttachments, limitResult] = await Promise.all([
         getAccount({ email: user.email }),
