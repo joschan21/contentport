@@ -1,12 +1,11 @@
 'use client'
 
+import PostGraph from '@/components/posted/post-graph'
 import TweetList from '@/components/tweet-list'
 import { AccountAvatar } from '@/hooks/account-ctx'
 import { CheckCircle2 } from 'lucide-react'
 
 export default function PostedTweetsPage() {
-
-
   return (
     <div className="space-y-6 relative z-10 max-w-3xl mx-auto w-full">
       <div className="flex items-center gap-3">
@@ -18,6 +17,7 @@ export default function PostedTweetsPage() {
           </p>
         </div>
       </div>
+      <PostGraph />
 
       <TweetList
         title="Posted Tweets"
