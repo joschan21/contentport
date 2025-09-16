@@ -12,7 +12,7 @@ export type ActivityData = {
 }
 
 export const postedRouter = j.router({
-  getPublishingActivity: privateProcedure
+  get_publishing_activity: privateProcedure
     .input(
       z.object({
         year: z.number().min(2020).max(2030).optional(),
@@ -70,7 +70,7 @@ export const postedRouter = j.router({
         currentDate.setDate(currentDate.getDate() + 1)
       }
 
-      const totalCount = dailyTweets.reduce((sum, { count }) => sum + count, 0)
+      const totalCount = activity.reduce((sum, day) => sum + day.count, 0)
 
       return c.superjson({
         activity,
@@ -81,7 +81,7 @@ export const postedRouter = j.router({
       })
     }),
 
-  getPublishingStats: privateProcedure
+  get_publishing_stats: privateProcedure
     .input(
       z.object({
         accountId: z.string().optional(),
@@ -136,7 +136,7 @@ export const postedRouter = j.router({
       })
     }),
 
-  getRecentPublished: privateProcedure
+  get_recent_published: privateProcedure
     .input(
       z.object({
         limit: z.number().min(1).max(50).default(10),

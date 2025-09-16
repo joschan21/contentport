@@ -30,7 +30,7 @@ const PostGraph = () => {
   const { data: apiData, isLoading, isError } = useQuery({
     queryKey: ['publishing-activity', account?.username, currentYear],
     queryFn: async () => {
-      const res = await client.posted.getPublishingActivity.$get({
+      const res = await client.posted.get_publishing_activity.$get({
         year: currentYear,
         accountId: account?.id,
       });
@@ -115,6 +115,8 @@ const PostGraph = () => {
                           />
                         </g>
                       </TooltipTrigger>
+                      
+                      {!shouldUseFakeData && (
                       <TooltipContent>
                         <p className="font-semibold">
                           {format(parseISO(activity.date), "MMMM d, yyyy")}
@@ -124,6 +126,7 @@ const PostGraph = () => {
                           {activity.count === 1 ? "tweet" : "tweets"} posted
                         </p>
                       </TooltipContent>
+                      )}
                     </Tooltip>
                   )}
                 </ContributionGraphCalendar>
