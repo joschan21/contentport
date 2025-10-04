@@ -68,7 +68,18 @@ export const LeftSidebar = () => {
 
       <SidebarContent>
         {/* Create Group */}
-        <SidebarGroup>
+        <SidebarGroup className="relative">
+          {isCollapsed && (
+            <div className="absolute bottom-0 left-0 right-0 border-b border-border/40" />
+          )}
+          {/* <SidebarGroupLabel
+            className={cn(
+              'transition-all duration-200 ease-out px-3',
+              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+            )}
+          >
+            Create
+          </SidebarGroupLabel> */}
           <SidebarGroupContent>
             <Link
               suppressHydrationWarning
