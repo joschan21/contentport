@@ -74,6 +74,8 @@ export const authRouter = j.router({
         })
       }
 
+      console.log('ℹ️ Creating twitter link:', `${getBaseUrl()}/api/auth_router/callback`);
+
       try {
         const { url, oauth_token, oauth_token_secret } = await client.generateAuthLink(
           `${getBaseUrl()}/api/auth_router/callback`,
