@@ -51,12 +51,22 @@ export const auth = betterAuth({
         const baseUrl = getBaseUrl()
         const emailUrl = baseUrl + `/verify/${token}`
 
-        await resend.emails.send({
-          from: 'Josh <josh@mail.contentport.io>',
-          to: [email],
-          subject: 'Sign into Contentport',
-          text: `Click this link to sign into Contentport: ${emailUrl}`,
-        })
+        try {
+          const res = await resend.emails.send({
+            from: 'Josh <josh@mail.contentport.io>',
+            to: [email],
+            subject: 'Sign into Contentport',
+            text: `Click this link to sign into Contentport: ${emailUrl}`,
+          })
+
+          console.log(res)
+
+          if (res.error) {
+            console.error('[Error sending email]:', res.error)
+          }
+        } catch (err) {
+          console.error(err)
+        }
       },
     }),
   ],
