@@ -44,9 +44,7 @@ export function Providers({ children }: ProvidersProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AccountProvider>
-        <ConfettiProvider>{children}</ConfettiProvider>
-      </AccountProvider>
+      <ConfettiProvider>{children}</ConfettiProvider>
     </QueryClientProvider>
   )
 }
