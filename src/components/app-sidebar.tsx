@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowUp, History, Paperclip, Plus, RotateCcw, Square, X } from 'lucide-react'
+import { ArrowUp, History, Paperclip, Plus, Square, X } from 'lucide-react'
 import { useCallback, useContext, useEffect, useState } from 'react'
 
 import {
@@ -14,15 +14,20 @@ import {
 } from '@/components/ui/sidebar'
 import { useAttachments } from '@/hooks/use-attachments'
 import { useChatContext } from '@/hooks/use-chat'
+import { PayloadTweet, useTweetsV2 } from '@/hooks/use-tweets-v2'
+import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
 import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
+import type { RealtimeEvents } from '@/lib/realtime'
+import { cn } from '@/lib/utils'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
+import { useRealtime } from '@upstash/realtime/client'
 import { formatDistanceToNow } from 'date-fns'
 import { motion } from 'framer-motion'
 import {
@@ -31,7 +36,6 @@ import {
   $getRoot,
   $getSelection,
   $isRangeSelection,
-  COMMAND_PRIORITY_EDITOR,
   COMMAND_PRIORITY_HIGH,
   KEY_ENTER_COMMAND,
   PASTE_COMMAND,
@@ -39,11 +43,6 @@ import {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AttachmentItem } from './attachment-item'
 import { Messages } from './chat/messages'
-import { KnowledgeSelector, SelectedKnowledgeDocument } from './knowledge-selector'
-import DuolingoButton from './ui/duolingo-button'
-import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-upload'
-import { PromptSuggestion } from './ui/prompt-suggestion'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 import {
   Dialog,
   DialogContent,
@@ -51,7 +50,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
-import { MemoryTweet, PayloadTweet, useTweetsV2 } from '@/hooks/use-tweets-v2'
+import DuolingoButton from './ui/duolingo-button'
+import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-upload'
+import { PromptSuggestion } from './ui/prompt-suggestion'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
+import { Loader } from './ui/loader'
+import Link from 'next/link'
 
 const ChatInput = ({
   onSubmit,
@@ -59,21 +63,45 @@ const ChatInput = ({
   disabled,
   handleFilesAdded,
 }: {
-  onSubmit: (text: string) => void
+  onSubmit: (text: string, length: 'short' | 'long' | 'thread') => void
   onStop: () => void
   disabled: boolean
   handleFilesAdded: (files: File[]) => void
 }) => {
+  const [length, setLength] = useState<'short' | 'long' | 'thread'>('short')
   const [editor] = useLexicalComposerContext()
   const { isDragging } = useContext(FileUploadContext)
+  const { open } = useSidebar()
+  const { data: session } = authClient.useSession()
 
-  const { attachments, removeAttachment, addKnowledgeAttachment, hasUploading } =
-    useAttachments()
+  const { data: ownTweets, refetch: refetchOwnTweets } = useQuery({
+    queryKey: ['get-own-tweets-sidebar'],
+    queryFn: async () => {
+      const res = await client.knowledge.get_own_tweets.$get()
+      return await res.json()
+    },
+    refetchOnWindowFocus: false,
+  })
+
+  const isIndexing = !ownTweets?.length
+
+  useEffect(() => {
+    if (isIndexing) editor.setEditable(false)
+    else editor.setEditable(true)
+  }, [isIndexing, editor])
+
+  useRealtime<RealtimeEvents>({
+    channel: session?.user.id,
+    enabled: Boolean(session?.user.id) && isIndexing && open,
+    events: { index_tweets: { status: () => refetchOwnTweets() } },
+  })
+
+  const { attachments, removeAttachment, hasUploading } = useAttachments()
 
   const handleSubmit = () => {
     const text = editor.read(() => $getRoot().getTextContent().trim())
 
-    onSubmit(text)
+    onSubmit(text, length)
 
     editor.update(() => {
       const root = $getRoot()
@@ -94,7 +122,7 @@ const ChatInput = ({
             const text = root.getTextContent().trim()
             if (!text) return
 
-            onSubmit(text)
+            onSubmit(text, length)
 
             root.clear()
             const paragraph = $createParagraphNode()
@@ -135,14 +163,7 @@ const ChatInput = ({
       removeCommand?.()
       removePasteCommand?.()
     }
-  }, [editor, onSubmit])
-
-  const handleAddKnowledgeDoc = useCallback(
-    (doc: SelectedKnowledgeDocument) => {
-      addKnowledgeAttachment(doc)
-    },
-    [addKnowledgeAttachment],
-  )
+  }, [editor, length, onSubmit])
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
@@ -171,24 +192,38 @@ const ChatInput = ({
   return (
     <div>
       <div className="mb-2 flex gap-2 items-center">
-        {attachments.map((attachment, i) => {
-          const onRemove = () => removeAttachment({ id: attachment.id })
-          return (
-            <motion.div
-              key={attachment.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.2, delay: i * 0.1 }}
+        {isIndexing ? (
+          <div className="flex items-center gap-2">
+            <Loader variant="classic" size="xs" />
+            <p className="text-sm text-gray-500 mt-1">Indexing your tweets</p>
+            <p className="text-gray-500 mt-1 text-sm">•</p>
+            <Link
+              href="/studio/knowledge"
+              className="hover:underline text-sm text-gray-500 mt-1"
             >
-              <AttachmentItem
-                onRemove={onRemove}
+              See status
+            </Link>
+          </div>
+        ) : (
+          attachments.map((attachment, i) => {
+            const onRemove = () => removeAttachment({ id: attachment.id })
+            return (
+              <motion.div
                 key={attachment.id}
-                attachment={attachment}
-              />
-            </motion.div>
-          )
-        })}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ duration: 0.2, delay: i * 0.1 }}
+              >
+                <AttachmentItem
+                  onRemove={onRemove}
+                  key={attachment.id}
+                  attachment={attachment}
+                />
+              </motion.div>
+            )
+          })
+        )}
       </div>
 
       <div className="space-y-3">
@@ -220,7 +255,8 @@ const ChatInput = ({
                 contentEditable={
                   <ContentEditable
                     autoFocus
-                    className="w-full px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
+                    disabled={isIndexing}
+                    className="w-full diabled:opacity-50 px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
                     style={{ minHeight: '4.5rem' }}
                     onPaste={handlePaste}
                   />
@@ -234,12 +270,51 @@ const ChatInput = ({
               <div className="flex items-center justify-between px-3 pb-3">
                 <div className="flex gap-1.5 items-center">
                   <FileUploadTrigger asChild>
-                    <DuolingoButton type="button" variant="secondary" size="icon">
+                    <DuolingoButton
+                      disabled={isIndexing}
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                    >
                       <Paperclip className="text-stone-600 size-5" />
                     </DuolingoButton>
                   </FileUploadTrigger>
 
-                  <KnowledgeSelector onSelectDocument={handleAddKnowledgeDoc} />
+                  <div className="flex items-center gap-1.5">
+                    <DuolingoButton
+                      disabled={isIndexing}
+                      onClick={() => {
+                        setLength((prev) => {
+                          if (prev === 'short') return 'long'
+                          if (prev === 'long') return 'thread'
+                          else return 'short'
+                        })
+                      }}
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <div
+                          className={cn('h-1 w-4 bg-gray-300 rounded-full', {
+                            'bg-gray-700': length === 'thread',
+                          })}
+                        />
+                        <div
+                          className={cn('h-1 w-4 bg-gray-300 rounded-full', {
+                            'bg-gray-700': length === 'long' || length === 'thread',
+                          })}
+                        />
+                        <div className={cn('h-1 w-4 bg-gray-700 rounded-full', {})} />
+                      </div>
+                    </DuolingoButton>
+                    <div className="">
+                      <p className="text-xs text-gray-600">Length</p>
+                      <p className="text-xs text-gray-400">
+                        {length.slice(0, 1).toUpperCase() + length.slice(1)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {disabled ? (
@@ -253,7 +328,7 @@ const ChatInput = ({
                   </DuolingoButton>
                 ) : (
                   <DuolingoButton
-                    disabled={hasUploading}
+                    disabled={hasUploading || isIndexing}
                     onClick={handleSubmit}
                     variant="icon"
                     size="icon"
@@ -272,7 +347,7 @@ const ChatInput = ({
 }
 
 export function AppSidebar({ children }: { children: React.ReactNode }) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, open } = useSidebar()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [editor] = useLexicalComposerContext()
@@ -303,7 +378,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
   )
 
   const handleSubmit = useCallback(
-    async (text: string) => {
+    async (text: string, length: 'short' | 'long' | 'thread') => {
       if (!text.trim()) return
 
       if (!Boolean(searchParams.get('chatId'))) {
@@ -314,7 +389,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
 
       sendMessage({
         text,
-        metadata: { attachments, tweets: payloadTweets, userMessage: text },
+        metadata: { attachments, tweets: payloadTweets, userMessage: text, length },
       })
 
       if (attachments.length > 0) {
@@ -355,8 +430,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   })
-
-  const exampleDocuments = knowledgeData?.documents?.filter((doc) => doc.isExample) || []
 
   return (
     <>
@@ -430,10 +503,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                     attachments.forEach((attachment) => {
                       removeAttachment({ id: attachment.id })
                     })
-
-                    const blogDoc = exampleDocuments.find(
-                      (doc) => doc.title?.includes('Zod') || doc.type === 'url',
-                    )
 
                     editor.update(() => {
                       const root = $getRoot()
@@ -536,8 +605,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
         </SidebarContent>
 
         <SidebarFooter className="relative p-3 border-t border-t-gray-300 bg-gray-100">
-          {/* <Improvements /> */}
-
           <FileUpload onFilesAdded={handleFilesAdded}>
             <ChatInput
               onStop={stop}

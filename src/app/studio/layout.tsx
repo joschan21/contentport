@@ -9,10 +9,12 @@ export default async function Layout({ children }: PropsWithChildren) {
   const sidebarState = cookieStore.get('sidebar:state')
 
   return (
-    <DashboardProviders>
-      <ClientLayout width={sidebarWidth} state={sidebarState}>
-        {children}
-      </ClientLayout>
-    </DashboardProviders>
+    <main style={{ scrollbarGutter: 'stable' }}>
+      <DashboardProviders>
+        <ClientLayout width={sidebarWidth} state={sidebarState}>
+          {children}
+        </ClientLayout>
+      </DashboardProviders>
+    </main>
   )
 }

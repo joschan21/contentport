@@ -27,28 +27,28 @@ import {
   CornerDownLeft,
   ImageIcon,
   Paperclip,
+  Quote,
   Smile,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import toast from 'react-hot-toast'
 import {
-  QuotedTweet,
   TweetBody,
-  TweetContainer,
   TweetHeader,
   TweetInReplyTo,
   TweetMedia,
   type EnrichedTweet,
 } from 'react-tweet'
+import { QuotedTweet } from './quoted-tweet'
 
-interface CommentModalProps {
+interface QuoteModalProps {
   isOpen: boolean
   onClose: () => void
   tweet: EnrichedTweet
   onSubmit: () => void
 }
 
-export function CommentModal({ isOpen, onClose, tweet, onSubmit }: CommentModalProps) {
+export function QuoteModal({ isOpen, onClose, tweet, onSubmit }: QuoteModalProps) {
   const [editor] = useLexicalComposerContext()
 
   useEffect(() => {
@@ -69,9 +69,7 @@ export function CommentModal({ isOpen, onClose, tweet, onSubmit }: CommentModalP
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isHotkey('Enter', e)) {
         e.preventDefault()
-        console.log('ENTER')
         handleSubmit()
-
         return
       }
 
@@ -92,9 +90,12 @@ export function CommentModal({ isOpen, onClose, tweet, onSubmit }: CommentModalP
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
-  const { mutate: sendReply } = useMutation({
+  const { mutate: sendQuote } = useMutation({
     mutationFn: async () => {
       const content = editor.read(() => $getRoot().getTextContent().trim())
+      // const tweetUrl = `https://twitter.com/${tweet.user.screen_name}/status/${tweet.id_str}`
+      // const quotedContent = `${content}\n\n${tweetUrl}`
+
       const payload: PayloadTweet = {
         content,
         id: tweet.id_str,
@@ -104,13 +105,13 @@ export function CommentModal({ isOpen, onClose, tweet, onSubmit }: CommentModalP
 
       const res = await client.tweet.postImmediate.$post({
         thread: [payload],
-        replyToTwitterId: tweet.id_str,
+        quoteToTwitterId: tweet.id_str,
       })
 
       return await res.json()
     },
     onMutate: () => {
-      toast.success('Reply is being sent!')
+      toast.success('Quote tweet is being sent!')
       onClose()
     },
   })
@@ -119,11 +120,12 @@ export function CommentModal({ isOpen, onClose, tweet, onSubmit }: CommentModalP
     const content = editor.read(() => $getRoot().getTextContent().trim())
 
     if (!content) {
-      toast.error('Cant post an empty reply')
+      toast.error('Add your thoughts to quote this tweet')
+      return
     }
 
     onSubmit()
-    sendReply()
+    sendQuote()
   }
 
   return (
@@ -136,30 +138,12 @@ export function CommentModal({ isOpen, onClose, tweet, onSubmit }: CommentModalP
         className="max-w-xl p-0 gap-0"
       >
         <DialogHeader className="flex flex-row items-center justify-between px-6 py-4 border-b border-border space-y-0">
-          <DialogTitle className="text-lg font-semibold">
-            Reply to @{tweet.user.screen_name}
+          <DialogTitle className="text-lg font-semibold flex items-center gap-2">
+            Quote @{tweet.user.screen_name}
           </DialogTitle>
         </DialogHeader>
 
-        {/* Original Tweet */}
-        <div className="px-6 py-4 border-b border-border bg-muted/20">
-          <article className='max-h-96 overflow-y-scroll'>
-            <TweetHeader tweet={tweet} />
-            {tweet.in_reply_to_status_id_str && <TweetInReplyTo tweet={tweet} />}
-            <TweetBody tweet={tweet} />
-            {tweet.mediaDetails?.length ? (
-              <div className="max-w-full">
-                <TweetMedia tweet={tweet} />
-              </div>
-            ) : null}
-            {tweet.quoted_tweet && <QuotedTweet tweet={tweet.quoted_tweet} />}
-            <p className="text-[15px] mt-2 text-gray-500">
-              {format(new Date(tweet.created_at), 'h:mm a · MMM d, yyyy')}
-            </p>
-          </article>
-        </div>
-
-        {/* Comment Form */}
+        {/* Quote Form */}
         <div className="px-6 py-4">
           <div className="flex gap-3 mb-4">
             <AccountAvatar className="size-8 flex-shrink-0" />
@@ -170,13 +154,31 @@ export function CommentModal({ isOpen, onClose, tweet, onSubmit }: CommentModalP
                 }
                 ErrorBoundary={LexicalErrorBoundary}
               />
-              <PlaceholderPlugin placeholder="Post your reply..." />
+              <PlaceholderPlugin placeholder="Add your thoughts..." />
               <HistoryPlugin />
               <MentionsPlugin />
               <MentionTooltipPlugin />
               <AutoLinkPlugin matchers={[MATCHERS]} />
               <LinkPreviewPlugin shouldShowLink />
             </div>
+          </div>
+
+          {/* Original Tweet Preview */}
+          <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-muted/20">
+            <article className="max-h-96 overflow-y-scroll">
+              <TweetHeader tweet={tweet} />
+              {tweet.in_reply_to_status_id_str && <TweetInReplyTo tweet={tweet} />}
+              <TweetBody tweet={tweet} />
+              {tweet.mediaDetails?.length ? (
+                <div className="max-w-full">
+                  <TweetMedia tweet={tweet} />
+                </div>
+              ) : null}
+              {tweet.quoted_tweet && <QuotedTweet tweet={tweet.quoted_tweet} isNestedQuote={false} />}
+              <p className="text-[15px] mt-2 text-gray-500">
+                {format(new Date(tweet.created_at), 'h:mm a · MMM d, yyyy')}
+              </p>
+            </article>
           </div>
 
           {/* Actions Bar */}
@@ -218,23 +220,8 @@ export function CommentModal({ isOpen, onClose, tweet, onSubmit }: CommentModalP
 
             <div className="flex items-center gap-3">
               <DuolingoButton onClick={handleSubmit} size="sm">
-                Reply
+                Quote
               </DuolingoButton>
-              {/* <Button
-                onClick={handleSubmit}
-                disabled={!comment.trim() || isSending}
-                size="sm"
-                className="h-9 px-6 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 rounded-full font-medium transition-all shadow-sm hover:shadow-md disabled:cursor-not-allowed"
-              >
-                {isSending ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Send className="h-3.5 w-3.5 mr-2" />
-                    Reply
-                  </>
-                )}
-              </Button> */}
             </div>
           </div>
         </div>

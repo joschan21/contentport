@@ -1,15 +1,14 @@
 import { assistantPrompt } from '@/lib/prompt-utils'
-import { DiffWithReplacement } from '@/lib/utils'
 import { XmlPrompt } from '@/lib/xml-prompt'
 import {
   convertToModelMessages,
-  CoreMessage,
   createIdGenerator,
   createUIMessageStream,
   createUIMessageStreamResponse,
   smoothStream,
   stepCountIs,
   streamText,
+  tool,
   UIMessage,
 } from 'ai'
 import { format } from 'date-fns'
@@ -21,37 +20,17 @@ import { j, privateProcedure } from '../../jstack'
 import { create_read_website_content } from './read-website-content'
 import { parseAttachments } from './utils'
 
+import { PayloadTweet } from '@/hooks/use-tweets-v2'
+import { Sitemap } from '@/lib/knowledge'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { Ratelimit } from '@upstash/ratelimit'
 import { getAccount } from '../utils/get-account'
 import { createTweetTool } from './tools/create-tweet-tool'
-import { Ratelimit } from '@upstash/ratelimit'
-import { PayloadTweet } from '@/hooks/use-tweets-v2'
+import { vector } from '@/lib/vector'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 })
-
-// ==================== Types ====================
-
-export interface EditTweetToolResult {
-  id: string
-  improvedText: string
-  diffs: DiffWithReplacement[]
-}
-
-// Custom message type that ensures all messages have an ID
-export type ChatMessage = Omit<UIMessage, 'content'> & {
-  content: string | UIMessage['parts']
-  role: CoreMessage['role']
-  id: string
-  metadata?: MessageMetadata
-  chatId?: string
-}
-
-export interface Chat {
-  id: string
-  messages: ChatMessage[]
-}
 
 export interface WebScrapingResult {
   url: string
@@ -74,23 +53,17 @@ export type TAttachment = z.infer<typeof attachmentSchema>
 
 const messageMetadataSchema = z.object({
   attachments: z.array(attachmentSchema).optional(),
+  length: z.enum(['short', 'long', 'thread']),
 })
 
 export type Attachment = z.infer<typeof attachmentSchema>
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>
 
-const chatMessageSchema = z.object({
-  id: z.string(),
-  chatId: z.string(),
-  role: z.enum(['user', 'assistant', 'system']),
-  content: z.string(),
-  metadata: messageMetadataSchema.optional(),
-})
-
 export type Metadata = {
   userMessage: string
   attachments: Array<TAttachment>
   tweets: PayloadTweet[]
+  length: 'short' | 'long' | 'thread'
 }
 
 export interface ChatHistoryItem {
@@ -111,18 +84,22 @@ export type MyUIMessage = UIMessage<
       index: number
       status: 'processing' | 'streaming' | 'complete'
     }
-    writeTweet: {
+    write_tweet: {
       status: 'processing'
     }
   },
   {
-    readWebsiteContent: {
+    read_website_content: {
       input: { website_url: string }
       output: {
         url: string
         title: string
         content: string
       }
+    }
+    lookup_involved_project: {
+      input: { involved_project_name: string }
+      output: string[]
     }
   }
 >
@@ -189,7 +166,7 @@ export const chatRouter = j.router({
         if (!success) {
           if (user.plan === 'pro') {
             throw new HTTPException(429, {
-              message: `You've reached your hourly message limit. Please try again in a few hours.`,
+              message: `You've reached a rate-limit. Please try again soon.`,
             })
           } else {
             throw new HTTPException(429, {
@@ -238,6 +215,47 @@ export const chatRouter = j.router({
 
       content.close('message')
 
+      const sitemaps = await redis.hgetall<Record<string, { name: string; url: string }>>(
+        `sitemaps:${user.email}`,
+      )
+
+      if (sitemaps) {
+        content.open('involved_projects', {
+          note: 'These are provided by the system. They may or may not be relevant to the user query, it is upon you to decide.',
+        })
+        Object.entries(sitemaps).map(([key, sitemap]) =>
+          content.tag('involved_project', sitemap.name, {
+            name: sitemap.name,
+            involved_project_id: key,
+          }),
+        )
+        content.close('involved_projects')
+      }
+
+      const lookup_involved_project = tool({
+        description: `Use this tool when the user asks to tweet about an <involved_project />. Also required for vague requests like "tweet about <involved_project />", "what should I tweet today about <involved_project />". Always use this first before offering tweet suggestions. Under the hood, this tool holds a collection of all relevant URLs of a project the user is involved in.`,
+        inputSchema: z.object({
+          involved_project_id: z.string(),
+          topic: z.string().describe("The topic to search, e.g. 'markdown streaming'."),
+        }),
+        execute: async ({ topic, involved_project_id }) => {
+          const namespace = vector.namespace(`sitemap:${involved_project_id}`)
+
+          const res = await namespace.query({
+            data: topic,
+            topK: 20,
+            includeData: true,
+            includeMetadata: true,
+          })
+
+          const links = res.map((doc) => doc.data).filter(Boolean)
+
+          console.log('OUTPUT LINKS', links)
+
+          return links
+        },
+      })
+
       const userMessage: MyUIMessage = {
         ...message,
         parts: [{ type: 'text', text: content.toString() }, ...attachments],
@@ -283,7 +301,7 @@ export const chatRouter = j.router({
         execute: async ({ writer }) => {
           const generationId = crypto.randomUUID()
           // tools
-          const writeTweet = createTweetTool({
+          const write_tweet = createTweetTool({
             writer,
             ctx: {
               plan: user.plan as 'free' | 'pro',
@@ -291,7 +309,9 @@ export const chatRouter = j.router({
               instructions: userContent,
               messages,
               userContent,
+              userId: user.id,
               attachments: { attachments, links },
+              length: message.metadata?.length ?? 'long',
               redisKeys: {
                 thread: `thread:${id}:${generationId}`,
                 style: `style:${user.email}:${account.id}`,
@@ -301,7 +321,7 @@ export const chatRouter = j.router({
             },
           })
 
-          const readWebsiteContent = create_read_website_content({ chatId: id })
+          const read_website_content = create_read_website_content({ chatId: id })
 
           const result = streamText({
             model: openrouter.chat('openai/gpt-4.1', {
@@ -310,8 +330,13 @@ export const chatRouter = j.router({
             }),
             system: assistantPrompt({ tweets: message.metadata?.tweets ?? [] }),
             messages: convertToModelMessages(messages),
-            tools: { writeTweet, readWebsiteContent },
-            stopWhen: stepCountIs(3),
+            tools: {
+              write_tweet,
+              read_website_content,
+              lookup_involved_project,
+              // ...(sitemaps ? { lookup } : undefined),
+            },
+            stopWhen: stepCountIs(5),
             experimental_transform: smoothStream({
               delayInMs: 20,
               chunking: /[^-]*---/,

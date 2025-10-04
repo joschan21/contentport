@@ -1,9 +1,20 @@
-"use client"
+'use client'
 
+import { Container } from '@/components/container'
 import TweetQueue from '@/components/tweet-queue'
 import { AccountAvatar } from '@/hooks/account-ctx'
 
 export default function ScheduledTweetsPage() {
+  return (
+    <Container
+      title="Tweet Queue"
+      description="Your queue automatically publishes tweets to peak activity times."
+    >
+      <div className="mt-6">
+        <TweetQueue />
+      </div>
+    </Container>
+  )
   return (
     <div className="relative z-10 max-w-3xl mx-auto w-full">
       <div className="space-y-6 relative z-10 max-w-3xl mx-auto w-full">

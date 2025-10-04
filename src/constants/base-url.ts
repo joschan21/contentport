@@ -5,6 +5,9 @@ export const getBaseUrl = () => {
     return `https://${process.env.VERCEL_BRANCH_URL}`
   }
 
-  if (process.env.NODE_ENV === 'production') return `https://contentport.io`
+  if (process.env.NODE_ENV === 'production' && !Boolean(process.env.IS_LOCAL)) {
+    return `https://contentport.io`
+  }
+
   return `http://localhost:3000`
 }

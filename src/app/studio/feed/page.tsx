@@ -5,15 +5,12 @@ import { useEffect, useRef, useState } from 'react'
 
 import { RefreshCcwIcon } from 'lucide-react'
 
-import { InfoModal } from '@/app/studio/feed/info-modal'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { EmptyState } from './empty-state'
 import { Feed } from './feed'
-import { FeedSettingsModal } from './feed-settings-modal'
 import { Loader } from '@/components/ui/loader'
 import { authClient } from '@/lib/auth-client'
 import { useRouter } from 'next/navigation'
@@ -23,6 +20,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { InfoModal } from '../topic-monitor/info-modal'
+import { FeedSettingsModal } from '../topic-monitor/feed-settings-modal'
+import { EmptyState } from '../topic-monitor/empty-state'
 
 const Page = () => {
   const queryClient = useQueryClient()
@@ -141,12 +141,12 @@ const Page = () => {
               <p className="text-gray-500 text-sm">Showing relevant tweets for:</p>
               <TooltipProvider>
                 {keywordData.keywords.map((keyword) => {
-                  const isExcluded = excludedKeywords.has(keyword)
+                  const isExcluded = excludedKeywords.has(keyword.text)
                   return (
-                    <Tooltip key={keyword}>
+                    <Tooltip key={keyword.text}>
                       <TooltipTrigger asChild>
                         <button
-                          onClick={() => toggleKeywordExclusion(keyword)}
+                          onClick={() => toggleKeywordExclusion(keyword.text)}
                           className={cn(
                             'inline-flex group items-center gap-x-1 rounded-md px-2 py-1 text-xs font-medium inset-ring',
                           )}
@@ -161,7 +161,7 @@ const Page = () => {
                           >
                             <circle r={3} cx={3} cy={3} />
                           </svg>
-                          <span className="group-hover:underline">{keyword}</span>
+                          <span className="group-hover:underline">{keyword.text}</span>
                         </button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -228,12 +228,16 @@ const Page = () => {
             <p className="text-sm text-gray-800">Curating feed...</p>
           </div>
         ) : isFetched && data?.length === 0 ? (
-          <EmptyState onAddKeywords={() => setIsSettingsModalOpen(true)} />
+          <EmptyState
+            title="No tracked keywords yet"
+            description="Add tracked keywords to get started."
+          />
         ) : data ? (
           <Feed
             keywords={
-              keywordData.keywords.filter((keyword) => !excludedKeywords.has(keyword)) ??
-              []
+              keywordData.keywords.filter(
+                (keyword) => !excludedKeywords.has(keyword.text),
+              ) ?? []
             }
             data={data}
             containerRef={containerRef}

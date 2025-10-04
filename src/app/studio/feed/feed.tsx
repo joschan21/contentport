@@ -4,9 +4,10 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import throttle from 'lodash.throttle'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TweetCard } from './tweet-card'
+import { Keyword } from '../topic-monitor/feed-settings-modal'
 
 interface FeedProps {
-  keywords: string[]
+  keywords: Keyword[]
   data: InferOutput['feed']['get_tweets']
   containerRef: React.RefObject<HTMLDivElement | null>
 }

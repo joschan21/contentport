@@ -149,7 +149,7 @@ export default function Pricing({ targetUrl }: PricingProps) {
               ))}
             </ul>
             <div className="mt-10">
-              <Link href="/login">
+              <Link href="/sign-in">
                 <DuolingoButton variant={tier.featured ? 'primary' : 'primary'} size="md">
                   Get Started Now!
                 </DuolingoButton>

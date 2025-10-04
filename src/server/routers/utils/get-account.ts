@@ -4,8 +4,15 @@ import { TwitterApi } from 'twitter-api-v2'
 
 const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN as string).readOnly
 
-export const getAccount = async ({ email }: { email: string }) => {
-  const account = await redis.json.get<Account>(`active-account:${email}`)
+export const getAccount = async ({
+  email,
+  accountId,
+}: {
+  email: string
+  accountId?: string
+}) => {
+  const key = accountId ? `account:${email}:${accountId}` : `active-account:${email}`
+  const account = await redis.json.get<Account>(key)
 
   let payload = account
 
@@ -15,8 +22,11 @@ export const getAccount = async ({ email }: { email: string }) => {
       ...account,
       twitterId: user.data.id,
     }
-
-    await redis.json.set(`active-account:${email}`, '$', payload)
+    if (accountId) {
+      await redis.json.set(`account:${email}:${accountId}`, '$', payload)
+    } else {
+      await redis.json.set(`active-account:${email}`, '$', payload)
+    }
   }
 
   return payload

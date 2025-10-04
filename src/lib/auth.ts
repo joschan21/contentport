@@ -1,8 +1,12 @@
 import { db } from '@/db'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { createAuthMiddleware, oAuthProxy } from 'better-auth/plugins'
+import { createAuthMiddleware, magicLink } from 'better-auth/plugins'
 import { PostHog } from 'posthog-node'
+import { Resend } from 'resend'
+import { redis } from './redis'
+import { getAccount } from '@/server/routers/utils/get-account'
+import { getBaseUrl } from '@/constants/base-url'
 
 const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   host: 'https://eu.i.posthog.com',
@@ -35,6 +39,27 @@ const getTrustedOrigins = () => {
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: getTrustedOrigins(),
+  plugins: [
+    magicLink({
+      sendMagicLink: async ({ email, token, url }, request) => {
+        await redis.set(`redirect:${token}`, url, {
+          ex: 60 * 5, // 5 mins, same as better-auth default
+        })
+
+        const resend = new Resend(process.env.RESEND_API_KEY)
+
+        const baseUrl = getBaseUrl()
+        const emailUrl = baseUrl + `/verify/${token}`
+
+        await resend.emails.send({
+          from: 'Josh <josh@mail.contentport.io>',
+          to: [email],
+          subject: 'Sign into Contentport',
+          text: `Click this link to sign into Contentport: ${emailUrl}`,
+        })
+      },
+    }),
+  ],
   databaseHooks: {
     user: {
       create: {
@@ -74,13 +99,7 @@ export const auth = betterAuth({
     twitter: {
       clientId: process.env.TWITTER_CLIENT_ID as string,
       clientSecret: process.env.TWITTER_CLIENT_SECRET as string,
-      scope: [
-        'tweet.read',
-        'tweet.write',
-        'users.read',
-        'offline.access',
-        'media.write',
-      ],
+      scope: ['tweet.read', 'tweet.write', 'users.read', 'offline.access', 'media.write'],
     },
   },
   advanced: {
@@ -93,10 +112,19 @@ export const auth = betterAuth({
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
       const session = ctx.context.newSession
-      if (session) {
+      const user = session?.user
+
+      let isOnboarded: boolean = false
+
+      if (user) {
+        const account = await getAccount({ email: user.email })
+        if (Boolean(account)) isOnboarded = true
+      }
+
+      if (isOnboarded) {
         ctx.redirect('/studio')
       } else {
-        ctx.redirect('/')
+        ctx.redirect('/onboarding')
       }
     }),
   },

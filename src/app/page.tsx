@@ -68,7 +68,7 @@ const Page = async () => {
                           </DuolingoButton>
                         </Link>
                       ) : (
-                        <Link href="/login">
+                        <Link href="/sign-in">
                           <DuolingoButton className="w-full h-14 sm:px-8">
                             Start Posting More →
                           </DuolingoButton>
@@ -367,7 +367,7 @@ const Page = async () => {
                 </span>
               </h2>{' '}
               <div className="max-w-xs w-full mx-auto">
-                <Link href="/login">
+                <Link href="/sign-in">
                   <DuolingoButton className="w-full h-14 sm:px-8">
                     Get Started Now →
                   </DuolingoButton>
@@ -589,7 +589,7 @@ const Page = async () => {
 
                 <div className="pt-16 text-center">
                   <div className="max-w-xs mx-auto">
-                    <Link href="/login">
+                    <Link href="/sign-in">
                       <DuolingoButton className="w-full h-14 sm:px-8">
                         Start Building Your System →
                       </DuolingoButton>

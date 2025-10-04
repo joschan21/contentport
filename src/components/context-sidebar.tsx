@@ -29,19 +29,16 @@ const searchParams = {
 const serialize = createSerializer(searchParams)
 
 export const LeftSidebar = () => {
-  const { state } = useSidebar()
-  const { data } = authClient.useSession()
-
   const pathname = usePathname()
 
   const { id } = useChatContext()
+  const { state, toggleSidebar } = useSidebar()
+  const { data } = authClient.useSession()
 
   const isCollapsed = state === 'collapsed'
 
-  const { toggleSidebar } = useSidebar()
-
   return (
-    <Sidebar collapsible="icon" side="left" className="z-50 border-r border-border/40">
+    <Sidebar collapsible="icon" side="left" className="z-30 border-r border-border/40">
       <SidebarHeader className="border-b border-border/40 p-4">
         <div className="flex items-center justify-start gap-2">
           <button
@@ -71,20 +68,10 @@ export const LeftSidebar = () => {
 
       <SidebarContent>
         {/* Create Group */}
-        <SidebarGroup className="relative">
-          {isCollapsed && (
-            <div className="absolute bottom-0 left-0 right-0 border-b border-border/40" />
-          )}
-          <SidebarGroupLabel
-            className={cn(
-              'transition-all duration-200 ease-out px-3',
-              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
-            )}
-          >
-            Create
-          </SidebarGroupLabel>
+        <SidebarGroup>
           <SidebarGroupContent>
             <Link
+              suppressHydrationWarning
               href={{
                 pathname: '/studio',
                 search: serialize({ chatId: id }),
@@ -107,7 +94,7 @@ export const LeftSidebar = () => {
                   isCollapsed ? 'opacity-0 w-0 overflow-hidden hidden' : 'opacity-100',
                 )}
               >
-                Studio
+                Create
               </span>
             </Link>
           </SidebarGroupContent>
@@ -128,8 +115,9 @@ export const LeftSidebar = () => {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <Link
+              suppressHydrationWarning
               href={{
-                pathname: '/studio/feed',
+                pathname: '/studio/topic-monitor',
                 search: serialize({ chatId: id }),
               }}
               className={cn(
@@ -137,7 +125,7 @@ export const LeftSidebar = () => {
                   variant: 'ghost',
                   className: 'w-full justify-start gap-2 px-3 py-2',
                 }),
-                pathname === '/studio/feed' &&
+                pathname === '/studio/topic-monitor' &&
                   'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
               )}
             >
@@ -172,6 +160,7 @@ export const LeftSidebar = () => {
           <SidebarGroupContent>
             <div className="flex flex-col gap-1">
               <Link
+                suppressHydrationWarning
                 href={{
                   pathname: '/studio/knowledge',
                   search: serialize({ chatId: id }),
@@ -199,6 +188,7 @@ export const LeftSidebar = () => {
               </Link>
 
               <Link
+                suppressHydrationWarning
                 href={{
                   pathname: '/studio/scheduled',
                   search: serialize({ chatId: id }),
@@ -226,6 +216,7 @@ export const LeftSidebar = () => {
               </Link>
 
               <Link
+                suppressHydrationWarning
                 href={{
                   pathname: '/studio/posted',
                   search: serialize({ chatId: id }),
@@ -267,6 +258,7 @@ export const LeftSidebar = () => {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <Link
+              suppressHydrationWarning
               href={{
                 pathname: '/studio/accounts',
                 search: serialize({ chatId: id }),
@@ -306,6 +298,7 @@ export const LeftSidebar = () => {
           <div className="flex flex-col gap-2">
             {data?.user ? (
               <Link
+                suppressHydrationWarning
                 href={{
                   pathname: `/studio/settings`,
                   search: id ? `?chatId=${id}` : undefined,
@@ -349,6 +342,7 @@ export const LeftSidebar = () => {
         >
           <div className="flex flex-col gap-2">
             <Link
+              suppressHydrationWarning
               href={{
                 pathname: `/studio/settings`,
                 search: id ? `?chatId=${id}` : undefined,

@@ -1,6 +1,5 @@
 'use client'
 
-import { AccountProvider } from '@/hooks/account-ctx'
 import { AttachmentsProvider } from '@/hooks/use-attachments'
 import { ChatProvider } from '@/hooks/use-chat'
 import { EditorProvider } from '@/hooks/use-editors'
@@ -41,18 +40,14 @@ export function DashboardProviders({ children }: ProvidersProps) {
   }, [session])
 
   return (
-    <ConfettiProvider>
-      <NuqsAdapter>
-        <AccountProvider>
-          <EditorProvider>
-            <TweetV2Provider>
-              <AttachmentsProvider>
-                <ChatProvider>{children}</ChatProvider>
-              </AttachmentsProvider>
-            </TweetV2Provider>
-          </EditorProvider>
-        </AccountProvider>
-      </NuqsAdapter>
-    </ConfettiProvider>
+    <NuqsAdapter>
+      <EditorProvider>
+        <TweetV2Provider>
+          <AttachmentsProvider>
+            <ChatProvider>{children}</ChatProvider>
+          </AttachmentsProvider>
+        </TweetV2Provider>
+      </EditorProvider>
+    </NuqsAdapter>
   )
 }

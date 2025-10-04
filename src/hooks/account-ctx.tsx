@@ -57,11 +57,20 @@ export function useAccount() {
 export function AccountAvatar({ className }: { className?: string }) {
   const { account, isLoading } = useAccount()
   if (isLoading || !account) {
-    return <Skeleton className={cn('h-10 w-10 rounded-full', className)} />
+    return (
+      <div className={cn('relative size-10 overflow-hidden rounded-full', className)}>
+        <Skeleton className="size-full" />
+        <div className="bg-gray-200 size-full absolute inset-0" />
+      </div>
+    )
   }
+
   return (
     <Avatar className={cn('h-10 w-10 rounded-full', className)}>
-      <AvatarImage src={account.profile_image_url} alt={account.username} />
+      <AvatarImage
+        src={account.profile_image_url?.replace('_normal', '_400x400')}
+        alt={account.username}
+      />
       <AvatarFallback>
         {(account?.name?.[0] || account?.username?.[0] || '?').toUpperCase()}
       </AvatarFallback>
@@ -75,7 +84,7 @@ const itemVariants = {
     opacity: 1,
     y: 0,
     transition: {
-      type: 'spring',
+      type: 'spring' as const,
       duration: 0.5,
       bounce: 0.2,
     },
@@ -123,11 +132,14 @@ export function AccountName({
   }
 
   return (
-    <a 
+    <a
       href={`https://x.com/${account.username}`}
       target="_blank"
       rel="noopener noreferrer"
-      className={cn('font-semibold inline-flex items-center gap-1 hover:underline transition-all', className)}
+      className={cn(
+        'font-semibold inline-flex items-center gap-1 hover:underline transition-all',
+        className,
+      )}
     >
       {account.name}
       {account.verified && renderBadge()}
@@ -144,10 +156,9 @@ export function AccountHandle({ className }: { className?: string }) {
 }
 
 export function AccountVerifiedBadge({ className }: { className?: string }) {
-  const { account, isLoading } = useAccount()
-  if (isLoading || !account) {
-    return <Skeleton className={cn('inline-block h-4 w-4 rounded', className)} />
-  }
-  if (!account.verified) return null
+  const { account } = useAccount()
+ 
+  if (!account?.verified) return null
+
   return <Icons.verificationBadge className={cn('h-4 w-4', className)} />
 }

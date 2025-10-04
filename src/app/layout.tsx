@@ -54,9 +54,9 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html suppressHydrationWarning lang="en">
+    <html className="h-full" suppressHydrationWarning lang="en">
       <body
-        className={`${rubik.className} ${inter.variable} ${jetBrainsMono.variable} antialiased light`}
+        className={`${rubik.className} ${inter.variable} ${jetBrainsMono.variable} antialiased light h-full`}
       >
         <Analytics />
 

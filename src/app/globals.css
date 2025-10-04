@@ -184,7 +184,7 @@ body {
 }
 
 #editor a {
-  @apply text-blue-600
+  @apply text-blue-600;
 }
 
 /* node styles */
@@ -380,31 +380,23 @@ body {
 }
 
 @theme inline {
-  --animate-marquee: marquee var(--duration) infinite linear;
-  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
-  @keyframes marquee {
+  --animate-fade-in: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+  @keyframes fade-in {
     from {
-      transform: translateX(0);
+      opacity: 0;
     }
     to {
-      transform: translateX(calc(-100% - var(--gap)));
-    }
-  }
-  @keyframes marquee-vertical {
-    from {
-      transform: translateY(0);
-    }
-    to {
-      transform: translateY(calc(-100% - var(--gap)));
+      opacity: 1;
     }
   }
 }
 
 .swiper-slide {
-  height: auto !important
+  height: auto !important;
 }
 .swiper-wrapper {
-  align-items: stretch !important
+  align-items: stretch !important;
 }
 
 /* Custom minimal scrollbar styling */

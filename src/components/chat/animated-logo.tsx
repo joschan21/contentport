@@ -20,7 +20,7 @@ export function AnimatedLogo({ className, isAnimating = true, ...props }: Animat
         duration: 2.5,
         times: [0, 0.225, 0.7, 0.925],
         repeat: isAnimating ? Infinity : 0,
-        ease: [0.25, 0.1, 0.25, 1],
+        ease: [0.25, 0.1, 0.25, 1] as const,
       },
     },
     static: {
@@ -29,7 +29,7 @@ export function AnimatedLogo({ className, isAnimating = true, ...props }: Animat
       rotate: 0,
       transition: {
         duration: 0.3,
-        ease: [0.25, 0.1, 0.25, 1],
+        ease: [0.25, 0.1, 0.25, 1] as const,
       },
     },
   }
@@ -44,7 +44,7 @@ export function AnimatedLogo({ className, isAnimating = true, ...props }: Animat
         duration: 2.5,
         times: [0, 0.2, 0.95],
         repeat: isAnimating ? Infinity : 0,
-        ease: [0.25, 0.1, 0.25, 1],
+        ease: [0.25, 0.1, 0.25, 1] as const,
       },
     },
     static: {
@@ -53,7 +53,7 @@ export function AnimatedLogo({ className, isAnimating = true, ...props }: Animat
       rotate: 0,
       transition: {
         duration: 0.3,
-        ease: [0.25, 0.1, 0.25, 1],
+        ease: [0.25, 0.1, 0.25, 1] as const,
       },
     },
   }
@@ -68,7 +68,7 @@ export function AnimatedLogo({ className, isAnimating = true, ...props }: Animat
         duration: 2.5,
         times: [0, 0.25, 0.975],
         repeat: isAnimating ? Infinity : 0,
-        ease: [0.25, 0.1, 0.25, 1],
+        ease: [0.25, 0.1, 0.25, 1] as const,
       },
     },
     static: {
@@ -77,7 +77,7 @@ export function AnimatedLogo({ className, isAnimating = true, ...props }: Animat
       rotate: 0,
       transition: {
         duration: 0.3,
-        ease: [0.25, 0.1, 0.25, 1],
+        ease: [0.25, 0.1, 0.25, 1] as const,
       },
     },
   }

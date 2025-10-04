@@ -7,6 +7,7 @@ import { Plus, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { TweetItem } from './tweet-item'
 import { useRef, useState } from 'react'
+import { Card } from '../ui/card'
 
 interface TweetProps {
   editMode?: boolean
@@ -42,38 +43,33 @@ export default function Tweet({ editMode = false }: TweetProps) {
         </div>
       )}
 
-      <div
-        className={cn(
-          'relative w-full min-w-0 rounded-2xl border p-3 border-black border-opacity-[0.01] bg-clip-padding group bg-white shadow-[0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)]',
-          {
-            'border border-indigo-300': editMode,
-          },
-        )}
+      <Card
+        className={cn('p-3', {
+          'border border-indigo-300': editMode,
+        })}
       >
-        <div className={cn('relative z-50')}>
-          {tweets.map((tweet, index) => {
-            return (
-              <div
-                key={tweet.id}
-                className={cn('relative z-50', {
-                  'pt-6': index > 0,
-                })}
-              >
-                <TweetItem tweet={tweet} index={index} />
+        {tweets.map((tweet, index) => {
+          return (
+            <div
+              key={tweet.id}
+              className={cn('relative z-50', {
+                'pt-6': index > 0,
+              })}
+            >
+              <TweetItem tweet={tweet} index={index} />
 
-                {tweets.length > 1 && index < tweets.length - 1 && (
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: '100%' }}
-                    transition={{ duration: 0.5 }}
-                    className="absolute z-10 left-8 top-[44px] w-0.5 bg-gray-200/75 h-[calc(100%+100px)]"
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+              {tweets.length > 1 && index < tweets.length - 1 && (
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: '100%' }}
+                  transition={{ duration: 0.5 }}
+                  className="absolute z-10 left-8 top-[44px] w-0.5 bg-gray-200/75 h-[calc(100%+100px)]"
+                />
+              )}
+            </div>
+          )
+        })}
+      </Card>
 
       <button
         onClick={() => addTweet({ initialContent: '' })}

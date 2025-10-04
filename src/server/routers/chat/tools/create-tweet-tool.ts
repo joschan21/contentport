@@ -1,4 +1,6 @@
-import { avoidPrompt, createStylePrompt, editToolSystemPrompt } from '@/lib/prompt-utils'
+import { PayloadTweet } from '@/hooks/use-tweets-v2'
+import { Memories } from '@/lib/knowledge'
+import { avoidPrompt, editToolSystemPrompt, styleGuide } from '@/lib/prompt-utils'
 import { redis } from '@/lib/redis'
 import { XmlPrompt } from '@/lib/xml-prompt'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
@@ -9,6 +11,7 @@ import {
   tool,
   UIMessageStreamWriter,
 } from 'ai'
+import { format } from 'date-fns'
 import { HTTPException } from 'hono/http-exception'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
@@ -17,8 +20,6 @@ import { Style } from '../../style-router'
 import { MyUIMessage } from '../chat-router'
 import { WebsiteContent } from '../read-website-content'
 import { parseAttachments } from '../utils'
-import { format } from 'date-fns'
-import { PayloadTweet } from '@/hooks/use-tweets-v2'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -33,6 +34,8 @@ interface Context {
     userContent: string
     messages: MyUIMessage[]
     attachments: Awaited<ReturnType<typeof parseAttachments>>
+    length: 'short' | 'long' | 'thread'
+    userId: string
     redisKeys: {
       thread: string
       style: string
@@ -51,36 +54,36 @@ const singleTweetSchema = z.object({
   instruction: z.string().describe(
     `Capture the user's instruction EXACTLY as they wrote it - preserve every detail including:
 - Exact wording and phrasing
-- Original capitalization (lowercase, UPPERCASE, Title Case)
+- Original capitalization
 - Punctuation and special characters
 - Typos or informal language
 - Numbers and formatting
 
-DO NOT paraphrase, summarize, or clean up the instruction in any way.
+DO NOT paraphrase, summarize, or modify up the instruction in any way EXCEPT if the user asks for MULTIPLE tweets. If the user asks for multiple tweets, slightly alternate the instruction for each call to not get the same result.
 
 <examples>
-<example>
-<user_message>make a tweet about AI being overhyped tbh</user_message>
-<instruction>make a tweet about AI being overhyped tbh</instruction>
-</example>
+  <example>
+  <user_message>tweet about ai being overhyped</user_message>
+  <result>tweet about ai being overhyped</result>
+  </example>
 
-<example>
-<user_message>make 2 tweets about why nextjs 15 is AMAZING!!!</user_message>
-<instruction>tweet about why nextjs 15 is AMAZING!!!</instruction>
-</example>
+  <example>
+  <user_message>write 2 tweets about why nextjs 15 is AMAZING!!!</user_message>
+  <result note="user asked for two tweets, this tool call is responsible for one">tweet about why nextjs 15 is AMAZING!!!</result>
+  </example>
 
-<example>
-<user_message>write something funny about debugging at 3am</user_message>
-<instruction>write something funny about debugging at 3am</instruction>
-</example>
+  <example>
+  <user_message>write something funny</user_message>
+  <result>write something funny</result>
+  </example>
 
-<example>
-<user_message>write a thread about car engines</user_message>
-<instruction>write a thread about car engines</instruction>
-</example>
+  <example>
+  <user_message>write a thread about car engines</user_message>
+  <result>write a thread about car engines</result>
+  </example>
 </examples>
 
-Remember: This tool creates/edits ONE tweet or thread per call. If the user requests multiple drafts, frame the instruction for one specific draft only. If the user requests one thread, calling this tool once will create the entire thread.`,
+Remember: This tool creates/edits ONE tweet or thread per call. If the user wants 2 tweets, call this tool 2 times. For each of the parallel calls, frame the instruction as being for one tweet.`,
   ),
   tweetContent: z
     .string()
@@ -114,14 +117,14 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         },
       })
 
-      const [style, account, websiteContent] = await Promise.all([
-        redis.json.get<Style>(ctx.redisKeys.style),
+      const [account, websiteContent] = await Promise.all([
+        // redis.json.get<Style>(ctx.redisKeys.style),
         redis.json.get<Account>(ctx.redisKeys.account),
         redis.lrange<WebsiteContent>(ctx.redisKeys.websiteContent, 0, -1),
       ])
 
-      if (!style || !account) {
-        throw new Error('Style or account not found')
+      if (!account) {
+        throw new Error('Account not found')
       }
 
       const prompt = new XmlPrompt()
@@ -130,10 +133,12 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
 
       // system
       prompt.open('system')
-      prompt.text(editToolSystemPrompt({ name: account.name }))
+      prompt.text(editToolSystemPrompt({ name: account.name, length: ctx.length }))
       prompt.close('system')
 
-      prompt.open('language_rules', { note: 'be EXTREMELY strict with these rules' })
+      prompt.open('language_rules', {
+        note: 'be EXTREMELY strict with these rules. NEVER use ANY of the forbidden words. If you are tempted to use one: you are probably overcomplicating your language. We need a simple, easy to understand 4-th grade level tweet.',
+      })
       prompt.text(avoidPrompt())
       prompt.close('language_rules')
 
@@ -150,7 +155,11 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
             if (Boolean(websiteContent.length)) {
               websiteContent.forEach(({ url, title, content }) => {
                 if (content && title) {
-                  prompt.tag('attached_website_content', content, { url, title })
+                  prompt.tag('attached_website_content', content, {
+                    url,
+                    title,
+                    note: 'This URL is for your view only. Do NOT include it in the tweet unless SPECIFICALLY ASKED TO by the user.',
+                  })
                 }
               })
             }
@@ -187,9 +196,57 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
       }
 
       // style
-      prompt.tag('style', createStylePrompt({ account, style }))
+      const style = await styleGuide(ctx.userId, instruction)
+      prompt.tag('style', style)
 
-      prompt.tag("reminder", "Remember to NEVER use ANY of the PROHIBITED_WORDS.")
+      if (ctx.length === 'short') {
+        prompt.tag(
+          'expected_length',
+          'Regardless of previous tweets lengths: You are expected to respond with a VERY SHORT tweet now (NEVER exceed a single sentence).',
+          {
+            note: 'Adjust the tweet length exactly to this requirement.',
+          },
+        )
+      } else if (ctx.length === 'long') {
+        prompt.tag(
+          'expected_length',
+          'Regardless of previous tweets lengths: You are expected to respond with a short tweet now (around 160 characters).',
+          {
+            note: 'Adjust the tweet length exactly to this requirement.',
+          },
+        )
+      } else if (ctx.length === 'thread') {
+        prompt.tag(
+          'expected_length',
+          `Regardless of previous tweets lengths: You are expected to respond with a thread now (multiple tweets). VERY IMPORTANT: To do this, separate each thread tweet with three hyphens (no break lines) to indicate moving on to the next tweet in the thread.
+
+<thread_example>
+  <tweet index="0">first tweet</tweet>
+  ---
+  <tweet index="1">second tweet</tweet>
+  ---
+  <tweet index="2">third tweet</tweet>
+</thread_example>`,
+          {
+            note: 'Adjust the tweet length exactly to this requirement.',
+          },
+        )
+      }
+
+      const memories = await Memories.get(ctx.userId, {
+        data: instruction,
+        topK: 25,
+        includeMetadata: true,
+        includeData: true,
+      })
+
+      prompt.open('memories', {
+        note: 'These are the memories you have about this user. Its on you to decide which perspective/context from these memories might or might not be relevant to write a tweet.',
+        perspective:
+          'When responding, adopt the perspective of the user. Use first-person ("I", "my", "we") when discussing their projects, companies, or work. Use third-person when discussing external things they are not directly involved with.',
+      })
+      memories.forEach((memory) => prompt.tag('memory', memory.data!))
+      prompt.close('memories')
 
       prompt.close('prompt')
 
@@ -213,9 +270,15 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         models: ['anthropic/claude-3.7-sonnet', 'openai/o4-mini'],
       })
 
+      console.log('STARTING STREAM')
+
       const result = streamText({
         model,
-        system: editToolSystemPrompt({ name: account.name }),
+        system: `${editToolSystemPrompt({ name: account.name, length: ctx.length })}
+        
+${avoidPrompt()}
+
+Remember: NEVER use prohibited words. Instead of banned words, use easy, 6-th grade level alternatives.`,
         messages: convertToModelMessages(messages),
         onError(error) {
           console.log('❌❌❌ ERROR:', JSON.stringify(error, null, 2))
@@ -225,6 +288,7 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
           })
         },
         async onFinish(message) {
+          console.log('FINISHED', message)
           await redis.lpush(ctx.redisKeys.thread, message.text)
         },
       })

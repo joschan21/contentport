@@ -1,22 +1,86 @@
+import { Keyword } from '@/app/studio/topic-monitor/feed-settings-modal'
 import React from 'react'
-import { levenshteinDistance } from './utils'
+
+const levenshteinDistance = (str1: string, str2: string): number => {
+  const matrix = Array(str2.length + 1)
+    .fill(null)
+    .map(() => Array(str1.length + 1).fill(null))
+
+  for (let i = 0; i <= str1.length; i++) {
+    matrix[0]![i] = i
+  }
+
+  for (let j = 0; j <= str2.length; j++) {
+    matrix[j]![0] = j
+  }
+
+  for (let j = 1; j <= str2.length; j++) {
+    for (let i = 1; i <= str1.length; i++) {
+      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1
+      matrix[j]![i] = Math.min(
+        matrix[j]![i - 1]! + 1,
+        matrix[j - 1]![i]! + 1,
+        matrix[j - 1]![i - 1]! + indicator,
+      )
+    }
+  }
+
+  return matrix[str2.length]![str1.length]!
+}
+
+const fuzzyIncludes = (text: string, keyword: string, tolerance: number = 1): boolean => {
+  const textLower = text.toLowerCase()
+  const keywordLower = keyword.toLowerCase()
+
+  if (textLower.includes(keywordLower)) {
+    return true
+  }
+
+  const words = textLower.split(/\s+/)
+
+  return words.some((word) => {
+    if (word.length < keywordLower.length - tolerance) {
+      return false
+    }
+
+    for (let i = 0; i <= word.length - keywordLower.length + tolerance; i++) {
+      for (
+        let j = keywordLower.length - tolerance;
+        j <= keywordLower.length + tolerance;
+        j++
+      ) {
+        if (i + j > word.length) continue
+
+        const substring = word.substring(i, i + j)
+        if (
+          substring.length >= keywordLower.length - tolerance &&
+          levenshteinDistance(substring, keywordLower) <= tolerance
+        ) {
+          return true
+        }
+      }
+    }
+
+    return false
+  })
+}
 
 interface HighlightMatch {
   start: number
   end: number
-  keyword: string
+  keyword: Keyword
 }
 
 const findFuzzyMatches = (
   text: string,
-  keywords: string[],
+  keywords: Keyword[],
   tolerance: number = 1,
 ): HighlightMatch[] => {
   const matches: HighlightMatch[] = []
   const textLower = text.toLowerCase()
 
   for (const keyword of keywords) {
-    const keywordLower = keyword.toLowerCase()
+    const keywordLower = keyword.text.toLowerCase()
 
     let searchIndex = 0
     while (searchIndex < text.length) {
@@ -24,10 +88,10 @@ const findFuzzyMatches = (
       if (exactMatch !== -1) {
         matches.push({
           start: exactMatch,
-          end: exactMatch + keyword.length,
+          end: exactMatch + keyword.text.length,
           keyword,
         })
-        searchIndex = exactMatch + keyword.length
+        searchIndex = exactMatch + keyword.text.length
         continue
       }
 
@@ -112,7 +176,7 @@ const mergeOverlappingMatches = (matches: HighlightMatch[]): HighlightMatch[] =>
 
 export const highlightText = (
   text: string,
-  keywords: string[],
+  keywords: Keyword[],
 ): (string | React.ReactElement)[] => {
   if (!keywords.length || !text) return [text]
 

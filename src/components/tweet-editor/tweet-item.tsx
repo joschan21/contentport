@@ -312,13 +312,13 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
               },
             )}
           >
-            <AccountAvatar className="relative !z-50 size-10" />
+            <AccountAvatar className="relative !z-50 size-11 mt-2" />
           </div>
 
           <div className="w-full flex-1">
             <div className="flex items-center gap-1">
               <AccountName />
-              <AccountHandle />
+              <div className='hidden sm:block'><AccountHandle /></div>
             </div>
 
             <div className="text-stone-800 leading-relaxed">

@@ -7,6 +7,7 @@ import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
 import { TwitterApi } from 'twitter-api-v2'
+import { Memories } from '@/lib/knowledge'
 
 export type Account = {
   id: string
@@ -38,7 +39,9 @@ export const settingsRouter = j.router({
       const activeAccount = await redis.json.get<Account>(`active-account:${user.email}`)
 
       if (activeAccount?.id === accountId) {
-        await redis.del(`active-account:${user.email}`)
+        throw new HTTPException(409, {
+          message: 'You cannot delete your active account.',
+        })
       }
 
       const [dbAccount] = await db
@@ -51,6 +54,12 @@ export const settingsRouter = j.router({
       }
 
       await redis.json.del(`account:${user.email}:${accountId}`)
+
+      // cleanup memories
+      await Memories.deleteAll({ accountId }).catch(() => {})
+
+      // cleanup tweets
+      await redis.del(`posts:${accountId}`)
 
       return c.json({ success: true })
     }),

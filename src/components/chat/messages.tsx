@@ -101,7 +101,11 @@ export const Messages = memo(
                         )
                       }
 
-                      if (part.type === 'tool-readWebsiteContent') {
+                      if(part.type === "tool-lookup_involved_project") {
+                        return <p className='text-gray-500' key={i}>Searching knowledge base...</p>
+                      }
+
+                      if (part.type === 'tool-read_website_content') {
                         if (
                           part.state === 'input-available' ||
                           part.state === 'input-streaming'
@@ -117,7 +121,7 @@ export const Messages = memo(
                               title={part.output.title}
                             >
                               <div className="line-clamp-3">
-                                <ReactMarkdown>
+                                <ReactMarkdown components={{ img: () => <></> }}>
                                   {part.output.content.slice(0, 250)}
                                 </ReactMarkdown>
                               </div>

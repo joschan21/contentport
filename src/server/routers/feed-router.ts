@@ -1,16 +1,11 @@
+import { Keyword } from '@/app/studio/topic-monitor/feed-settings-modal'
 import { redis } from '@/lib/redis'
-import { Redis } from '@upstash/redis'
+import { fuzzyIncludes } from '@/lib/utils'
 import { HTTPException } from 'hono/http-exception'
-import { EnrichedTweet, enrichTweet } from 'react-tweet'
-import { getTweet } from 'react-tweet/api'
-import superjson from 'superjson'
+import { EnrichedTweet } from 'react-tweet'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
-import { fuzzyIncludes } from '@/lib/utils'
-
-const redis_raw = Redis.fromEnv({
-  automaticDeserialization: false,
-})
+import { getTweet } from './utils/get-tweet'
 
 export const feedRouter = j.router({
   refresh: privateProcedure.post(async ({ c, ctx, input }) => {
@@ -21,7 +16,23 @@ export const feedRouter = j.router({
     if (user.plan === 'free') {
       keywords = ['contentport']
     } else {
-      keywords = (await redis.get<string[]>(`feed-keywords:${user.email}`)) ?? []
+      const feedKeywords = await redis.get<
+        | Array<{
+            text: string
+            excludeNameMatches: boolean
+            excludeLinkMatches: boolean
+          }>
+        | string[]
+      >(`feed-keywords:${user.email}`)
+
+      if (feedKeywords) {
+        keywords = feedKeywords.map((keyword) => {
+          if (typeof keyword === 'string') {
+            return keyword
+          }
+          return keyword.text
+        })
+      }
     }
 
     const userId = user.plan === 'free' ? 'contentport' : user.id
@@ -60,12 +71,31 @@ export const feedRouter = j.router({
       const { user } = ctx
       const { exclude } = input
 
-      let keywords: string[] = []
+      let keywords: Keyword[] = []
       if (user.plan === 'free') {
-        keywords = ['contentport']
+        keywords = [
+          { text: 'contentport', excludeLinkMatches: false, excludeNameMatches: false },
+        ]
       } else {
-        keywords = (await redis.get<string[]>(`feed-keywords:${user.email}`)) ?? []
+        const existing = await redis.get<(string | Keyword)[]>(
+          `feed-keywords:${user.email}`,
+        )
+
+        existing?.forEach((keyword) => {
+          if (typeof keyword === 'string') {
+            // legacy compat
+            keywords.push({
+              text: keyword,
+              excludeLinkMatches: false,
+              excludeNameMatches: false,
+            })
+          } else {
+            keywords.push(keyword)
+          }
+        })
       }
+
+      console.log('keywords', keywords)
 
       let ids: string[] = []
       if (user.plan === 'free') {
@@ -74,15 +104,17 @@ export const feedRouter = j.router({
         ids = await redis.smembers(`feed:${user.id}`)
       }
 
+      console.log('ids', ids)
+
       const tweetMap: Map<string, EnrichedTweet> = new Map()
       const replyMap: Record<string, string[]> = {}
       const mains = new Set<EnrichedTweet>()
 
       await Promise.all(
         ids.map(async (id) => {
-          const cached = await redis_raw.get<string>(`enriched-tweet:${id}`)
-          if (cached) {
-            const tweet = superjson.parse(cached) as EnrichedTweet
+          const tweet = await getTweet(id)
+
+          if (tweet) {
             tweetMap.set(tweet.id_str, tweet)
 
             if (tweet.in_reply_to_status_id_str) {
@@ -98,25 +130,25 @@ export const feedRouter = j.router({
             return tweet
           }
 
-          const tweet = await getTweet(id)
+          // const tweet = await getTweet(id)
 
-          if (tweet) {
-            const enriched = enrichTweet(tweet)
-            tweetMap.set(enriched.id_str, enriched)
+          // if (tweet) {
+          //   const enriched = enrichTweet(tweet)
+          //   tweetMap.set(enriched.id_str, enriched)
 
-            if (enriched.in_reply_to_status_id_str) {
-              if (!replyMap[enriched.in_reply_to_status_id_str]) {
-                replyMap[enriched.in_reply_to_status_id_str] = []
-              }
+          //   if (enriched.in_reply_to_status_id_str) {
+          //     if (!replyMap[enriched.in_reply_to_status_id_str]) {
+          //       replyMap[enriched.in_reply_to_status_id_str] = []
+          //     }
 
-              replyMap[enriched.in_reply_to_status_id_str]?.push(enriched.id_str)
-            } else {
-              mains.add(enriched)
-            }
+          //     replyMap[enriched.in_reply_to_status_id_str]?.push(enriched.id_str)
+          //   } else {
+          //     mains.add(enriched)
+          //   }
 
-            await redis_raw.set(`enriched-tweet:${id}`, superjson.stringify(enriched))
-            return enriched
-          }
+          //   await redis_raw.set(`enriched-tweet:${id}`, superjson.stringify(enriched))
+          //   return enriched
+          // }
         }),
       )
 
@@ -124,6 +156,8 @@ export const feedRouter = j.router({
         main: EnrichedTweet
         replyChains: Array<Array<EnrichedTweet>>
       }> = []
+
+      console.log('ids length', ids.length)
 
       const buildReplyChain = async (
         startTweet: EnrichedTweet,
@@ -148,6 +182,55 @@ export const feedRouter = j.router({
         return chain
       }
 
+      const excludeKeywords = keywords?.filter((k) => Boolean(exclude?.includes(k.text)))
+      const includeKeywords = keywords?.filter((k) => !Boolean(exclude?.includes(k.text)))
+
+      function shouldIncludeTweet(tweet: EnrichedTweet): boolean {
+        const text = tweet.entities.reduce((acc, curr) => {
+          if (curr.type === 'text') return acc + curr.text
+          return acc
+        }, '')
+
+        const hasExcludedKeyword = excludeKeywords.some((keyword) => {
+          const relevantEntities = tweet.entities.filter((e) => {
+            if (e.type === 'mention' || e.type === 'hashtag' || e.type === 'url') {
+              return fuzzyIncludes(e.text.toLowerCase(), keyword.text.toLowerCase())
+            }
+          })
+
+          return (
+            Boolean(fuzzyIncludes(text.toLowerCase(), keyword.text.toLowerCase())) ||
+            Boolean(relevantEntities.length)
+          )
+        })
+
+        const hasIncludedKeyword = includeKeywords.some((keyword) => {
+          const relevantEntities = tweet.entities.filter((e) => {
+            if (e.type === 'url' && keyword.excludeLinkMatches) return false
+
+            if (e.type === 'mention' || e.type === 'hashtag' || e.type === 'url') {
+              return fuzzyIncludes(e.text.toLowerCase(), keyword.text.toLowerCase())
+            }
+          })
+
+          let checkedText = text
+
+          if (keyword.excludeNameMatches === false) {
+            checkedText = [tweet.user.name, tweet.user.screen_name, text].join(' ')
+          }
+
+          return (
+            Boolean(
+              fuzzyIncludes(checkedText.toLowerCase(), keyword.text.toLowerCase()),
+            ) || Boolean(relevantEntities.length)
+          )
+        })
+
+        console.log('has included keyword?', hasIncludedKeyword)
+
+        return Boolean(hasIncludedKeyword && !hasExcludedKeyword)
+      }
+
       for (const mainTweet of Array.from(mains)) {
         const replyIds = replyMap[mainTweet.id_str] ?? []
 
@@ -161,29 +244,80 @@ export const feedRouter = j.router({
           }),
         )
 
+        function shouldIncludeTweet(tweet: EnrichedTweet): boolean {
+          const text = tweet.entities.reduce((acc, curr) => {
+            if (curr.type === 'text') return acc + curr.text
+            return acc
+          }, '')
+
+          const hasExcludedKeyword = excludeKeywords.some((keyword) => {
+            const relevantEntities = tweet.entities.filter((e) => {
+              if (e.type === 'mention' || e.type === 'hashtag' || e.type === 'url') {
+                return fuzzyIncludes(e.text.toLowerCase(), keyword.text.toLowerCase())
+              }
+            })
+
+            return (
+              Boolean(fuzzyIncludes(text.toLowerCase(), keyword.text.toLowerCase())) ||
+              Boolean(relevantEntities.length)
+            )
+          })
+
+          const hasIncludedKeyword = includeKeywords.some((keyword) => {
+            const relevantEntities = tweet.entities.filter((e) => {
+              if (e.type === 'url' && keyword.excludeLinkMatches) return false
+
+              if (e.type === 'mention' || e.type === 'hashtag' || e.type === 'url') {
+                return fuzzyIncludes(e.text.toLowerCase(), keyword.text.toLowerCase())
+              }
+            })
+
+            let checkedText = text
+
+            if (keyword.excludeNameMatches === false) {
+              checkedText = [tweet.user.name, tweet.user.screen_name, text].join(' ')
+            }
+
+            return (
+              Boolean(
+                fuzzyIncludes(checkedText.toLowerCase(), keyword.text.toLowerCase()),
+              ) || Boolean(relevantEntities.length)
+            )
+          })
+
+          console.log('has included keyword?', hasIncludedKeyword)
+
+          return Boolean(hasIncludedKeyword && !hasExcludedKeyword)
+        }
+
         const filteredChains = replyChains.filter((chain) => {
           return chain.some((tweet) => {
-            return keywords?.some((keyword) => {
-              const text = tweet.entities.reduce((acc, curr) => {
-                if (curr.type === 'text') {
-                  return acc + curr.text
-                } else return acc
-              }, '')
+            return shouldIncludeTweet(tweet)
+            // return keywords?.some((keyword) => {
+            //   const text = tweet.entities.reduce((acc, curr) => {
+            //     if (curr.type === 'text') {
+            //       return acc + curr.text
+            //     } else return acc
+            //   }, '')
 
-              const relevantEntities = tweet.entities.filter(
-                (e) =>
-                  e.type === 'mention' ||
-                  e.type === 'hashtag' ||
-                  (e.type === 'url' &&
-                    fuzzyIncludes(e.text.toLowerCase(), keyword.toLowerCase())),
-              )
+            //   const relevantEntities = tweet.entities.filter(
+            //     (e) => {
+            //       if (e.type === 'mention' || e.type === 'hashtag' || e.type === 'url') {
+            //         return fuzzyIncludes(e.text.toLowerCase(), keyword.text.toLowerCase())
+            //       }
+            //     },
+            //     // e.type === 'mention' ||
+            //     // e.type === 'hashtag' ||
+            //     // (e.type === 'url' &&
+            //     //   fuzzyIncludes(e.text.toLowerCase(), keyword.text.toLowerCase())),
+            //   )
 
-              const isRelevant =
-                Boolean(fuzzyIncludes(text.toLowerCase(), keyword.toLowerCase())) ||
-                Boolean(relevantEntities.length)
+            //   const isRelevant =
+            //     Boolean(fuzzyIncludes(text.toLowerCase(), keyword.text.toLowerCase())) ||
+            //     Boolean(relevantEntities.length)
 
-              return isRelevant
-            })
+            //   return isRelevant
+            // })
           })
         })
 
@@ -193,64 +327,20 @@ export const feedRouter = j.router({
         })
       }
 
-      const excludeKeywords = exclude?.filter(Boolean) ?? []
-      const includeKeywords = keywords?.filter((k) => !excludeKeywords.includes(k)) ?? []
-
-      const shouldExcludeTweet = (tweet: EnrichedTweet): boolean => {
-        if (excludeKeywords.length === 0) return false
-
-        const text = tweet.entities.reduce((acc, curr) => {
-          if (curr.type === 'text') {
-            return acc + curr.text
-          } else return acc
-        }, '')
-
-        const hasExcludedKeyword = excludeKeywords.some((keyword) => {
-          const relevantEntities = tweet.entities.filter(
-            (e) =>
-              e.type === 'mention' ||
-              e.type === 'hashtag' ||
-              (e.type === 'url' &&
-                fuzzyIncludes(e.text.toLowerCase(), keyword.toLowerCase())),
-          )
-
-          return (
-            Boolean(fuzzyIncludes(text.toLowerCase(), keyword.toLowerCase())) ||
-            Boolean(relevantEntities.length)
-          )
-        })
-
-        if (!hasExcludedKeyword) return false
-
-        const hasIncludedKeyword = includeKeywords.some((keyword) => {
-          const relevantEntities = tweet.entities.filter((e) => {
-            if (e.type === 'mention' || e.type === 'hashtag' || e.type === 'url') {
-              return fuzzyIncludes(e.text.toLowerCase(), keyword.toLowerCase())
-            }
-          })
-
-          return (
-            Boolean(fuzzyIncludes(text.toLowerCase(), keyword.toLowerCase())) ||
-            Boolean(relevantEntities.length)
-          )
-        })
-
-        return hasExcludedKeyword && !hasIncludedKeyword
-      }
-
       const filteredData = data.filter((item) => {
-        const shouldExcludeMain = shouldExcludeTweet(item.main)
-        if (shouldExcludeMain) return false
+        const shouldIncludeMain = shouldIncludeTweet(item.main)
+        console.log('should include??', shouldIncludeMain)
+        if (shouldIncludeMain) return true
 
-        const hasExcludedReplies = item.replyChains.some((chain) =>
+        const hasIncludedReplies = item.replyChains.some((chain) =>
           chain.some((tweet) => {
-            return shouldExcludeTweet(tweet)
+            return shouldIncludeTweet(tweet)
           }),
         )
 
-        if (hasExcludedReplies) return false
+        if (hasIncludedReplies) return true
 
-        return true
+        return false
       })
 
       let sorted: typeof filteredData = []
@@ -276,13 +366,44 @@ export const feedRouter = j.router({
   get_keywords: privateProcedure.get(async ({ c, ctx }) => {
     const { user } = ctx
 
-    let keywords: string[] = []
-
     if (user.plan === 'free') {
-      keywords = ['contentport']
-    } else {
-      const feedKeywords = await redis.get<string[]>(`feed-keywords:${user.email}`)
-      if (feedKeywords) keywords = feedKeywords
+      return c.json({
+        keywords: [
+          {
+            text: 'contentport',
+            excludeNameMatches: false,
+            excludeLinkMatches: false,
+          },
+        ],
+      })
+    }
+
+    const feedKeywords = await redis.get<
+      | Array<{
+          text: string
+          excludeNameMatches: boolean
+          excludeLinkMatches: boolean
+        }>
+      | string[]
+    >(`feed-keywords:${user.email}`)
+
+    let keywords: Array<{
+      text: string
+      excludeNameMatches: boolean
+      excludeLinkMatches: boolean
+    }> = []
+
+    if (feedKeywords) {
+      keywords = feedKeywords.map((keyword) => {
+        if (typeof keyword === 'string') {
+          return {
+            text: keyword,
+            excludeNameMatches: false,
+            excludeLinkMatches: false,
+          }
+        }
+        return keyword
+      })
     }
 
     return c.json({ keywords })
@@ -291,16 +412,22 @@ export const feedRouter = j.router({
   save_keywords: privateProcedure
     .input(
       z.object({
-        keywords: z.array(z.string()),
+        keywords: z.array(
+          z.object({
+            text: z.string(),
+            excludeNameMatches: z.boolean().default(false),
+            excludeLinkMatches: z.boolean().default(false),
+          }),
+        ),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
       const { keywords } = input
 
-      if (user.plan === 'free' && keywords.length > 1) {
+      if (user.plan === 'free') {
         throw new HTTPException(402, {
-          message: 'Topic limit (1) reached, please upgrade to monitor more keywords.',
+          message: 'Please upgrade to monitor more keywords.',
         })
       }
 
@@ -310,10 +437,65 @@ export const feedRouter = j.router({
         })
       }
 
-      await redis.set(`feed-keywords:${user.email}`, keywords)
-      await redis.del(`feed:${user.id}`)
-      await redis.del(`last-scan:${user.id}`)
+      const currentKeywords = await redis.get<Keyword[]>(`feed-keywords:${user.email}`)
 
-      return c.json({ success: true })
+      const isTextContentChange = currentKeywords?.some(
+        (keyword) => keyword.text !== keywords.find((k) => k.text === keyword.text)?.text,
+      )
+
+      await redis.set<Keyword[]>(`feed-keywords:${user.email}`, keywords)
+
+      if (isTextContentChange) {
+        await redis.del(`feed:${user.id}`)
+        await redis.del(`last-scan:${user.id}`)
+      }
+
+      return c.json({ keywords })
     }),
+
+  // start_index_own_tweets: privateProcedure.post(async ({ c, ctx }) => {
+  //   const { user } = ctx
+
+  //   const account = await getAccount({ email: user.email })
+
+  //   if (!account) {
+  //     throw new HTTPException(404, {
+  //       message: 'Account not found',
+  //     })
+  //   }
+
+  //   const baseUrl =
+  //     process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
+
+  //   await qstash.publishJSON({
+  //     url: baseUrl + '/feed/index_own_tweets',
+  //     body: {
+  //       userId: user.id,
+  //       accountId: account.id,
+  //       username: account.username,
+  //     },
+  //   })
+
+  //   return c.json({ success: true })
+  // }),
+
+  // index_own_tweets: qstashProcedure.post(async ({ c, ctx, input }) => {
+  //   const { body } = ctx
+  //   const { userId, accountId, username } = body
+
+  //   const res = await fetch(process.env.TWITTER_API_SERVICE + '/knowledge/index', {
+  //     method: 'POST',
+  //     headers: {
+  //       'Content-Type': 'application/json',
+  //       Authorization: `Bearer ${process.env.CONTENTPORT_IDENTITY_KEY}`,
+  //     },
+  //     body: JSON.stringify({ accountId: accountId, handle: username }),
+  //   })
+
+  //   const namespace = realtime.namespace(userId)
+
+  //   await namespace.index_own_tweets.update({ status: 'success' })
+
+  //   return c.json({ status: 'success' })
+  // }),
 })

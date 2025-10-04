@@ -473,7 +473,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         isPosting={isPosting}
       />
 
-      <SidebarInset className="w-full flex-1 overflow-x-hidden bg-stone-100 border border-gray-200">
+      <SidebarInset className="w-full flex-1 overflow-x-hidden bg-stone-100">
         {/* Dot Pattern Background */}
         <div
           className="absolute inset-0 z-0 pointer-events-none"
@@ -491,7 +491,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
           />
         </div>
 
-        <header className="relative z-10 flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 justify-between">
+        <header className="relative z-20 flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 justify-between">
           <div className="flex w-full justify-end items-center gap-2 px-4">
             <div className="flex items-center gap-2">
               {/* post & queue buttons */}
@@ -553,7 +553,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                                 >
                                   <DuolingoButton
                                     size="sm"
-                                    className="group/toggle-button rounded-r-none"
+                                    className="group/toggle-button rounded-r-none h-10"
                                   >
                                     Schedule
                                   </DuolingoButton>
@@ -626,7 +626,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                             <DuolingoButton
                               size="sm"
                               onClick={() => setIsPostDialogOpen(true)}
-                              className="group/toggle-button"
+                              className="group/toggle-button h-10"
                             >
                               Post
                             </DuolingoButton>
@@ -657,7 +657,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                     variant="secondary"
                     size="icon"
                     onClick={toggleSidebar}
-                    className="group/toggle-button shrink-0"
+                    className="group/toggle-button shrink-0 h-10"
                   >
                     <PanelLeft className="h-4 w-4 transition-all duration-200 group-hover/toggle-button:opacity-0 group-hover/toggle-button:scale-75" />
                     <div className="absolute transition-all duration-200 opacity-0 scale-75 group-hover/toggle-button:opacity-100 group-hover/toggle-button:scale-100">

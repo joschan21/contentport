@@ -8,9 +8,10 @@ import Link from 'next/link'
 import { EnrichedTweet, TweetMedia } from 'react-tweet'
 import { QuotedTweet } from './quoted-tweet'
 import { TweetBody } from './tweet-body'
+import { Keyword } from '../topic-monitor/feed-settings-modal'
 
 interface TweetCardProps {
-  keywords: string[]
+  keywords: Keyword[]
   isNew: boolean
   threadGroup?: InferOutput['feed']['get_tweets'][number]
 }

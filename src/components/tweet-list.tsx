@@ -18,20 +18,10 @@ import { Clock, Eye } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Fragment } from 'react'
+import { EmptyState } from '@/app/studio/topic-monitor/empty-state'
+interface TweetListProps {}
 
-interface TweetListProps {
-  title: string
-  emptyStateTitle: string
-  emptyStateDescription: string
-  emptyStateIcon: React.ReactNode
-}
-
-export default function TweetList({
-  title,
-  emptyStateTitle,
-  emptyStateDescription,
-  emptyStateIcon,
-}: TweetListProps) {
+export default function TweetList({}: TweetListProps) {
   const { account } = useAccount()
   const router = useRouter()
 
@@ -44,23 +34,23 @@ export default function TweetList({
     enabled: !!account,
   })
 
-  if (isLoading) {
-    return (
-      <div className="container max-w-4xl mx-auto p-6">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-stone-800">{title}</h1>
-          </div>
-          <div className="animate-pulse bg-stone-100 h-16 rounded-lg" />
-          <div className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="animate-pulse bg-stone-100 h-16 rounded-lg" />
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // if (isLoading) {
+  //   return (
+  //     <div className="container max-w-4xl mx-auto p-6">
+  //       <div className="space-y-4">
+  //         <div className="flex items-center gap-3">
+  //           <h1 className="text-2xl font-bold text-stone-800">{title}</h1>
+  //         </div>
+  //         <div className="animate-pulse bg-stone-100 h-16 rounded-lg" />
+  //         <div className="space-y-2">
+  //           {Array.from({ length: 5 }).map((_, i) => (
+  //             <div key={i} className="animate-pulse bg-stone-100 h-16 rounded-lg" />
+  //           ))}
+  //         </div>
+  //       </div>
+  //     </div>
+  //   )
+  // }
 
   const renderDay = (unix: number) => {
     if (isToday(unix)) return `Today | ${format(unix, 'MMM d')}`
@@ -74,19 +64,10 @@ export default function TweetList({
     <div className="relative z-10 p-2">
       <div className="space-y-6">
         {results.length === 0 ? (
-          <Card className="p-12 text-center">
-            <div className="flex flex-col gap-4">
-              {emptyStateIcon}
-              <h3 className="text-lg font-medium text-stone-800">{emptyStateTitle}</h3>
-              <p className="text-stone-600">{emptyStateDescription}</p>
-              <DuolingoButton
-                onClick={() => router.push('/studio')}
-                className="w-fit mx-auto"
-              >
-                Start writing ✏️
-              </DuolingoButton>
-            </div>
-          </Card>
+          <EmptyState
+            title="No tweets to show"
+            description="Your published tweets will appear here once you start posting."
+          />
         ) : (
           <div className="space-y-6">
             {results.map((result) => {

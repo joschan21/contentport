@@ -1,12 +1,32 @@
 import { db } from '@/db'
 import { listKnowledgeDocuments } from '@/db/queries/knowledge'
-import { knowledgeDocument } from '@/db/schema'
+import { knowledgeDocument, user as userSchema } from '@/db/schema'
 import { firecrawl } from '@/lib/firecrawl'
 import { and, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { TwitterApi } from 'twitter-api-v2'
 import { z } from 'zod'
-import { j, privateProcedure } from '../jstack'
+import { j, privateProcedure, publicProcedure, qstashProcedure } from '../jstack'
+import { getAccount } from './utils/get-account'
+import { redis } from '@/lib/redis'
+import { Knowledge, Memories, Sitemap } from '@/lib/knowledge'
+import { generateText } from 'ai'
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { XmlPrompt } from '@/lib/xml-prompt'
+import { qstash } from '@/lib/qstash'
+import { getBaseUrl } from '@/constants/base-url'
+import { randomUUID } from 'crypto'
+import { nanoid } from 'nanoid'
+import { Index } from '@upstash/vector'
+import { vector } from '@/lib/vector'
+import { Redis } from '@upstash/redis'
+import { realtime } from '@/lib/realtime'
+import { getTweet } from './utils/get-tweet'
+import { Account } from './settings-router'
+
+const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
+})
 
 const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
 
@@ -33,7 +53,699 @@ export type TweetMetadata = {
   }
 }
 
+type Bio = {
+  username: string
+  name: string
+  description: string
+  id: string
+}
+
+type TSitemap = {
+  id: string
+  name: string
+  url: string
+  updatedAt: number // unix
+  length: number
+}
+
 export const knowledgeRouter = j.router({
+  reindex_all_accounts: privateProcedure.post(async ({ c, ctx }) => {
+    const { user } = ctx
+
+    const [dbUser] = await db.select().from(userSchema).where(eq(userSchema.id, user.id))
+
+    if (!dbUser) {
+      throw new HTTPException(404, { message: 'User not found' })
+    }
+
+    const accounts = await redis.scan(0, { match: `account:${dbUser.email}:*` })
+    const [, accountKeys] = accounts
+
+    if (accountKeys.length === 0) {
+      throw new HTTPException(404, { message: 'No accounts found' })
+    }
+
+    const baseUrl =
+      process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
+
+    const indexingPromises = []
+
+    for (const accountKey of accountKeys) {
+      const account = await redis.json.get<{
+        id: string
+        username: string
+        name: string
+        profile_image_url: string
+        verified: boolean
+        twitterId: string
+      }>(accountKey)
+
+      if (account) {
+        indexingPromises.push(
+          qstash.publishJSON({
+            url: baseUrl + '/api/knowledge/index_tweets',
+            body: {
+              userId: user.id,
+              accountId: account.id,
+              handle: account.username,
+            },
+          }),
+          qstash.publishJSON({
+            url: baseUrl + '/api/knowledge/index_memories',
+            body: {
+              userId: user.id,
+              accountId: account.id,
+              handle: account.username,
+            },
+          }),
+        )
+      }
+    }
+
+    await Promise.all(indexingPromises)
+
+    return c.json({ success: true })
+  }),
+
+  get_sitemaps: privateProcedure.get(async ({ c, ctx }) => {
+    const { user } = ctx
+
+    const sitemaps = await redis.hgetall<
+      Record<string, { id: string; name: string; url: string; updatedAt: number }>
+    >(`sitemaps:${user.email}`)
+
+    if (!sitemaps) {
+      return c.json({
+        sitemaps: {} as Record<
+          string,
+          { id: string; name: string; url: string; length: number; updatedAt: number }
+        >,
+      })
+    }
+
+    const sitemapsWithLength: Record<
+      string,
+      { id: string; name: string; url: string; length: number; updatedAt: number }
+    > = {}
+
+    await Promise.all(
+      Object.entries(sitemaps).map(async ([key, sitemap]) => {
+        const length = await redis.scard(`sitemap:${sitemap.id}`)
+
+        sitemapsWithLength[key] = { ...sitemap, length }
+      }),
+    )
+
+    return c.json({ sitemaps: sitemapsWithLength })
+  }),
+
+  delete_sitemap: privateProcedure
+    .input(z.object({ id: z.string() }))
+    .post(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { id } = input
+
+      const sitemap = await redis.hget<{
+        id: string
+        name: string
+        url: string
+        updatedAt: number
+      }>(`sitemaps:${user.email}`, id)
+
+      if (sitemap) {
+        await redis.hdel(`sitemaps:${user.email}`, id)
+        await redis.del(`sitemap:${sitemap.url}`)
+      }
+
+      vector.deleteNamespace(`sitemap:${id}`)
+
+      return c.json({ success: true })
+    }),
+
+  refresh_sitemap: privateProcedure
+    .input(z.object({ id: z.string() }))
+    .post(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { id } = input
+
+      const namespace = vector.namespace(`sitemap:${id}`)
+
+      const sitemap = await redis.hget<{
+        id: string
+        name: string
+        url: string
+        updatedAt: number
+      }>(`sitemaps:${user.email}`, id)
+
+      if (!sitemap) {
+        throw new HTTPException(404, { message: 'Sitemap not found' })
+      }
+
+      const map = await firecrawl.mapUrl(sitemap.url)
+
+      if (map.error) {
+        throw new HTTPException(500, { message: `Unable to index sitemap: ${map.error}` })
+      }
+
+      if (map.success && map.links) {
+        await redis.del(`sitemap:${sitemap.id}`)
+        await redis.sadd(`sitemap:${sitemap.id}`, ...(map.links as [string]))
+
+        const batchSize = 1_000
+
+        await namespace.reset()
+
+        // upstash vector has max batch size of 1_000
+        for (let i = 0; i < map.links.length; i += batchSize) {
+          const batch = map.links.slice(i, i + batchSize)
+          await namespace.upsert(
+            batch.map((link) => ({
+              id: link,
+              data: link,
+              metadata: { userId: user.id },
+            })),
+          )
+        }
+      }
+
+      return c.json({ success: true })
+    }),
+
+  // start_indexing_sitemap: privateProcedure
+  //   .input(z.object({ name: z.string(), url: z.string() }))
+  //   .post(async ({ c, ctx, input }) => {
+  //     const { user } = ctx
+  //     const { name, url } = input
+
+  //     const id = randomUUID()
+
+  //     const baseUrl =
+  //       process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
+
+  //     await qstash.publishJSON({
+  //       url: baseUrl + '/api/knowledge/index_sitemap',
+  //       method: 'POST',
+  //       body: { id, name, url, userId: user.id },
+  //     })
+
+  //     return c.json({ success: true, id })
+  //   }),
+  index_sitemap: privateProcedure
+    .input(
+      z.object({
+        name: z.string(),
+        url: z.string(),
+      }),
+    )
+    .post(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { name, url } = input
+
+      const [dbUser] = await db
+        .select()
+        .from(userSchema)
+        .where(eq(userSchema.id, user.id))
+
+      if (!dbUser) {
+        throw new HTTPException(404, { message: 'User not found' })
+      }
+
+      const id = nanoid()
+
+      await redis.hset(`sitemaps:${dbUser.email}`, {
+        [id]: { id, name, url, updatedAt: new Date().getTime() },
+      })
+
+      const map = await firecrawl.mapUrl(url)
+
+      if (map.error) {
+        throw new HTTPException(500, { message: `Unable to index sitemap: ${map.error}` })
+      }
+
+      const namespace = vector.namespace(`sitemap:${id}`)
+
+      if (map.success && map.links) {
+        await redis.del(`sitemap:${id}`)
+        await redis.sadd(`sitemap:${id}`, ...(map.links as [string]))
+
+        await namespace.reset()
+
+        const batchSize = 1_000
+
+        // upstash vector has max batch size of 1_000
+        for (let i = 0; i < map.links.length; i += batchSize) {
+          const batch = map.links.slice(i, i + batchSize)
+          await namespace.upsert(
+            batch.map((link) => ({
+              id: link,
+              data: link,
+              metadata: { userId: user.id },
+            })),
+          )
+        }
+      }
+
+      return c.json({ success: true })
+    }),
+
+  get_own_tweets: privateProcedure.get(async ({ c, ctx, input }) => {
+    const { user } = ctx
+
+    const account = await getAccount({ email: user.email })
+
+    if (!account) {
+      throw new HTTPException(404, {
+        message: 'Account not found',
+      })
+    }
+
+    console.log('GETTING TWEETS FOR ACC', account.id)
+
+    const ids = await redis.smembers(`posts:${account.id}`)
+
+    const tweets = await Promise.all(ids.map((id) => getTweet(id)))
+
+    const returnTweets = tweets
+      .filter(Boolean)
+      .sort((a, b) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+      .map((t) => ({ main: t, replyChains: [] }))
+
+    return c.json(returnTweets)
+  }),
+
+  index_memories: qstashProcedure.post(async ({ c, ctx }) => {
+    const { body } = ctx
+    const { userId, accountId } = body
+
+    const [dbUser] = await db.select().from(userSchema).where(eq(userSchema.id, userId))
+
+    if (!dbUser) {
+      throw new HTTPException(404, { message: 'User not found' })
+    }
+
+    const account = await getAccount({ email: dbUser.email, accountId })
+
+    if (!account) {
+      throw new HTTPException(404, { message: 'Account not found' })
+    }
+
+    await Memories.deleteAll({ accountId }).catch(() => {})
+
+    let bios: Array<Bio> = []
+
+    const twitterUser = await client.v2.user(account.twitterId!, {
+      'user.fields': ['description', 'entities'],
+    })
+
+    bios.push({
+      username: twitterUser.data.username,
+      name: twitterUser.data.name,
+      description: twitterUser.data.description || '',
+      id: twitterUser.data.id,
+    })
+
+    const mentionedUsers = twitterUser.data?.entities?.description?.mentions
+
+    if (mentionedUsers && mentionedUsers.length > 0) {
+      const mentionedUsernames = mentionedUsers.map((mention) => mention.username)
+      const usersResponse = await client.v2.usersByUsernames(mentionedUsernames, {
+        'user.fields': ['description', 'entities', 'public_metrics'],
+      })
+
+      bios.push(
+        ...usersResponse.data?.map((user) => ({
+          username: user.username,
+          name: user.name,
+          description: user.description || '',
+          id: user.id,
+        })),
+      )
+    }
+
+    const prompt = new XmlPrompt()
+
+    prompt.open('prompt')
+    prompt.tag(
+      'instructions',
+      'summarize this twitter user in up to 10 bullet points. frame it from the perspective of the main user (e.g. Im a software engineer at XYZ)',
+    )
+
+    bios.forEach((bio, i) => {
+      let note: string | undefined = undefined
+
+      if (i === 0 && bios.length > 1) {
+        note =
+          "This is the main user we're talking about. Other bios are attached because they are mentioned in the main user's description."
+      } else if (i > 0) {
+        note = "This is a user/company/project mentioned in the main user's description."
+      }
+
+      prompt.tag(
+        'bio',
+        `Name: ${bio.name} Username: ${bio.username} Description: ${bio.description}`,
+        { ...(note ? { note } : {}) },
+      )
+    })
+
+    prompt.tag(
+      'example_output',
+      `- memory one
+- memory two
+- memory three`,
+      {
+        note: "Respond with all bullet points directly. No 'here's the bullet points' or similar, just start immediately with the first bullet point and end with the last. Use standard hypens for the bullet points, nothing else.",
+      },
+    )
+
+    prompt.close('prompt')
+
+    const result = await generateText({
+      model: openrouter.chat('anthropic/claude-sonnet-4'),
+      prompt: prompt.toString(),
+    })
+
+    const memories = result.text
+      .split('\n')
+      .map((line) => line.trim())
+      .map((line) => (line.startsWith('-') ? line.slice(1).trim() : line))
+
+    await Promise.all(
+      memories.map(async (memory) => {
+        await redis.lpush(`memories:${account.id}`, { id: nanoid(), memory })
+      }),
+    )
+
+    const namespace = realtime.channel(userId)
+    await namespace.index_memories.status.emit({ status: 'success' })
+
+    return c.json({ success: true })
+  }),
+
+  show_indexing_modal: privateProcedure.query(async ({ c, ctx, input }) => {
+    const { user } = ctx
+
+    const accounts = await redis.scan(0, { match: `account:${user.email}:*` })
+
+    const [_, accountKeys] = accounts
+
+    const accountStatuses = await Promise.all(
+      accountKeys.map(async (key) => {
+        const account = await redis.json.get<Account>(key)
+        const status = await redis.get<'started' | 'success' | 'error'>(
+          `status:posts:${account?.id}`,
+        )
+
+        if (status === 'started') return { isAcceptable: true }
+        if (status === 'success') return { isAcceptable: true }
+
+        if (account) {
+          // status can expire, so double-check
+          const posts = await redis.exists(`posts:${account.id}`)
+          if (posts) return { isAcceptable: true }
+        }
+
+        return { isAcceptable: false }
+      }),
+    )
+
+    if (accountStatuses.some((account) => account.isAcceptable === false)) {
+      return c.json({ shouldShow: true })
+    }
+
+    return c.json({ shouldShow: false })
+  }),
+
+  index_tweets: qstashProcedure.post(async ({ c, ctx, input }) => {
+    const { body } = ctx
+    const { userId, accountId, handle } = body
+
+    await redis.set(`status:posts:${accountId}`, 'started', { ex: 60 * 60 * 24 })
+
+    try {
+      await fetch(process.env.TWITTER_API_SERVICE + '/knowledge/index_tweets', {
+        method: 'POST',
+        body: JSON.stringify({
+          accountId,
+          handle,
+        }),
+        headers: {
+          Authorization: `Bearer ${process.env.CONTENTPORT_IDENTITY_KEY}`,
+        },
+      })
+    } catch (err) {
+      await redis.set(`status:posts:${accountId}`, 'error')
+    }
+
+    const namespace = realtime.channel(userId)
+    await namespace.index_tweets.status.emit({ status: 'success' })
+
+    return c.json({ success: true })
+  }),
+
+  //     .input(z.object({ accountId: z.string() }).optional())
+  //     .post(async ({ c, ctx, input }) => {
+  //       const { user } = ctx
+
+  //       const account = await getAccount({ email: user.email, accountId: input?.accountId })
+
+  //       if (!account) {
+  //         throw new HTTPException(404, { message: 'Account not found' })
+  //       }
+
+  //       await Memories.deleteAll({ accountId: account.id })
+
+  //       let bios: Array<Bio> = []
+
+  //       const twitterUser = await client.v2.user(account.twitterId!, {
+  //         'user.fields': ['description', 'entities'],
+  //       })
+
+  //       bios.push({
+  //         username: twitterUser.data.username,
+  //         name: twitterUser.data.name,
+  //         description: twitterUser.data.description || '',
+  //         id: twitterUser.data.id,
+  //       })
+
+  //       const mentionedUsers = twitterUser.data?.entities?.description?.mentions
+
+  //       if (mentionedUsers && mentionedUsers.length > 0) {
+  //         const mentionedUsernames = mentionedUsers.map((mention) => mention.username)
+  //         const usersResponse = await client.v2.usersByUsernames(mentionedUsernames, {
+  //           'user.fields': ['description', 'entities', 'public_metrics'],
+  //         })
+
+  //         console.log(usersResponse.data)
+
+  //         bios.push(
+  //           ...usersResponse.data?.map((user) => ({
+  //             username: user.username,
+  //             name: user.name,
+  //             description: user.description || '',
+  //             id: user.id,
+  //           })),
+  //         )
+  //       }
+
+  //       const prompt = new XmlPrompt()
+
+  //       prompt.open('prompt')
+  //       prompt.tag(
+  //         'instructions',
+  //         'summarize this twitter user in up to 10 bullet points. frame it from the perspective of the main user (e.g. Im a software engineer at XYZ)',
+  //       )
+
+  //       bios.forEach((bio, i) => {
+  //         let note: string | undefined = undefined
+
+  //         if (i === 0 && bios.length > 1) {
+  //           note =
+  //             "This is the main user we're talking about. Other bios are attached because they are mentioned in the main user's description."
+  //         } else if (i > 0) {
+  //           note =
+  //             "This is a user/company/project mentioned in the main user's description."
+  //         }
+
+  //         prompt.tag(
+  //           'bio',
+  //           `Name: ${bio.name} Username: ${bio.username} Description: ${bio.description}`,
+  //           { ...(note ? { note } : {}) },
+  //         )
+  //       })
+
+  //       prompt.tag(
+  //         'example_output',
+  //         `- memory one
+  // - memory two
+  // - memory three`,
+  //         {
+  //           note: "Respond with all bullet points directly. No 'here's the bullet points' or similar, just start immediately with the first bullet point and end with the last.",
+  //         },
+  //       )
+
+  //       prompt.close('prompt')
+
+  //       const result = await generateText({
+  //         model: openrouter.chat('anthropic/claude-sonnet-4'),
+  //         prompt: prompt.toString(),
+  //       })
+
+  //       // output to array
+  //       const memories = result.text
+  //         .split('\n')
+  //         .map((line) => line.trim())
+  //         .map((line) => (line.startsWith('-') ? line.slice(1).trim() : line))
+
+  //       await Promise.all(
+  //         memories.map((memory) => {
+  //           return Memories.add({ accountId: account.id, data: memory })
+  //         }),
+  //       )
+
+  //       return c.json({ success: true })
+  //     }),
+  get_memories: privateProcedure.get(async ({ c, ctx, input }) => {
+    const { user } = ctx
+
+    const account = await getAccount({ email: user.email })
+
+    if (!account) {
+      throw new HTTPException(404, { message: 'Account not found' })
+    }
+
+    const memories = await redis.lrange<{ id: string; memory: string }>(
+      `memories:${account.id}`,
+      0,
+      -1,
+    )
+
+    return c.json({ memories })
+  }),
+
+  add_memory: privateProcedure
+    .input(z.object({ memory: z.string() }))
+    .post(async ({ c, ctx, input }) => {
+      const { memory } = input
+      const { user } = ctx
+
+      const account = await getAccount({ email: user.email })
+
+      if (!account) {
+        throw new HTTPException(404, { message: 'Account not found' })
+      }
+
+      const result = await Memories.add({ accountId: account.id, data: memory })
+
+      return c.json({
+        success: true,
+        memoryId: result.id,
+        timestamp: result.timestamp,
+      })
+    }),
+
+  delete_memory: privateProcedure
+    .input(z.object({ memoryId: z.string() }))
+    .post(async ({ c, ctx, input }) => {
+      const { memoryId } = input
+      const { user } = ctx
+
+      const account = await getAccount({ email: user.email })
+
+      if (!account) {
+        throw new HTTPException(404, { message: 'Account not found' })
+      }
+
+      await Memories.delete({ accountId: account.id, memoryId })
+
+      return c.json({
+        success: true,
+        memoryId,
+      })
+    }),
+
+  //   summarize_user: privateProcedure.post(async ({ c, ctx, input }) => {
+  //     const { user } = ctx
+
+  //     const account = await getAccount({
+  //       email: user.email,
+  //     })
+
+  //     if (!account?.id) {
+  //       throw new HTTPException(400, {
+  //         message: 'Please connect your Twitter account',
+  //       })
+  //     }
+
+  //     let bios: Array<Bio> = []
+
+  //     const twitterUser = await client.v2.user(account.twitterId!, {
+  //       'user.fields': ['description', 'entities'],
+  //     })
+
+  //     bios.push({
+  //       username: twitterUser.data.username,
+  //       name: twitterUser.data.name,
+  //       description: twitterUser.data.description || '',
+  //       id: twitterUser.data.id,
+  //     })
+
+  //     const mentionedUsers = twitterUser.data?.entities?.description?.mentions
+
+  //     if (mentionedUsers && mentionedUsers.length > 0) {
+  //       const mentionedUsernames = mentionedUsers.map((mention) => mention.username)
+  //       const usersResponse = await client.v2.usersByUsernames(mentionedUsernames, {
+  //         'user.fields': ['description', 'entities'],
+  //       })
+
+  //       bios.push(
+  //         ...usersResponse.data?.map((user) => ({
+  //           username: user.username,
+  //           name: user.name,
+  //           description: user.description || '',
+  //           id: user.id,
+  //         })),
+  //       )
+  //     }
+
+  //     const result = await generateText({
+  //       model: openrouter.chat('anthropic/claude-sonnet-4'),
+  //       prompt: `summarize this twitter user in 1-2 sentences and an unordered list of up to 5 bullet points. respond in markdown.
+
+  // - Write this in a conversational, understated tone, like you're casually telling a friend who this person is
+  // - Avoid marketing language and buzzwords
+  // - Keep it straightforward and matter-of-fact
+
+  // don't write headings for each section, just respond with the two sections directly.
+
+  // for example
+  // - memory one
+  // - memory two
+  // - memory three
+
+  // their (and perhaps relevant entities they are related to) twitter bios:
+
+  // ${JSON.stringify(bios, null, 2)}`,
+  //     })
+
+  //     // output to array
+  //     const memories = result.text
+  //       .split('\n')
+  //       .map((line) => line.trim())
+  //       .map((line) => (line.startsWith('-') ? line.slice(1).trim() : line))
+
+  //     await Memories.deleteAll(user.id)
+
+  //     await Promise.all(
+  //       memories.map((memory) => {
+  //         return Memories.add(user.id, memory)
+  //       }),
+  //     )
+
+  //     return c.json({ success: true })
+  //   }),
+
   getDocument: privateProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ c, ctx, input }) => {
@@ -43,7 +755,7 @@ export const knowledgeRouter = j.router({
         .select()
         .from(knowledgeDocument)
         .where(
-          and(eq(knowledgeDocument.userId, user.id), eq(knowledgeDocument.id, input.id))
+          and(eq(knowledgeDocument.userId, user.id), eq(knowledgeDocument.id, input.id)),
         )
 
       if (!document) {
@@ -60,20 +772,20 @@ export const knowledgeRouter = j.router({
           limit: z.number().min(1).max(100).default(100).optional(),
           offset: z.number().min(0).default(0).optional(),
         })
-        .optional()
+        .optional(),
     )
     .query(async ({ c, ctx, input }) => {
       const { user } = ctx
 
-      const documents = await listKnowledgeDocuments(user.id, {
-        isStarred: input?.isStarred,
-        limit: input?.limit ?? 100,
-        offset: input?.offset,
-      })
+      // const documents = await listKnowledgeDocuments(user.id, {
+      //   isStarred: input?.isStarred,
+      //   limit: input?.limit ?? 100,
+      //   offset: input?.offset,
+      // })
 
       return c.superjson({
-        documents,
-        total: documents.length,
+        documents: [],
+        total: 0,
       })
     }),
 
@@ -87,7 +799,10 @@ export const knowledgeRouter = j.router({
           .update(knowledgeDocument)
           .set({ isDeleted: true })
           .where(
-            and(eq(knowledgeDocument.id, input.id), eq(knowledgeDocument.userId, user.id))
+            and(
+              eq(knowledgeDocument.id, input.id),
+              eq(knowledgeDocument.userId, user.id),
+            ),
           )
 
         return c.json({

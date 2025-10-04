@@ -21,7 +21,7 @@ export const WebsiteMockup = memo(
         y: 0,
         scale: 1,
         transition: {
-          type: 'spring',
+          type: 'spring' as const,
           duration: 0.6,
           bounce: 0.1,
           staggerChildren: 0.1,

@@ -113,6 +113,15 @@ const config: Config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate"),],
+  plugins: [
+    require("tailwindcss-animate"),
+    function({ addUtilities }: { addUtilities: any }) {
+      addUtilities({
+        '.ring-3': {
+          'box-shadow': 'var(--tw-ring-inset) 0 0 0 3px var(--tw-ring-color)',
+        },
+      })
+    },
+  ],
 }
 export default config

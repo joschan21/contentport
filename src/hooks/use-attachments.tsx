@@ -1,4 +1,3 @@
-import { SelectedKnowledgeDocument } from '@/components/knowledge-selector'
 import { client } from '@/lib/client'
 import { Attachment } from '@/server/routers/chat/chat-router'
 import { useMutation } from '@tanstack/react-query'
@@ -18,7 +17,6 @@ export interface LocalAttachment {
 
 interface AttachmentManager {
   attachments: (Attachment | LocalAttachment)[]
-  addKnowledgeAttachment: (doc: SelectedKnowledgeDocument) => void
   addChatAttachment: (file: File) => void
   addVideoAttachment: (s3Key: string, fileName?: string) => void
   removeAttachment: ({ id }: { id: string }) => void
@@ -74,7 +72,7 @@ export const AttachmentsProvider = ({ children }: PropsWithChildren) => {
       const res = await client.file.upload.$post({
         fileName: file.name,
         fileType: file.type,
-        source: "chat"
+        source: 'chat',
       })
 
       const { url, fields, fileKey, type } = await res.json()
@@ -142,20 +140,6 @@ export const AttachmentsProvider = ({ children }: PropsWithChildren) => {
     },
   })
 
-  const addKnowledgeAttachment = (doc: SelectedKnowledgeDocument) => {
-    setAttachments((prev) => {
-      const newAttachment: Attachment = {
-        id: doc.id,
-        type: doc.type,
-        fileKey: doc.s3Key,
-        title: doc.title,
-        variant: 'knowledge',
-      }
-
-      return [...prev, newAttachment]
-    })
-  }
-
   const addChatAttachment = async (file: File) => uploadAttachment({ file })
 
   const addVideoAttachment = (s3Key: string, fileName?: string) => {
@@ -180,7 +164,6 @@ export const AttachmentsProvider = ({ children }: PropsWithChildren) => {
     <AttachmentsContext.Provider
       value={{
         attachments,
-        addKnowledgeAttachment,
         addChatAttachment,
         addVideoAttachment,
         removeAttachment,

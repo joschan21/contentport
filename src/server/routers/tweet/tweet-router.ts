@@ -19,6 +19,7 @@ import { ensureValidMedia } from '../utils/upload-media-to-twitter'
 import { fetchMediaFromS3 } from './fetch-media-from-s3'
 
 import { getNextAvailableQueueSlot } from './queue-utils'
+import { Knowledge } from '@/lib/knowledge'
 
 async function getFutureScheduledTweetsCount(
   userId: string,
@@ -404,15 +405,6 @@ export const tweetRouter = j.router({
         scheduledUnixInSeconds: scheduledUnix / 1000,
       })
 
-      // const baseUrl =
-      //   process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
-
-      // const { messageId } = await qstash.publishJSON({
-      //   url: baseUrl + '/api/tweet/post',
-      //   body: { tweetId, userId: user.id, accountId: dbAccount.id },
-      //   notBefore: scheduledUnix,
-      // })
-
       try {
         const generatedIds = thread.map((_, i) =>
           i === 0 ? tweetId : crypto.randomUUID(),
@@ -628,6 +620,11 @@ export const tweetRouter = j.router({
             eq(tweets.accountId, accountId),
           ),
         )
+
+      if (!tweet.isReplyTo) {
+        await redis.sadd(`posts:${userId}`, tweet.twitterId)
+        await Knowledge.add(userId, tweet.content)
+      }
 
       const next = await db.query.tweets.findFirst({
         where: and(

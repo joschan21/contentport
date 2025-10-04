@@ -54,6 +54,8 @@ export const privateProcedure = publicProcedure.use(authMiddleware)
 export const qstashProcedure = j.procedure.use(async ({ c, next }) => {
   const { Receiver } = await import('@upstash/qstash')
 
+  console.log('qstash procedure')
+
   const receiver = new Receiver({
     currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY as string,
     nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY as string,
@@ -63,6 +65,7 @@ export const qstashProcedure = j.procedure.use(async ({ c, next }) => {
   const body = await c.req.text()
 
   if (!signature) {
+    console.log('missing signature')
     throw new HTTPException(401, { message: 'Missing QStash signature' })
   }
 
@@ -72,6 +75,7 @@ export const qstashProcedure = j.procedure.use(async ({ c, next }) => {
   })
 
   if (!isValid) {
+    console.log('invalid signature')
     throw new HTTPException(401, { message: 'Invalid QStash signature' })
   }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { PropsWithChildren } from 'react'
+import { PropsWithChildren, useEffect, useState } from 'react'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { LeftSidebar } from '@/components/context-sidebar'
@@ -8,6 +8,9 @@ import { AppSidebarInset } from '@/components/providers/app-sidebar-inset'
 import { DashboardProviders } from '@/components/providers/dashboard-providers'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
+import { WhatsNewModal } from '@/components/whats-new-modal'
+import { useQuery } from '@tanstack/react-query'
+import { client } from '@/lib/client'
 
 interface LayoutProps extends PropsWithChildren {
   hideAppSidebar?: boolean
@@ -36,6 +39,24 @@ export default function ClientLayout({
   state,
   hideAppSidebar,
 }: LayoutProps) {
+  const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false)
+
+  const { data } = useQuery({
+    queryKey: ['are-tweets-indexed'],
+    queryFn: async () => {
+      const res = await client.knowledge.show_indexing_modal.$get()
+      return await res.json()
+    },
+    initialData: { shouldShow: false },
+  })
+
+  useEffect(() => {
+    if (data.shouldShow) {
+      console.log('yep should show')
+      setIsWhatsNewOpen(true)
+    }
+  }, [data])
+
   let defaultOpen = true
 
   if (state) {
@@ -45,6 +66,8 @@ export default function ClientLayout({
   return (
     <DashboardProviders>
       <div className="flex">
+        <WhatsNewModal open={isWhatsNewOpen} onOpenChange={setIsWhatsNewOpen} />
+
         <SidebarProvider className="w-fit" defaultOpen={false}>
           <LeftSidebar />
         </SidebarProvider>

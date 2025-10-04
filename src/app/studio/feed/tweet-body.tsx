@@ -1,6 +1,7 @@
 import { EnrichedTweet } from 'react-tweet'
 import { ReactNode } from 'react'
 import { highlightText } from '@/lib/highlight-utils'
+import { Keyword } from '../topic-monitor/feed-settings-modal'
 
 type Props = {
   children: ReactNode
@@ -18,7 +19,7 @@ export const TweetBody = ({
   highlights,
 }: {
   tweet: EnrichedTweet
-  highlights: string[]
+  highlights: Keyword[]
 }) => (
   <p className="text-sm" lang={tweet.lang} dir="auto">
     {tweet.entities.map((item, i) => {

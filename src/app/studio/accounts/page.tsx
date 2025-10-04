@@ -7,14 +7,6 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -24,6 +16,7 @@ import DuolingoBadge from '@/components/ui/duolingo-badge'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import DuolingoInput from '@/components/ui/duolingo-input'
 import DuolingoTextarea from '@/components/ui/duolingo-textarea'
+import { Modal } from '@/components/ui/modal'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -52,9 +45,12 @@ import {
   X,
 } from 'lucide-react'
 import posthog from 'posthog-js'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { UserIcon, UserSwitchIcon, XLogoIcon } from '@phosphor-icons/react'
+import { PlusIcon, UserIcon, UserSwitchIcon, XLogoIcon } from '@phosphor-icons/react'
+import { Container } from '@/components/container'
+import { Card } from '@/components/ui/card'
+import { Icons } from '@/components/icons'
 
 interface TweetCard {
   src?: string
@@ -93,24 +89,9 @@ export default function AccountsPage() {
   const [showConnectDialog, setShowConnectDialog] = useState(false)
   const [inviteLink, setInviteLink] = useState('')
   const [showInviteDialog, setShowInviteDialog] = useState(false)
-  const [isStyleSettingsOpen, setIsStyleSettingsOpen] = useState(false)
-  const [skipPostConfirmation, setSkipPostConfirmation] = useState(false)
   const { account } = useAccount()
   const { data } = authClient.useSession()
   const queryClient = useQueryClient()
-
-  useEffect(() => {
-    const stored = localStorage.getItem('skipPostConfirmation')
-    if (stored !== null) {
-      setSkipPostConfirmation(stored === 'true')
-    }
-  }, [])
-
-  const handleSkipConfirmationToggle = (checked: boolean) => {
-    setSkipPostConfirmation(checked)
-    localStorage.setItem('skipPostConfirmation', checked.toString())
-    toast.success(checked ? 'Post confirmation disabled' : 'Post confirmation enabled')
-  }
 
   const {
     mutate: createOAuthLink,
@@ -127,7 +108,10 @@ export default function AccountsPage() {
       toast.error('Error, please try again')
     },
     onSuccess: ({ url }) => {
-      window.open(url, '_blank')
+      window.location.href = url
+    },
+    onSettled: () => {
+      setShowConnectDialog(false)
     },
   })
 
@@ -282,7 +266,6 @@ export default function AccountsPage() {
     },
     onSuccess: () => {
       setTweetLink('')
-      refetchStyle()
       toast.success('Tweet imported successfully')
     },
     onError: (error: HTTPException) => {
@@ -290,70 +273,21 @@ export default function AccountsPage() {
     },
   })
 
-  const {
-    mutate: deleteTweet,
-    isPending: isDeleting,
-    variables: deleteVariables,
-  } = useMutation({
-    mutationFn: async ({ tweetId }: { tweetId: string }) => {
-      if (!account) return
 
-      await client.style.delete.$post({ tweetId })
-    },
-    onError: (error: HTTPException) => {
-      toast.error(error.message)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['account-style'] })
-    },
-  })
 
-  const { mutate: savePrompt, isPending: isSaving } = useMutation({
-    mutationFn: async () => {
-      await client.style.save.$post({ prompt })
-    },
-    onSuccess: () => {
-      refetchStyle()
-      toast.success('Style saved')
-    },
-    onError: (error: HTTPException) => {
-      toast.error(error.message)
-    },
-  })
 
-  const { data: style, refetch: refetchStyle } = useQuery({
-    queryKey: ['account-style', account?.id],
-    queryFn: async () => {
-      const res = await client.style.get.$get()
-      const style = await res.json()
-
-      console.log('STYLE PROMPT', style.prompt)
-
-      if (typeof style.prompt === 'string') setPrompt(style.prompt)
-
-      return style
-    },
-  })
 
   return (
-    <div className="relative z-10 max-w-2xl w-full mx-auto p-6 space-y-8 pb-32">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold text-stone-900">Account Management</h1>
-        <p className="text-stone-600">
-          Manage your connected accounts, writing style, and preferences
-        </p>
-      </div>
-
-      {/* Connected Accounts Section */}
-      <div className="space-y-4">
+    <Container
+      title="Manage Accounts"
+      description="Run all Twitter accounts from a single place."
+    >
+      <div className="space-y-4 mt-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-stone-800">Your Accounts</h2>
-            <p className="text-stone-600 text-sm">
-              Personal accounts and accounts delegated to you
-            </p>
-          </div>
-
+          <p className="text-stone-700">
+            <span className="mr-1.5">👉</span> Showing {accounts?.accounts?.length}{' '}
+            account{accounts?.accounts?.length === 1 ? '' : 's'}
+          </p>
           {data?.user.plan === 'free' ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -364,9 +298,8 @@ export default function AccountsPage() {
                   }}
                   className="w-auto relative z-20 transition-all duration-200"
                 >
-                  <Lock className="size-4 mr-2" />
+                  <PlusIcon className="size-4 mr-1.5" weight="bold" />
                   <span className="whitespace-nowrap">Add Account</span>
-                  <ChevronDown className="size-4 ml-2" />
                 </DuolingoButton>
               </TooltipTrigger>
               <TooltipContent className="bg-gray-900 text-white border-gray-700">
@@ -376,10 +309,12 @@ export default function AccountsPage() {
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <DuolingoButton size="sm" className="w-auto relative z-20">
-                  <Plus className="size-4 mr-2" />
+                <DuolingoButton
+                  size="sm"
+                  className="w-auto relative z-20 transition-all duration-200"
+                >
+                  <PlusIcon className="size-4 mr-1.5" weight="bold" />
                   <span className="whitespace-nowrap">Add Account</span>
-                  <ChevronDown className="size-4 ml-2" />
                 </DuolingoButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="p-3 border-2 shadow-xl">
@@ -429,7 +364,7 @@ export default function AccountsPage() {
         </div>
 
         {isLoadingAccounts ? (
-          <div className="bg-white">
+          <Card className='p-0'>
             {[1].map((index) => (
               <div key={index}>
                 <div className="rounded-lg p-4">
@@ -446,15 +381,14 @@ export default function AccountsPage() {
                     <Skeleton className="h-8 w-16 rounded-md" />
                   </div>
                 </div>
-                {index === 1 && <Separator />}
               </div>
             ))}
-          </div>
+          </Card>
         ) : accounts?.accounts?.length ? (
-          <div className="bg-white">
+          <Card className="gap-0 p-0">
             {accounts.accounts.map((acc, i) => (
-              <div key={acc.id}>
-                <div className="rounded-lg p-4">
+              <Fragment key={acc.id}>
+                <div key={acc.id} className="px-6 py-5">
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-3">
                       <Avatar className="size-10">
@@ -467,9 +401,14 @@ export default function AccountsPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium">{acc.name}</p>
-                        </div>
+                        <p className="inline-flex items-center gap-1 text-sm font-medium">
+                          <span>{acc.name}</span>
+                          {acc.verified && (
+                            <span>
+                              <Icons.verificationBadge className="size-4" />
+                            </span>
+                          )}
+                        </p>
                         <p className="text-sm opacity-60">@{acc.username}</p>
                       </div>
                     </div>
@@ -594,9 +533,9 @@ export default function AccountsPage() {
                   </div>
                 </div>
                 {i < accounts.accounts.length - 1 && <Separator />}
-              </div>
+              </Fragment>
             ))}
-          </div>
+          </Card>
         ) : (
           <div className="rounded-lg bg-white border border-dashed border-stone-300 p-8 text-center space-y-4">
             <p className="text-stone-600">No accounts connected yet</p>
@@ -604,166 +543,13 @@ export default function AccountsPage() {
         )}
       </div>
 
-      <Separator />
-
-      {/* Style Settings Section */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-xl font-bold text-stone-900">Style Settings</h2>
-          <p className="text-stone-600 mt-1">Customize AI assistant output</p>
-        </div>
-
-        <Collapsible open={isStyleSettingsOpen} onOpenChange={setIsStyleSettingsOpen}>
-          <CollapsibleTrigger asChild>
-            <button className="w-full group">
-              <div className="flex items-center justify-between p-4 rounded-t-lg border border-stone-200 bg-white hover:bg-stone-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  {account && <AccountAvatar className="size-10" />}
-                  <div className="text-left">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-stone-800">
-                        Writing Style & References
-                      </h3>
-                      {/* <DuolingoBadge variant="gray" className="px-3 text-xs">
-                        Optional
-                      </DuolingoBadge> */}
-                    </div>
-                    {account && (
-                      <p className="text-sm opacity-60">For @{account.username}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isStyleSettingsOpen ? (
-                    <ChevronDown className="size-5 text-stone-500 transition-transform" />
-                  ) : (
-                    <ChevronRight className="size-5 text-stone-500 transition-transform" />
-                  )}
-                </div>
-              </div>
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="bg-white border border-t-0 border-stone-200 rounded-b-lg space-y-6 pt-4 pb-4">
-            {/* Fine-Tune Writing Style */}
-            <div className="px-4 space-y-4">
-              <div>
-                <h4 className="text-base font-semibold text-stone-800">
-                  Fine-Tune Writing Style
-                </h4>
-                <p className="opacity-60 text-sm">
-                  Describe your writing preferences, tone, and style patterns
-                </p>
-              </div>
-
-              <DuolingoTextarea
-                fullWidth
-                className="min-h-32"
-                placeholder="My tweets always use this emoji (◆) for bullet points and usually consist of a short, catchy intro hook and three bullet points. I love the 🎉 emoji"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-              />
-
-              <DuolingoButton
-                onClick={() => savePrompt()}
-                size="sm"
-                disabled={isSaving}
-                className="w-fit"
-              >
-                <Save className="mr-2 size-4" />
-                Save Writing Style
-              </DuolingoButton>
-            </div>
-
-            <Separator className="mx-4" />
-
-            {/* Style Reference Tweets */}
-            <div className="px-4 space-y-4">
-              <div>
-                <h4 className="text-base font-semibold text-stone-800">
-                  Style Reference Tweets
-                </h4>
-                <p className="opacity-60 text-sm">
-                  Import tweets that exemplify your desired writing style
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <DuolingoInput
-                  fullWidth
-                  value={tweetLink}
-                  onChange={(e) => setTweetLink(e.target.value)}
-                  className="flex-1"
-                  type="text"
-                  placeholder="https://x.com/username/status/1234567890123456789"
-                />
-                <DuolingoButton
-                  onClick={() => importTweets({ link: tweetLink })}
-                  disabled={isImporting || !tweetLink.trim()}
-                  variant="secondary"
-                  size="sm"
-                  className="w-fit"
-                >
-                  Import
-                </DuolingoButton>
-              </div>
-
-              <div className="">
-                {style?.tweets?.length ? (
-                  <div className="space-y-4">
-                    <p className="text-sm font-medium text-stone-700">
-                      {style.tweets.length} reference tweet
-                      {style.tweets.length > 1 ? 's' : ''}
-                    </p>
-                    <div
-                      className="space-y-3 border rounded-lg bg-stone-50 max-h-96 overflow-y-auto"
-                      style={{ minHeight: '6rem' }} // optional: ensures some height even if empty
-                    >
-                      {style.tweets.map((tweet, index) => (
-                        <div className="relative" key={index}>
-                          <DuolingoButton
-                            variant="destructive"
-                            className="absolute top-3 right-3 w-fit p-1.5 text-white aspect-square z-10"
-                            onClick={() => deleteTweet({ tweetId: tweet.id })}
-                            disabled={isDeleting && deleteVariables?.tweetId === tweet.id}
-                          >
-                            {isDeleting && deleteVariables?.tweetId === tweet.id ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                              <X className="size-4" />
-                            )}
-                          </DuolingoButton>
-                          <TweetCard
-                            username={tweet.author.username}
-                            name={tweet.author.name}
-                            src={tweet.author.profile_image_url}
-                            text={tweet.text}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Sparkles className="w-10 h-10 text-stone-300 mb-3" />
-                    <p className="text-sm font-medium text-stone-700">
-                      No imported tweets yet
-                    </p>
-                    <p className="text-xs text-stone-500 mt-1 max-w-xs">
-                      Import tweets that match your desired writing style
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      </div>
-
-      <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Before connecting:</DialogTitle>
-            <DialogDescription>
+      <Modal showModal={showConnectDialog} setShowModal={setShowConnectDialog}>
+        <div className="p-6">
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              Before connecting:
+            </h2>
+            <p className="text-gray-600 pr-12">
               Make sure you are signed in to the Twitter/X account you wish to connect.
               <br />
               <br />
@@ -772,58 +558,49 @@ export default function AccountsPage() {
                 href="https://x.com/account/switch"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-indigo-600 underline underline-offset-2 hover:underline"
+                className="text-indigo-600 font-medium underline underline-offset-2 hover:underline"
               >
                 switch accounts
               </a>{' '}
               before authenticating.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex-col sm:flex-row">
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
             <DuolingoButton
               variant="secondary"
-              size="sm"
               onClick={() => setShowConnectDialog(false)}
-              className="w-full sm:w-auto"
+              disabled={isCreatingOAuthLink}
             >
               Cancel
             </DuolingoButton>
             <DuolingoButton
               onClick={() => {
                 createOAuthLink({ action: 'add-account' })
-                setShowConnectDialog(false)
               }}
-              size="sm"
               disabled={isCreatingOAuthLink}
-              className="w-full sm:w-auto"
+              loading={isCreatingOAuthLink}
             >
-              {isCreatingOAuthLink ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                'Connect'
-              )}
+              Connect
             </DuolingoButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      </Modal>
 
-      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+      <Modal showModal={showInviteDialog} setShowModal={setShowInviteDialog}>
+        <div className="p-6">
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
               {isCreatingInviteLink
                 ? 'Creating Access Link...'
                 : 'Secure Access Link Created'}
-            </DialogTitle>
-            <DialogDescription>
+            </h2>
+            <p className="text-sm text-gray-600 pr-12">
               Send this invite to the account owner (client, brand, company). Once
               accepted, the brand/client account will appear in your dashboard with
               posting permissions.
-            </DialogDescription>
-          </DialogHeader>
+            </p>
+          </div>
 
           {isCreatingInviteLink ? (
             <div className="flex items-center justify-center py-8">
@@ -831,7 +608,7 @@ export default function AccountsPage() {
             </div>
           ) : (
             <>
-              <div className="space-y-4">
+              <div className="space-y-4 mb-6">
                 <div className="flex items-center space-x-2 p-3 bg-stone-50 rounded-lg border">
                   <LinkIcon className="size-4 text-stone-500 flex-shrink-0" />
                   <input
@@ -855,19 +632,15 @@ export default function AccountsPage() {
                 <p className="text-xs text-stone-600">This link is valid for 24 hours.</p>
               </div>
 
-              <DialogFooter>
-                <DuolingoButton
-                  size="sm"
-                  onClick={() => setShowInviteDialog(false)}
-                  className="w-full"
-                >
+              <div className="flex justify-end">
+                <DuolingoButton onClick={() => setShowInviteDialog(false)}>
                   Got it
                 </DuolingoButton>
-              </DialogFooter>
+              </div>
             </>
           )}
-        </DialogContent>
-      </Dialog>
-    </div>
+        </div>
+      </Modal>
+    </Container>
   )
 }

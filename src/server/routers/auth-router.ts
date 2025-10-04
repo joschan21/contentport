@@ -1,17 +1,19 @@
-import { DEFAULT_TWEETS } from '@/constants/default-tweet-preset'
+import { getBaseUrl } from '@/constants/base-url'
 import { db } from '@/db'
-import { account, knowledgeDocument, user, user as userSchema } from '@/db/schema'
+import { account, user, user as userSchema } from '@/db/schema'
 import { redis } from '@/lib/redis'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { customAlphabet } from 'nanoid'
 import { TwitterApi } from 'twitter-api-v2'
-import { j, privateProcedure, publicProcedure } from '../jstack'
 import { z } from 'zod'
+import { j, privateProcedure, publicProcedure } from '../jstack'
 import { Account } from './settings-router'
-import { getBaseUrl } from '@/constants/base-url'
 
+import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
 import { PostHog } from 'posthog-node'
+import { qstash } from '@/lib/qstash'
 
 const posthog = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   host: 'https://eu.i.posthog.com',
@@ -32,6 +34,24 @@ type AuthAction = 'onboarding' | 'invite' | 'add-account' | 're-authenticate'
 const clientV2 = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
 
 export const authRouter = j.router({
+  send_magic_link: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .post(async ({ c, ctx, input }) => {
+      const data = await auth.api.signInMagicLink({
+        body: {
+          email: input.email,
+          callbackURL: '/onboarding',
+        },
+        headers: await headers(),
+      })
+
+      if (data.status) {
+        return c.json({ status: 'success' })
+      }
+
+      return c.json({ error: 'Unable to produce magic link.' })
+    }),
+
   updateOnboardingMetaData: privateProcedure
     .input(z.object({ userGoals: z.array(z.string()), userFrequency: z.number() }))
     .post(async ({ c, input, ctx }) => {
@@ -173,6 +193,7 @@ export const authRouter = j.router({
     const [, accountKeys] = accounts
     for (const accountKey of accountKeys) {
       const existingAccount = await redis.json.get<Account>(accountKey)
+
       if (existingAccount?.username === userProfile.screen_name) {
         if (authAction === 'invite') {
           return c.redirect(`${getBaseUrl()}/invite/success?id=${inviteId}`)
@@ -191,7 +212,9 @@ export const authRouter = j.router({
           return c.redirect(`${getBaseUrl()}/studio/accounts`)
         }
 
-        return c.redirect(`${getBaseUrl()}/studio?account_connected=true`)
+        return c.redirect(
+          `${getBaseUrl()}/onboarding?account_connected=true&id=${existingAccount.id}`,
+        )
       }
     }
 
@@ -228,111 +251,29 @@ export const authRouter = j.router({
       await redis.json.set(`active-account:${user.email}`, '$', connectedAccount)
     }
 
-    const userTweets = await loggedInClient.v2.userTimeline(userProfile.id_str, {
-      max_results: 30,
-      'tweet.fields': [
-        'public_metrics',
-        'created_at',
-        'text',
-        'author_id',
-        'note_tweet',
-        'edit_history_tweet_ids',
-        'in_reply_to_user_id',
-        'referenced_tweets',
-      ],
-      'user.fields': ['username', 'profile_image_url', 'name'],
-      exclude: ['retweets', 'replies'],
-      expansions: ['author_id'],
-    })
+    const baseUrl =
+      process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
 
-    // NEW
-    const styleKey = `style:${user.email}:${dbAccountId}`
+    console.log('ℹ️ℹ️ℹ️ calling qstash')
 
-    if (!userTweets.data.data) {
-      await redis.json.set(styleKey, '$', {
-        tweets: DEFAULT_TWEETS,
-        prompt: '',
-      })
-    } else {
-      const filteredTweets = userTweets.data.data?.filter(
-        (tweet) =>
-          !tweet.in_reply_to_user_id &&
-          !tweet.referenced_tweets?.some((ref) => ref.type === 'replied_to'),
-      )
-      const tweetsWithStats = filteredTweets.map((tweet) => ({
-        id: tweet.id,
-        text: tweet.text,
-        likes: tweet.public_metrics?.like_count || 0,
-        retweets: tweet.public_metrics?.retweet_count || 0,
-        created_at: tweet.created_at || '',
-      }))
-      const sortedTweets = tweetsWithStats.sort((a, b) => b.likes - a.likes)
-      const topTweets = sortedTweets.slice(0, 20)
-      const author = userProfile
-      let formattedTweets = topTweets.map((tweet) => {
-        const cleanedText = tweet.text.replace(/https:\/\/t\.co\/\w+/g, '').trim()
-        return {
-          id: tweet.id,
-          text: cleanedText,
-          created_at: tweet.created_at,
-          author_id: userProfile.id_str,
-          edit_history_tweet_ids: [tweet.id],
-          author: author
-            ? {
-                username: author.screen_name,
-                profile_image_url: author.profile_image_url_https,
-                name: author.name,
-              }
-            : null,
-        }
-      })
-      if (formattedTweets.length < 20) {
-        const existingIds = new Set(formattedTweets.map((t) => t.id))
-        for (const defaultTweet of DEFAULT_TWEETS) {
-          if (formattedTweets.length >= 20) break
-          if (!existingIds.has(defaultTweet.id)) {
-            formattedTweets.push(defaultTweet)
-            existingIds.add(defaultTweet.id)
-          }
-        }
-      }
-      await redis.json.set(styleKey, '$', {
-        tweets: formattedTweets.reverse(),
-        prompt: '',
-      })
-    }
-
-    const hasExistingExamples = await db.query.knowledgeDocument.findFirst({
-      where: and(
-        eq(knowledgeDocument.isExample, true),
-        eq(knowledgeDocument.userId, user.id),
-      ),
-    })
-
-    if (!Boolean(hasExistingExamples)) {
-      await db.insert(knowledgeDocument).values([
-        {
-          userId: userId,
-          fileName: '',
-          type: 'url',
-          s3Key: '',
-          title: 'Introducing Zod 4',
-          description:
-            "An article about the Zod 4.0 release. After a year of active development: Zod 4 is now stable! It's faster, slimmer, more tsc-efficient, and implements some long-requested features.",
-          isExample: true,
-          sourceUrl: 'https://zod.dev/v4',
+    await Promise.all([
+      qstash.publishJSON({
+        url: baseUrl + '/api/knowledge/index_tweets',
+        body: {
+          userId: user.id,
+          accountId: connectedAccount.id,
+          handle: connectedAccount.username,
         },
-        {
-          userId: userId,
-          fileName: 'data-fetching.png',
-          type: 'image',
-          s3Key: 'knowledge/4bBacfDWPhQzOzN479b605xuippnbKzF/Lsv-t_5_EMwNXW8jptBYG.png',
-          title: 'React Hooks Cheatsheet - Visual Guide',
-          isExample: true,
-          sourceUrl: '',
+      }),
+      qstash.publishJSON({
+        url: baseUrl + '/api/knowledge/index_memories',
+        body: {
+          userId: user.id,
+          accountId: connectedAccount.id,
+          handle: connectedAccount.username,
         },
-      ])
-    }
+      }),
+    ])
 
     posthog.capture({
       distinctId: user.id,
@@ -345,7 +286,7 @@ export const authRouter = j.router({
       },
     })
 
-    await posthog.shutdown()
+    await posthog.shutdown().catch(() => {})
 
     if (authAction === 'invite') {
       return c.redirect(`${getBaseUrl()}/invite/success?id=${inviteId}`)
@@ -355,6 +296,8 @@ export const authRouter = j.router({
       return c.redirect(`${getBaseUrl()}/studio/accounts`)
     }
 
-    return c.redirect(`${getBaseUrl()}/studio?account_connected=true`)
+    return c.redirect(
+      `${getBaseUrl()}/onboarding?account_connected=true&id=${connectedAccount.id}`,
+    )
   }),
 })
