@@ -215,46 +215,46 @@ export const chatRouter = j.router({
 
       content.close('message')
 
-      const sitemaps = await redis.hgetall<Record<string, { name: string; url: string }>>(
-        `sitemaps:${user.email}`,
-      )
+      // const sitemaps = await redis.hgetall<Record<string, { name: string; url: string }>>(
+      //   `sitemaps:${user.email}`,
+      // )
 
-      if (sitemaps) {
-        content.open('involved_projects', {
-          note: 'These are provided by the system. They may or may not be relevant to the user query, it is upon you to decide.',
-        })
-        Object.entries(sitemaps).map(([key, sitemap]) =>
-          content.tag('involved_project', sitemap.name, {
-            name: sitemap.name,
-            involved_project_id: key,
-          }),
-        )
-        content.close('involved_projects')
-      }
+      // if (sitemaps) {
+      //   content.open('involved_projects', {
+      //     note: 'These are provided by the system. They may or may not be relevant to the user query, it is upon you to decide.',
+      //   })
+      //   Object.entries(sitemaps).map(([key, sitemap]) =>
+      //     content.tag('involved_project', sitemap.name, {
+      //       name: sitemap.name,
+      //       involved_project_id: key,
+      //     }),
+      //   )
+      //   content.close('involved_projects')
+      // }
 
-      const lookup_involved_project = tool({
-        description: `Use this tool when the user asks to tweet about an <involved_project />. Also required for vague requests like "tweet about <involved_project />", "what should I tweet today about <involved_project />". Always use this first before offering tweet suggestions. Under the hood, this tool holds a collection of all relevant URLs of a project the user is involved in.`,
-        inputSchema: z.object({
-          involved_project_id: z.string(),
-          topic: z.string().describe("The topic to search, e.g. 'markdown streaming'."),
-        }),
-        execute: async ({ topic, involved_project_id }) => {
-          const namespace = vector.namespace(`sitemap:${involved_project_id}`)
+      // const lookup_involved_project = tool({
+      //   description: `Use this tool when the user asks to tweet about an <involved_project />. Also required for vague requests like "tweet about <involved_project />", "what should I tweet today about <involved_project />". Always use this first before offering tweet suggestions. Under the hood, this tool holds a collection of all relevant URLs of a project the user is involved in.`,
+      //   inputSchema: z.object({
+      //     involved_project_id: z.string(),
+      //     topic: z.string().describe("The topic to search, e.g. 'markdown streaming'."),
+      //   }),
+      //   execute: async ({ topic, involved_project_id }) => {
+      //     const namespace = vector.namespace(`sitemap:${involved_project_id}`)
 
-          const res = await namespace.query({
-            data: topic,
-            topK: 20,
-            includeData: true,
-            includeMetadata: true,
-          })
+      //     const res = await namespace.query({
+      //       data: topic,
+      //       topK: 20,
+      //       includeData: true,
+      //       includeMetadata: true,
+      //     })
 
-          const links = res.map((doc) => doc.data).filter(Boolean)
+      //     const links = res.map((doc) => doc.data).filter(Boolean)
 
-          console.log('OUTPUT LINKS', links)
+      //     console.log('OUTPUT LINKS', links)
 
-          return links
-        },
-      })
+      //     return links
+      //   },
+      // })
 
       const userMessage: MyUIMessage = {
         ...message,
@@ -333,7 +333,6 @@ export const chatRouter = j.router({
             tools: {
               write_tweet,
               read_website_content,
-              lookup_involved_project,
               // ...(sitemaps ? { lookup } : undefined),
             },
             stopWhen: stepCountIs(5),
