@@ -25,33 +25,9 @@ const Page = () => {
   const isAccountConnected = searchParams.get('account_connected')
   const [swiperRef, setSwiperRef] = useState<SwiperType | null>(null)
   const [currentSlide, setCurrentSlide] = useState(0)
-  const [input, setInput] = useState({
-    name: '',
-  })
-
-  useEffect(() => {
-    if (isAccountConnected) {
-      localStorage.setItem('onboarding', 'true')
-    }
-  }, [isAccountConnected])
+  const [input, setInput] = useState({ name: '' })
 
   const { fire, isReady } = useConfetti()
-
-  const { data: activeAccountData } = useQuery({
-    queryKey: ['get-active-account-onboarding'],
-    queryFn: async () => {
-      const res = await client.settings.active_account.$get()
-      const data = await res.json()
-      return data
-    },
-  })
-
-  // redirect to studio if already account connected
-  useEffect(() => {
-    if (activeAccountData?.account && swiperRef?.activeIndex === 0) {
-      router.push('/studio')
-    }
-  }, [activeAccountData, swiperRef])
 
   useEffect(() => {
     if (isReady) {
