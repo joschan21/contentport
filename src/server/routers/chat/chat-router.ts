@@ -8,8 +8,7 @@ import {
   smoothStream,
   stepCountIs,
   streamText,
-  tool,
-  UIMessage,
+  UIMessage
 } from 'ai'
 import { format } from 'date-fns'
 import 'diff-match-patch-line-and-word'
@@ -21,12 +20,10 @@ import { create_read_website_content } from './read-website-content'
 import { parseAttachments } from './utils'
 
 import { PayloadTweet } from '@/hooks/use-tweets-v2'
-import { Sitemap } from '@/lib/knowledge'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { Ratelimit } from '@upstash/ratelimit'
 import { getAccount } from '../utils/get-account'
 import { createTweetTool } from './tools/create-tweet-tool'
-import { vector } from '@/lib/vector'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,

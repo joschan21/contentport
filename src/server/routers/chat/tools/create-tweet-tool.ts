@@ -1,5 +1,4 @@
 import { PayloadTweet } from '@/hooks/use-tweets-v2'
-import { Memories } from '@/lib/knowledge'
 import { avoidPrompt, editToolSystemPrompt, styleGuide } from '@/lib/prompt-utils'
 import { redis } from '@/lib/redis'
 import { XmlPrompt } from '@/lib/xml-prompt'
@@ -16,7 +15,6 @@ import { HTTPException } from 'hono/http-exception'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { Account } from '../../settings-router'
-import { Style } from '../../style-router'
 import { MyUIMessage } from '../chat-router'
 import { WebsiteContent } from '../read-website-content'
 import { parseAttachments } from '../utils'
@@ -118,7 +116,6 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
       })
 
       const [account, websiteContent] = await Promise.all([
-        // redis.json.get<Style>(ctx.redisKeys.style),
         redis.json.get<Account>(ctx.redisKeys.account),
         redis.lrange<WebsiteContent>(ctx.redisKeys.websiteContent, 0, -1),
       ])
@@ -196,7 +193,7 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
       }
 
       // style
-      const style = await styleGuide(ctx.userId, instruction)
+      const style = await styleGuide({ accountId: account.id, topic: instruction })
       prompt.tag('style', style)
 
       if (ctx.length === 'short') {
@@ -233,19 +230,14 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         )
       }
 
-      const memories = await Memories.get(ctx.userId, {
-        data: instruction,
-        topK: 25,
-        includeMetadata: true,
-        includeData: true,
-      })
+      const memories = await redis.lrange(`memories:${account.id}`, 0, -1)
 
       prompt.open('memories', {
         note: 'These are the memories you have about this user. Its on you to decide which perspective/context from these memories might or might not be relevant to write a tweet.',
         perspective:
           'When responding, adopt the perspective of the user. Use first-person ("I", "my", "we") when discussing their projects, companies, or work. Use third-person when discussing external things they are not directly involved with.',
       })
-      memories.forEach((memory) => prompt.tag('memory', memory.data!))
+      memories.forEach((memory) => prompt.tag('memory', memory))
       prompt.close('memories')
 
       prompt.close('prompt')
@@ -265,12 +257,12 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         },
       ]
 
+      console.log('⚠️⚠️⚠️ PROMPT', JSON.stringify(prompt.toString(), null, 2))
+
       const model = openrouter.chat('anthropic/claude-sonnet-4', {
         reasoning: { enabled: false, effort: 'low' },
         models: ['anthropic/claude-3.7-sonnet', 'openai/o4-mini'],
       })
-
-      console.log('STARTING STREAM')
 
       const result = streamText({
         model,
@@ -288,7 +280,6 @@ Remember: NEVER use prohibited words. Instead of banned words, use easy, 6-th gr
           })
         },
         async onFinish(message) {
-          console.log('FINISHED', message)
           await redis.lpush(ctx.redisKeys.thread, message.text)
         },
       })

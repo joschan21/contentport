@@ -1,29 +1,13 @@
 'use client'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { client } from '@/lib/client'
-import { PenIcon, PlusIcon, UserFocusIcon } from '@phosphor-icons/react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { User } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import toast from 'react-hot-toast'
-import { MemoriesTab } from './memories-tab'
-import { WritingStyleTab } from './writing-style-tab'
-import { AccountAvatar, AccountHandle, AccountName } from '@/hooks/account-ctx'
 import { Container } from '@/components/container'
 import DuolingoButton from '@/components/ui/duolingo-button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PenIcon, PlusIcon, UserFocusIcon } from '@phosphor-icons/react'
+import { useState } from 'react'
 import { MemoriesModal } from './memories-modal'
-
-interface Document {
-  id: string
-  title: string
-  content: string
-  updatedAt: Date
-  category: 'url' | 'file' | 'manual'
-  wordCount: number
-  isStarred: boolean
-}
+import { MemoriesTab } from './memories-tab'
+import { WritingStyleTab } from './writing-style-tab'
 
 const Page = () => {
   const [activeTab, setActiveTab] = useState('style')

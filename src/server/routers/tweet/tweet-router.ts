@@ -19,7 +19,7 @@ import { ensureValidMedia } from '../utils/upload-media-to-twitter'
 import { fetchMediaFromS3 } from './fetch-media-from-s3'
 
 import { getNextAvailableQueueSlot } from './queue-utils'
-import { Knowledge } from '@/lib/knowledge'
+import { vector } from '@/lib/vector'
 
 async function getFutureScheduledTweetsCount(
   userId: string,
@@ -623,7 +623,15 @@ export const tweetRouter = j.router({
 
       if (!tweet.isReplyTo) {
         await redis.sadd(`posts:${userId}`, tweet.twitterId)
-        await Knowledge.add(userId, tweet.content)
+        await vector.namespace(accountId).upsert({
+          id: res.data.id,
+          data: tweet.content,
+          metadata: {
+            replyIds: [],
+            isReply: Boolean(replyToTwitterId),
+            isQuote: Boolean(quoteToTwitterId),
+          },
+        })
       }
 
       const next = await db.query.tweets.findFirst({

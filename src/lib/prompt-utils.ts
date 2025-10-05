@@ -1,8 +1,8 @@
+import { PayloadTweet } from '@/hooks/use-tweets-v2'
 import { Style } from '@/server/routers/style-router'
 import { nanoid } from 'nanoid'
+import { vector } from './vector'
 import { XmlPrompt } from './xml-prompt'
-import { PayloadTweet } from '@/hooks/use-tweets-v2'
-import { Knowledge } from './knowledge'
 
 export const assistantPrompt = ({ tweets }: { tweets: PayloadTweet[] }) => {
   const prompt = new XmlPrompt()
@@ -277,15 +277,20 @@ const perspective = `Definition: A tone that uses first-person voice (I/me/we) t
   <example>"I built this to solve a problem I kept running into"</example>
 </allowed_if_user_is_author>`
 
-export const styleGuide = async (userId: string, topic: string) => {
-  const docs = await Knowledge.get(userId, {
+export const styleGuide = async ({
+  accountId,
+  topic,
+}: {
+  accountId: string
+  topic: string
+}) => {
+  const knowledge = await vector.namespace(accountId).query({
     data: topic,
     topK: 20,
     includeData: true,
   })
 
-  const relevant = docs
-    // .filter((d) => d.score > 0.75)
+  const relevant = knowledge
     .map((d) => d.data)
     .filter(Boolean)
     .map((data) => data.replace(/https?:\/\/t\.co\/\S+/g, '').trim())

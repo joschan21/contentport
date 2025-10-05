@@ -7,7 +7,7 @@ import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { j, privateProcedure } from '../jstack'
 import { TwitterApi } from 'twitter-api-v2'
-import { Memories } from '@/lib/knowledge'
+import { vector } from '@/lib/vector'
 
 export type Account = {
   id: string
@@ -56,10 +56,11 @@ export const settingsRouter = j.router({
       await redis.json.del(`account:${user.email}:${accountId}`)
 
       // cleanup memories
-      await Memories.deleteAll({ accountId }).catch(() => {})
+      await redis.del(`memories:${accountId}`)
 
       // cleanup tweets
       await redis.del(`posts:${accountId}`)
+      await vector.deleteNamespace(`${accountId}`).catch(() => {})
 
       return c.json({ success: true })
     }),

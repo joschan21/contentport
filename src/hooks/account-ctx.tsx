@@ -58,7 +58,7 @@ export function AccountAvatar({ className }: { className?: string }) {
   const { account, isLoading } = useAccount()
   if (isLoading || !account) {
     return (
-      <div className={cn('relative size-10 overflow-hidden rounded-full', className)}>
+      <div className={cn('relative shrink-0 size-10 overflow-hidden rounded-full', className)}>
         <Skeleton className="size-full" />
         <div className="bg-gray-200 size-full absolute inset-0" />
       </div>

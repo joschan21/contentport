@@ -32,26 +32,12 @@ export const MemoriesModal = ({ isModalOpen, setIsModalOpen }: MemoriesModalProp
       const res = await client.knowledge.add_memory.$post({ memory })
       return res.json()
     },
-    onSuccess: ({ memoryId }, memory) => {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['memories', activeAccount?.id] })
+
       setInput('')
       setIsModalOpen(false)
       toast.success('Memory added')
-
-      queryClient.setQueryData(['memories', activeAccount?.id], (prev: any) => {
-        if (!prev?.data) return prev
-
-        const newMemory = {
-          id: memoryId,
-          data: memory,
-          createdAt: new Date(),
-          relevanceScore: 1.0,
-        }
-
-        return {
-          ...prev,
-          data: [newMemory, ...prev.data],
-        }
-      })
     },
     onError: (error) => {
       console.error('Error adding memory:', error)
@@ -85,6 +71,11 @@ export const MemoriesModal = ({ isModalOpen, setIsModalOpen }: MemoriesModalProp
               id="new-memory"
               placeholder="Your preferences, insights, or observations..."
               value={input}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddMemory()
+                }
+              }}
               onChange={(e) => setInput(e.target.value)}
               disabled={isAddingMemory}
               className="bg-white"

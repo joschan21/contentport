@@ -1,28 +1,23 @@
+import { getBaseUrl } from '@/constants/base-url'
 import { db } from '@/db'
-import { listKnowledgeDocuments } from '@/db/queries/knowledge'
 import { knowledgeDocument, user as userSchema } from '@/db/schema'
 import { firecrawl } from '@/lib/firecrawl'
+import { qstash } from '@/lib/qstash'
+import { realtime } from '@/lib/realtime'
+import { redis } from '@/lib/redis'
+import { vector } from '@/lib/vector'
+import { XmlPrompt } from '@/lib/xml-prompt'
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { generateText } from 'ai'
 import { and, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
+import { nanoid } from 'nanoid'
 import { TwitterApi } from 'twitter-api-v2'
 import { z } from 'zod'
-import { j, privateProcedure, publicProcedure, qstashProcedure } from '../jstack'
-import { getAccount } from './utils/get-account'
-import { redis } from '@/lib/redis'
-import { Knowledge, Memories, Sitemap } from '@/lib/knowledge'
-import { generateText } from 'ai'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
-import { XmlPrompt } from '@/lib/xml-prompt'
-import { qstash } from '@/lib/qstash'
-import { getBaseUrl } from '@/constants/base-url'
-import { randomUUID } from 'crypto'
-import { nanoid } from 'nanoid'
-import { Index } from '@upstash/vector'
-import { vector } from '@/lib/vector'
-import { Redis } from '@upstash/redis'
-import { realtime } from '@/lib/realtime'
-import { getTweet } from './utils/get-tweet'
+import { j, privateProcedure, qstashProcedure } from '../jstack'
 import { Account } from './settings-router'
+import { getAccount } from './utils/get-account'
+import { getTweet } from './utils/get-tweet'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -319,14 +314,13 @@ export const knowledgeRouter = j.router({
       })
     }
 
-    console.log('GETTING TWEETS FOR ACC', account.id)
-
     const ids = await redis.smembers(`posts:${account.id}`)
 
     const tweets = await Promise.all(ids.map((id) => getTweet(id)))
 
     const returnTweets = tweets
       .filter(Boolean)
+      .filter((t) => !t.in_reply_to_status_id_str && !t.quoted_tweet)
       .sort((a, b) => {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       })
@@ -351,7 +345,8 @@ export const knowledgeRouter = j.router({
       throw new HTTPException(404, { message: 'Account not found' })
     }
 
-    await Memories.deleteAll({ accountId }).catch(() => {})
+    // clear existing memory
+    await redis.del(`memories:${account.id}`)
 
     let bios: Array<Bio> = []
 
@@ -389,7 +384,7 @@ export const knowledgeRouter = j.router({
     prompt.open('prompt')
     prompt.tag(
       'instructions',
-      'summarize this twitter user in up to 10 bullet points. frame it from the perspective of the main user (e.g. Im a software engineer at XYZ)',
+      'summarize this twitter user in 5-10 bullet points. frame it from the perspective of the main user (e.g. Im a software engineer at XYZ)',
     )
 
     bios.forEach((bio, i) => {
@@ -481,6 +476,10 @@ export const knowledgeRouter = j.router({
     const { body } = ctx
     const { userId, accountId, handle } = body
 
+    // clear existing tweets
+    await redis.del(`posts:${accountId}`)
+    await vector.deleteNamespace(`${accountId}`).catch(() => {})
+
     await redis.set(`status:posts:${accountId}`, 'started', { ex: 60 * 60 * 24 })
 
     try {
@@ -504,108 +503,6 @@ export const knowledgeRouter = j.router({
     return c.json({ success: true })
   }),
 
-  //     .input(z.object({ accountId: z.string() }).optional())
-  //     .post(async ({ c, ctx, input }) => {
-  //       const { user } = ctx
-
-  //       const account = await getAccount({ email: user.email, accountId: input?.accountId })
-
-  //       if (!account) {
-  //         throw new HTTPException(404, { message: 'Account not found' })
-  //       }
-
-  //       await Memories.deleteAll({ accountId: account.id })
-
-  //       let bios: Array<Bio> = []
-
-  //       const twitterUser = await client.v2.user(account.twitterId!, {
-  //         'user.fields': ['description', 'entities'],
-  //       })
-
-  //       bios.push({
-  //         username: twitterUser.data.username,
-  //         name: twitterUser.data.name,
-  //         description: twitterUser.data.description || '',
-  //         id: twitterUser.data.id,
-  //       })
-
-  //       const mentionedUsers = twitterUser.data?.entities?.description?.mentions
-
-  //       if (mentionedUsers && mentionedUsers.length > 0) {
-  //         const mentionedUsernames = mentionedUsers.map((mention) => mention.username)
-  //         const usersResponse = await client.v2.usersByUsernames(mentionedUsernames, {
-  //           'user.fields': ['description', 'entities', 'public_metrics'],
-  //         })
-
-  //         console.log(usersResponse.data)
-
-  //         bios.push(
-  //           ...usersResponse.data?.map((user) => ({
-  //             username: user.username,
-  //             name: user.name,
-  //             description: user.description || '',
-  //             id: user.id,
-  //           })),
-  //         )
-  //       }
-
-  //       const prompt = new XmlPrompt()
-
-  //       prompt.open('prompt')
-  //       prompt.tag(
-  //         'instructions',
-  //         'summarize this twitter user in up to 10 bullet points. frame it from the perspective of the main user (e.g. Im a software engineer at XYZ)',
-  //       )
-
-  //       bios.forEach((bio, i) => {
-  //         let note: string | undefined = undefined
-
-  //         if (i === 0 && bios.length > 1) {
-  //           note =
-  //             "This is the main user we're talking about. Other bios are attached because they are mentioned in the main user's description."
-  //         } else if (i > 0) {
-  //           note =
-  //             "This is a user/company/project mentioned in the main user's description."
-  //         }
-
-  //         prompt.tag(
-  //           'bio',
-  //           `Name: ${bio.name} Username: ${bio.username} Description: ${bio.description}`,
-  //           { ...(note ? { note } : {}) },
-  //         )
-  //       })
-
-  //       prompt.tag(
-  //         'example_output',
-  //         `- memory one
-  // - memory two
-  // - memory three`,
-  //         {
-  //           note: "Respond with all bullet points directly. No 'here's the bullet points' or similar, just start immediately with the first bullet point and end with the last.",
-  //         },
-  //       )
-
-  //       prompt.close('prompt')
-
-  //       const result = await generateText({
-  //         model: openrouter.chat('anthropic/claude-sonnet-4'),
-  //         prompt: prompt.toString(),
-  //       })
-
-  //       // output to array
-  //       const memories = result.text
-  //         .split('\n')
-  //         .map((line) => line.trim())
-  //         .map((line) => (line.startsWith('-') ? line.slice(1).trim() : line))
-
-  //       await Promise.all(
-  //         memories.map((memory) => {
-  //           return Memories.add({ accountId: account.id, data: memory })
-  //         }),
-  //       )
-
-  //       return c.json({ success: true })
-  //     }),
   get_memories: privateProcedure.get(async ({ c, ctx, input }) => {
     const { user } = ctx
 
@@ -615,11 +512,7 @@ export const knowledgeRouter = j.router({
       throw new HTTPException(404, { message: 'Account not found' })
     }
 
-    const memories = await redis.lrange<{ id: string; memory: string }>(
-      `memories:${account.id}`,
-      0,
-      -1,
-    )
+    const memories = await redis.lrange(`memories:${account.id}`, 0, -1)
 
     return c.json({ memories })
   }),
@@ -636,19 +529,15 @@ export const knowledgeRouter = j.router({
         throw new HTTPException(404, { message: 'Account not found' })
       }
 
-      const result = await Memories.add({ accountId: account.id, data: memory })
+      await redis.lpush(`memories:${account.id}`, memory)
 
-      return c.json({
-        success: true,
-        memoryId: result.id,
-        timestamp: result.timestamp,
-      })
+      return c.json({ success: true })
     }),
 
   delete_memory: privateProcedure
-    .input(z.object({ memoryId: z.string() }))
+    .input(z.object({ memory: z.string() }))
     .post(async ({ c, ctx, input }) => {
-      const { memoryId } = input
+      const { memory } = input
       const { user } = ctx
 
       const account = await getAccount({ email: user.email })
@@ -657,12 +546,9 @@ export const knowledgeRouter = j.router({
         throw new HTTPException(404, { message: 'Account not found' })
       }
 
-      await Memories.delete({ accountId: account.id, memoryId })
+      await redis.lrem(`memories:${account.id}`, 1, memory)
 
-      return c.json({
-        success: true,
-        memoryId,
-      })
+      return c.json({ success: true })
     }),
 
   //   summarize_user: privateProcedure.post(async ({ c, ctx, input }) => {

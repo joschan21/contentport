@@ -13,3 +13,9 @@ nice to have
 - web browsing for assistant
 - voice input for assistant
 - peronalize ideas shown as examples ("It would be AMAZING if these examples weren’t random but instead based on my background, who I am, what I do, and what’s happening out there in X that I could speak about."
+
+
+pending:
+- make tweet indexing only consier main tweets, not retweets/quotes
+- make thread button auto-detect word thread or something
+- create_tweet_tool doesnt get memories or tweets correctly

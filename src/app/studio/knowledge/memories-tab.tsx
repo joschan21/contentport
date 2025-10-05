@@ -51,42 +51,22 @@ export const MemoriesTab = () => {
       Boolean(session?.user.id) && Boolean(!memories?.length) && Boolean(isFetched),
     events: {
       index_memories: {
-        status: () => refetch,
+        status: () => refetch(),
       },
     },
   })
 
   const { mutate: deleteMemory } = useMutation({
-    mutationFn: async (memoryId: string) => {
-      const res = await client.knowledge.delete_memory.$post({ memoryId })
+    mutationFn: async (memory: string) => {
+      const res = await client.knowledge.delete_memory.$post({ memory })
       return res.json()
     },
-    onMutate: async (memoryId) => {
-      await queryClient.cancelQueries({ queryKey: ['memories'] })
-
-      const previousMemories = queryClient.getQueryData(['memories'])
-
-      queryClient.setQueryData(['memories'], (prev: any) => {
-        if (!prev?.data) return prev
-
-        return {
-          ...prev,
-          data: prev.data.filter((memory: Memory) => memory.id !== memoryId),
-        }
-      })
-
-      return { previousMemories }
-    },
-    onError: (error, memoryId, context) => {
-      console.error('Error deleting memory:', error)
-      toast.error('Failed to delete memory. Please try again.')
-
-      if (context?.previousMemories) {
-        queryClient.setQueryData(['memories'], context.previousMemories)
-      }
-    },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['memories', activeAccount?.id] })
       toast.success('Memory deleted')
+    },
+    onError: (error) => {
+      toast.error(error.message)
     },
   })
 
@@ -101,14 +81,14 @@ export const MemoriesTab = () => {
       </div>
 
       <div className="grid gap-1 w-full">
-        {memories?.map(({ id, memory }) => (
-          <div key={id} className="">
+        {memories?.map((memory, i) => (
+          <div key={i} className="">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <p className="text-gray-900 leading-relaxed inline">- {memory}</p>
 
                 <button
-                  onClick={() => deleteMemory(id)}
+                  onClick={() => deleteMemory(memory)}
                   className="text-red-500  whitspace-nowrap ml-2 hover:text-red-600 transition-colors inline-block"
                 >
                   <TrashIcon className="size-4" weight="bold" />
