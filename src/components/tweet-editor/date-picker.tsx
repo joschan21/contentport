@@ -5,15 +5,12 @@ import * as React from 'react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
-import { DayFlag, DayPicker, SelectionState, UI } from 'react-day-picker'
-import { cn } from '@/lib/utils'
-import DuolingoButton from '../ui/duolingo-button'
 import { authClient } from '@/lib/auth-client'
-import { useQuery } from '@tanstack/react-query'
 import { client } from '@/lib/client'
-import { Label } from '@/components/ui/label'
-import DuolingoCheckbox from '../ui/duolingo-checkbox'
-import { Checkbox } from '../ui/checkbox'
+import { cn } from '@/lib/utils'
+import { useQuery } from '@tanstack/react-query'
+import { DayFlag, DayPicker, UI } from 'react-day-picker'
+import DuolingoButton from '../ui/duolingo-button'
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
   onSchedule?: (date: Date, time: string, useNaturalTime?: boolean) => void
@@ -110,12 +107,7 @@ export const Calendar20 = ({
 
   const [date, setDate] = React.useState<Date | undefined>(getInitialDate())
   const [selectedTime, setSelectedTime] = React.useState<string | null>(getInitialTime())
-  const [useNaturalTime, setUseNaturalTime] = React.useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('useNaturalPostingTime') === 'true'
-    }
-    return false
-  })
+  const [useNaturalTime, setUseNaturalTime] = React.useState(false)
 
   const getInitialAmPm = (): 'AM' | 'PM' => {
     return currentHour >= 12 ? 'PM' : 'AM'
@@ -350,7 +342,8 @@ export const Calendar20 = ({
         </div>
 
         <div className="flex flex-col gap-3 w-full md:ml-auto md:w-auto">
-          <div className="flex items-center space-x-2">
+          {/* temporarily disabled */}
+          {/* <div className="flex items-center space-x-2">
             <Checkbox
               id="natural-time"
               checked={useNaturalTime}
@@ -370,7 +363,7 @@ export const Calendar20 = ({
             >
               Natural posting time (±4 min)
             </Label>
-          </div>
+          </div> */}
 
           <DuolingoButton
             loading={isPending}
@@ -382,7 +375,7 @@ export const Calendar20 = ({
               e.stopPropagation()
 
               if (date && selectedTime && onSchedule) {
-                onSchedule(date, selectedTime, useNaturalTime)
+                onSchedule(date, selectedTime)
               }
             }}
           >

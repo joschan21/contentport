@@ -89,7 +89,8 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     mutationFn: async ({ tweets }: { tweets: MemoryTweet[] }) => {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       const userNow = new Date()
-      const useNaturalTime = localStorage.getItem('useNaturalPostingTime') === 'true'
+      // temporarily disabled
+      // const useNaturalTime = localStorage.getItem('useNaturalPostingTime') === 'true'
 
       const thread: PayloadTweet[] = tweets.map(toPayloadTweet)
 
@@ -97,7 +98,6 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         thread,
         timezone,
         userNow,
-        useNaturalTime,
       })
 
       return await res.json()
