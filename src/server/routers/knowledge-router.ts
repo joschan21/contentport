@@ -379,6 +379,10 @@ export const knowledgeRouter = j.router({
       )
     }
 
+    if (bios.filter((b) => Boolean(b.description)).length === 0) {
+      return c.json({ success: true })
+    }
+
     const prompt = new XmlPrompt()
 
     prompt.open('prompt')
