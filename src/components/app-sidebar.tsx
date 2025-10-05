@@ -74,7 +74,11 @@ const ChatInput = ({
   const { open } = useSidebar()
   const { data: session } = authClient.useSession()
 
-  const { data: ownTweets, refetch: refetchOwnTweets } = useQuery({
+  const {
+    data: ownTweets,
+    refetch: refetchOwnTweets,
+    isFetched,
+  } = useQuery({
     queryKey: ['get-own-tweets-sidebar'],
     queryFn: async () => {
       const res = await client.knowledge.get_own_tweets.$get()
@@ -83,7 +87,7 @@ const ChatInput = ({
     refetchOnWindowFocus: false,
   })
 
-  const isIndexing = !ownTweets?.length
+  const isIndexing = !ownTweets?.length && isFetched
 
   useEffect(() => {
     if (isIndexing) editor.setEditable(false)
@@ -101,7 +105,13 @@ const ChatInput = ({
   const handleSubmit = () => {
     const text = editor.read(() => $getRoot().getTextContent().trim())
 
-    onSubmit(text, length)
+    if (text.toLowerCase().includes('thread')) {
+      // auto-detect threads
+      setLength('thread')
+      onSubmit(text, 'thread')
+    } else {
+      onSubmit(text, length)
+    }
 
     editor.update(() => {
       const root = $getRoot()
@@ -122,7 +132,12 @@ const ChatInput = ({
             const text = root.getTextContent().trim()
             if (!text) return
 
-            onSubmit(text, length)
+            if (text.toLowerCase().includes('thread')) {
+              setLength('thread')
+              onSubmit(text, 'thread')
+            } else {
+              onSubmit(text, length)
+            }
 
             root.clear()
             const paragraph = $createParagraphNode()

@@ -27,8 +27,6 @@ export const Messages = memo(
       [messages],
     )
 
-    console.log({ messages })
-
     const visibleMessages = useMemo(
       () =>
         messages.filter((message) =>
@@ -101,8 +99,12 @@ export const Messages = memo(
                         )
                       }
 
-                      if(part.type === "tool-lookup_involved_project") {
-                        return <p className='text-gray-500' key={i}>Searching knowledge base...</p>
+                      if (part.type === 'tool-lookup_involved_project') {
+                        return (
+                          <p className="text-gray-500" key={i}>
+                            Searching knowledge base...
+                          </p>
+                        )
                       }
 
                       if (part.type === 'tool-read_website_content') {

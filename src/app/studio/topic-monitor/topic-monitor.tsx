@@ -60,8 +60,6 @@ export const Feed = ({ keywords, data, containerRef }: FeedProps) => {
           cardWidth: newCardWidth,
         } = calculateResponsiveLayout(width)
 
-        console.log('LANES', newLanes);
-
         setLanes(newLanes)
         setGap(newGap)
       }
