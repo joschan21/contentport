@@ -35,7 +35,7 @@ import {
   Plus,
   RefreshCw,
   Trash2,
-  UserPlus
+  UserPlus,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Fragment, useEffect, useState } from 'react'
@@ -46,7 +46,7 @@ export default function AccountsPage() {
   const [showConnectDialog, setShowConnectDialog] = useState(false)
   const [inviteLink, setInviteLink] = useState('')
   const [showInviteDialog, setShowInviteDialog] = useState(false)
-  const { data } = authClient.useSession()
+  const { data: session } = authClient.useSession()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
   const isNewAccountConnected = searchParams.get('new_account_connected')
@@ -112,10 +112,12 @@ export default function AccountsPage() {
   })
 
   useRealtime<RealtimeEvents>({
-    channel: data?.user.id,
-    enabled: Boolean(
-      accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
-    ),
+    channel: session?.user.id,
+    enabled:
+      Boolean(Boolean(session?.user.id)) &&
+      Boolean(
+        accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+      ),
     events: {
       index_memories: { status: () => refetchAccounts() },
       index_tweets: { status: () => refetchAccounts() },
@@ -219,7 +221,7 @@ export default function AccountsPage() {
               <span className="mr-1.5">👉</span> Showing {accounts?.length} account
               {accounts?.length === 1 ? '' : 's'}
             </p>
-            {data?.user.plan === 'free' ? (
+            {session?.user.plan === 'free' ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DuolingoButton
