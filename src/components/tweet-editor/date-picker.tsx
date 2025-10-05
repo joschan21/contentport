@@ -11,9 +11,12 @@ import DuolingoButton from '../ui/duolingo-button'
 import { authClient } from '@/lib/auth-client'
 import { useQuery } from '@tanstack/react-query'
 import { client } from '@/lib/client'
+import { Label } from '@/components/ui/label'
+import DuolingoCheckbox from '../ui/duolingo-checkbox'
+import { Checkbox } from '../ui/checkbox'
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
-  onSchedule?: (date: Date, time: string) => void
+  onSchedule?: (date: Date, time: string, useNaturalTime?: boolean) => void
   isPending?: boolean
   initialScheduledTime?: Date
   editMode?: boolean
@@ -107,6 +110,12 @@ export const Calendar20 = ({
 
   const [date, setDate] = React.useState<Date | undefined>(getInitialDate())
   const [selectedTime, setSelectedTime] = React.useState<string | null>(getInitialTime())
+  const [useNaturalTime, setUseNaturalTime] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('useNaturalPostingTime') === 'true'
+    }
+    return false
+  })
 
   const getInitialAmPm = (): 'AM' | 'PM' => {
     return currentHour >= 12 ? 'PM' : 'AM'
@@ -340,22 +349,46 @@ export const Calendar20 = ({
           )}
         </div>
 
-        <DuolingoButton
-          loading={isPending}
-          size="sm"
-          disabled={!date || !selectedTime}
-          className="w-full md:ml-auto md:w-auto"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
+        <div className="flex flex-col gap-3 w-full md:ml-auto md:w-auto">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="natural-time"
+              checked={useNaturalTime}
+              onCheckedChange={(checked) => {
+                const isChecked = checked === true
+                setUseNaturalTime(isChecked)
+                if (isChecked) {
+                  localStorage.setItem('useNaturalPostingTime', 'true')
+                } else {
+                  localStorage.removeItem('useNaturalPostingTime')
+                }
+              }}
+            />
+            <Label
+              htmlFor="natural-time"
+              className="text-sm font-normal cursor-pointer text-muted-foreground"
+            >
+              Natural posting time (±4 min)
+            </Label>
+          </div>
 
-            if (date && selectedTime && onSchedule) {
-              onSchedule(date, selectedTime)
-            }
-          }}
-        >
-          {editMode ? 'Reschedule' : 'Schedule'}
-        </DuolingoButton>
+          <DuolingoButton
+            loading={isPending}
+            size="sm"
+            disabled={!date || !selectedTime}
+            className="w-full"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+
+              if (date && selectedTime && onSchedule) {
+                onSchedule(date, selectedTime, useNaturalTime)
+              }
+            }}
+          >
+            {editMode ? 'Reschedule' : 'Schedule'}
+          </DuolingoButton>
+        </div>
       </CardFooter>
     </Card>
   )

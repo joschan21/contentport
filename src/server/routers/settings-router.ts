@@ -80,14 +80,22 @@ export const settingsRouter = j.router({
     const activeAccount = await redis.json.get<Account>(`active-account:${user.email}`)
 
     const accounts = await Promise.all(
-      accountIds.map(async (accountRecord) => {
+      accountIds.map(async (account) => {
         const accountData = await redis.json.get<Account>(
-          `account:${user.email}:${accountRecord.id}`,
+          `account:${user.email}:${account.id}`,
         )
+
+        const doPostsExists = await redis.exists(`posts:${account.id}`)
+        const postIndexingStatus = await redis.get<'started' | 'success' | 'error'>(
+          `status:posts:${account.id}`,
+        )
+
         return {
-          ...accountRecord,
+          ...account,
           ...accountData,
-          isActive: activeAccount?.id === accountRecord.id,
+          isActive: activeAccount?.id === account.id,
+          postIndexingStatus: postIndexingStatus || (doPostsExists ? 'success' : 'error'),
+          // isMemoriesIndexed,
         }
       }),
     )

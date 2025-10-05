@@ -282,12 +282,15 @@ export const styleGuide = async ({
   topic,
 }: {
   accountId: string
+  accountTwitterId?: string
   topic: string
 }) => {
   const knowledge = await vector.namespace(accountId).query({
     data: topic,
     topK: 20,
     includeData: true,
+    includeMetadata: true,
+    filter: 'isRetweet = false AND isReply = false',
   })
 
   const relevant = knowledge

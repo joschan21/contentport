@@ -1,6 +1,6 @@
 import { getBaseUrl } from '@/constants/base-url'
 import { db } from '@/db'
-import { knowledgeDocument, user as userSchema } from '@/db/schema'
+import { account as accounts, knowledgeDocument, user as userSchema } from '@/db/schema'
 import { firecrawl } from '@/lib/firecrawl'
 import { qstash } from '@/lib/qstash'
 import { realtime } from '@/lib/realtime'
@@ -320,7 +320,7 @@ export const knowledgeRouter = j.router({
 
     const returnTweets = tweets
       .filter(Boolean)
-      .filter((t) => !t.in_reply_to_status_id_str && !t.quoted_tweet)
+      .filter((t) => t.user.id_str === account.twitterId)
       .sort((a, b) => {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       })
@@ -428,7 +428,7 @@ export const knowledgeRouter = j.router({
 
     await Promise.all(
       memories.map(async (memory) => {
-        await redis.lpush(`memories:${account.id}`, { id: nanoid(), memory })
+        await redis.lpush(`memories:${account.id}`, memory)
       }),
     )
 
@@ -440,6 +440,12 @@ export const knowledgeRouter = j.router({
 
   show_indexing_modal: privateProcedure.query(async ({ c, ctx, input }) => {
     const { user } = ctx
+
+    const passedIndexing = await redis.hget(`passed_indexing_users`, user.id)
+
+    if (passedIndexing) {
+      return c.json({ shouldShow: false })
+    }
 
     const accounts = await redis.scan(0, { match: `account:${user.email}:*` })
 
@@ -469,8 +475,58 @@ export const knowledgeRouter = j.router({
       return c.json({ shouldShow: true })
     }
 
+    await redis.hset(`passed_indexing_users`, { [user.id]: true })
+
     return c.json({ shouldShow: false })
   }),
+
+  reindex_tweets: privateProcedure
+    .input(z.object({ accountId: z.string() }))
+    .post(async ({ c, ctx, input }) => {
+      const { user } = ctx
+
+      const [dbAccount] = await db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.userId, user.id),
+            eq(accounts.providerId, 'twitter'),
+            eq(accounts.id, input.accountId),
+          ),
+        )
+
+      if (!dbAccount) {
+        throw new HTTPException(404, { message: 'Database account not found' })
+      }
+
+      // re-indexing
+
+      const account = await redis.json.get<Account>(
+        `account:${user.email}:${dbAccount.id}`,
+      )
+
+      if (!account) {
+        throw new HTTPException(404, { message: 'Account not found' })
+      }
+
+      await redis.del(`status:posts:${account.id}`)
+      await redis.set(`status:posts:${account.id}`, 'started')
+
+      const baseUrl =
+        process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
+
+      await qstash.publishJSON({
+        url: baseUrl + '/api/knowledge/index_tweets',
+        body: {
+          userId: user.id,
+          accountId: account.id,
+          handle: account.username,
+        },
+      })
+
+      return c.json({ success: true })
+    }),
 
   index_tweets: qstashProcedure.post(async ({ c, ctx, input }) => {
     const { body } = ctx
@@ -480,25 +536,39 @@ export const knowledgeRouter = j.router({
     await redis.del(`posts:${accountId}`)
     await vector.deleteNamespace(`${accountId}`).catch(() => {})
 
-    await redis.set(`status:posts:${accountId}`, 'started', { ex: 60 * 60 * 24 })
+    await redis.set(`status:posts:${accountId}`, 'started')
 
     try {
-      await fetch(process.env.TWITTER_API_SERVICE + '/knowledge/index_tweets', {
-        method: 'POST',
-        body: JSON.stringify({
-          accountId,
-          handle,
-        }),
-        headers: {
-          Authorization: `Bearer ${process.env.CONTENTPORT_IDENTITY_KEY}`,
+      const res = await fetch(
+        process.env.TWITTER_API_SERVICE + '/knowledge/index_tweets',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            accountId,
+            handle,
+          }),
+          headers: {
+            Authorization: `Bearer ${process.env.CONTENTPORT_IDENTITY_KEY}`,
+          },
         },
-      })
+      )
+
+      if (!res.ok) {
+        throw new HTTPException(500, {
+          message: 'Failed to index tweets:' + res.statusText,
+        })
+      }
+
+      await redis.set(`status:posts:${accountId}`, 'success')
     } catch (err) {
       await redis.set(`status:posts:${accountId}`, 'error')
+      console.error('[ERROR] Indexing tweets:', err)
     }
 
+    await redis.expire(`status:posts:${accountId}`, 60 * 60 * 24)
+
     const namespace = realtime.channel(userId)
-    await namespace.index_tweets.status.emit({ status: 'success' })
+    await namespace.index_tweets.status.emit({ status: 'resolved' })
 
     return c.json({ success: true })
   }),

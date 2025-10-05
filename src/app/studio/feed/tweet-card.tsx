@@ -22,7 +22,7 @@ export const TweetCard = ({ keywords, isNew, threadGroup }: TweetCardProps) => {
   const { main, replyChains } = threadGroup
 
   const renderTweet = (tweet: EnrichedTweet) => (
-    <article>
+    <article className="w-full">
       <div className="flex items-center gap-1.5 mb-3">
         <div className="flex flex-col gap-px">
           <span className="font-semibold truncate inline-flex items-center gap-1.5 text-gray-900 leading-none">

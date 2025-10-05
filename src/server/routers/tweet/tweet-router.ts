@@ -18,7 +18,7 @@ import { getAccount } from '../utils/get-account'
 import { ensureValidMedia } from '../utils/upload-media-to-twitter'
 import { fetchMediaFromS3 } from './fetch-media-from-s3'
 
-import { getNextAvailableQueueSlot } from './queue-utils'
+import { getNextAvailableQueueSlot, applyNaturalPostingTime } from './queue-utils'
 import { vector } from '@/lib/vector'
 
 async function getFutureScheduledTweetsCount(
@@ -245,11 +245,12 @@ export const tweetRouter = j.router({
         baseTweetId: z.string(),
         scheduledUnix: z.number(),
         thread: z.array(payloadTweetSchema).min(1),
+        useNaturalTime: z.boolean().optional(),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { baseTweetId, scheduledUnix, thread } = input
+      const { baseTweetId, scheduledUnix, thread, useNaturalTime } = input
 
       const account = await getAccount({
         email: user.email,
@@ -316,12 +317,13 @@ export const tweetRouter = j.router({
       await deleteTweet(baseTweetId)
 
       const newBaseTweetId = crypto.randomUUID()
+      const finalScheduledUnix = useNaturalTime ? applyNaturalPostingTime(scheduledUnix) : scheduledUnix
 
       const { messageId } = await postWithQStash({
         accountId: dbAccount.id,
         tweetId: newBaseTweetId,
         userId: user.id,
-        scheduledUnixInSeconds: scheduledUnix / 1000,
+        scheduledUnixInSeconds: finalScheduledUnix / 1000,
       })
 
       const generatedIds = thread.map((_, i) =>
@@ -335,7 +337,7 @@ export const tweetRouter = j.router({
         content: tweet.content,
 
         isScheduled: true,
-        scheduledUnix,
+        scheduledUnix: finalScheduledUnix,
         isQueued: existingBaseTweet.isQueued,
 
         media: tweet.media,
@@ -357,11 +359,12 @@ export const tweetRouter = j.router({
       z.object({
         thread: z.array(payloadTweetSchema).min(1),
         scheduledUnix: z.number(),
+        useNaturalTime: z.boolean().optional(),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { thread, scheduledUnix } = input
+      const { thread, scheduledUnix, useNaturalTime } = input
 
       const account = await getAccount({
         email: user.email,
@@ -398,11 +401,13 @@ export const tweetRouter = j.router({
 
       const tweetId = crypto.randomUUID()
 
+      const finalScheduledUnix = useNaturalTime ? applyNaturalPostingTime(scheduledUnix) : scheduledUnix
+
       const { messageId } = await postWithQStash({
         tweetId,
         userId: user.id,
         accountId: dbAccount.id,
-        scheduledUnixInSeconds: scheduledUnix / 1000,
+        scheduledUnixInSeconds: finalScheduledUnix / 1000,
       })
 
       try {
@@ -415,7 +420,7 @@ export const tweetRouter = j.router({
           accountId: account.id,
           userId: user.id,
           content: tweet.content,
-          scheduledUnix,
+          scheduledUnix: finalScheduledUnix,
 
           isScheduled: true,
           isQueued: false,
@@ -900,11 +905,12 @@ export const tweetRouter = j.router({
         userNow: z.date(),
         timezone: z.string(),
         thread: z.array(payloadTweetSchema).min(1),
+        useNaturalTime: z.boolean().optional(),
       }),
     )
     .mutation(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { userNow, timezone, thread } = input
+      const { userNow, timezone, thread, useNaturalTime } = input
 
       const account = await getAccount({
         email: user.email,
@@ -955,13 +961,14 @@ export const tweetRouter = j.router({
       }
 
       const scheduledUnix = nextSlot.getTime()
+      const finalScheduledUnix = useNaturalTime ? applyNaturalPostingTime(scheduledUnix) : scheduledUnix
       const baseTweetId = crypto.randomUUID()
 
       const { messageId } = await postWithQStash({
         accountId: dbAccount.id,
         tweetId: baseTweetId,
         userId: user.id,
-        scheduledUnixInSeconds: scheduledUnix / 1000,
+        scheduledUnixInSeconds: finalScheduledUnix / 1000,
       })
 
       try {
@@ -974,7 +981,7 @@ export const tweetRouter = j.router({
           accountId: account.id,
           userId: user.id,
           content: tweet.content,
-          scheduledUnix,
+          scheduledUnix: finalScheduledUnix,
 
           isScheduled: true,
           isQueued: true,
@@ -1000,7 +1007,7 @@ export const tweetRouter = j.router({
       return c.json({
         success: true,
         tweetId: baseTweetId,
-        scheduledUnix,
+        scheduledUnix: finalScheduledUnix,
         accountId: account.id,
         accountName: account.name,
       })

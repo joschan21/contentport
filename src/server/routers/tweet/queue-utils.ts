@@ -6,6 +6,12 @@ import { and, eq } from 'drizzle-orm'
 
 const SLOTS = [10, 12, 14]
 
+export function applyNaturalPostingTime(scheduledUnix: number): number {
+  const fourMinutesInMs = 4 * 60 * 1000
+  const randomOffset = Math.floor(Math.random() * (fourMinutesInMs * 2 + 1)) - fourMinutesInMs
+  return scheduledUnix + randomOffset
+}
+
 export async function getNextAvailableQueueSlot({
   userId,
   accountId,

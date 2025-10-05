@@ -15,7 +15,7 @@ const schema = {
   }),
   index_tweets: z.object({
     status: z.object({
-      status: z.enum(['started', 'success', 'error']),
+      status: z.enum(['started', 'resolved']),
     }),
   }),
   index_memories: z.object({

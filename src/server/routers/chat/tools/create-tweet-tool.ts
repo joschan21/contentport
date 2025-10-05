@@ -193,7 +193,11 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
       }
 
       // style
-      const style = await styleGuide({ accountId: account.id, topic: instruction })
+      const style = await styleGuide({
+        accountId: account.id,
+        topic: instruction,
+      })
+
       prompt.tag('style', style)
 
       if (ctx.length === 'short') {
@@ -259,9 +263,9 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
 
       console.log('⚠️⚠️⚠️ PROMPT', JSON.stringify(prompt.toString(), null, 2))
 
-      const model = openrouter.chat('anthropic/claude-sonnet-4', {
+      const model = openrouter.chat('anthropic/claude-sonnet-4.5', {
         reasoning: { enabled: false, effort: 'low' },
-        models: ['anthropic/claude-3.7-sonnet', 'openai/o4-mini'],
+        models: ['anthropic/claude-sonnet-4', 'anthropic/claude-3.7-sonnet'],
       })
 
       const result = streamText({

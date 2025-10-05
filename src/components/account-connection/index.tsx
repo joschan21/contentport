@@ -1,17 +1,22 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import DuolingoButton from '../ui/duolingo-button'
 
-export const AccountConnection = () => {
-  const router = useRouter()
-
+export const AccountConnection = ({
+  title,
+  buttonText,
+  onClick,
+}: {
+  title: string
+  buttonText: string
+  onClick: () => void
+}) => {
   return (
     <div className="h-full flex flex-col items-stretch gap-6">
       <div className="flex flex-col gap-4">
-        <h3 className="text-3xl font-semibold text-center">You're all set! 🎉</h3>
+        <h3 className="text-3xl font-semibold text-left">{title}</h3>
 
-        <p className="text-base text-pretty text-gray-500 text-center">
+        <p className="text-base text-pretty text-gray-500 text-left">
           We're analyzing your tweets and learning your writing style in the background.
         </p>
         <div className="bg-gray-50 rounded-xl p-5 space-y-4">
@@ -34,16 +39,14 @@ export const AccountConnection = () => {
             </div>
           </div>
         </div>
-        <p className="text-sm text-gray-500 text-center">
+        <p className="text-sm text-gray-500 text-left">
           This usually takes a few minutes. Feel free to explore your dashboard while we
           learn about you!
         </p>
       </div>
 
       <div className="h-full flex-1 flex items-end">
-        <DuolingoButton onClick={() => router.push('/studio')}>
-          Go to Dashboard
-        </DuolingoButton>
+        <DuolingoButton onClick={onClick}>{buttonText}</DuolingoButton>
       </div>
     </div>
   )

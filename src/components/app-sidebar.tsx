@@ -56,6 +56,7 @@ import { PromptSuggestion } from './ui/prompt-suggestion'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 import { Loader } from './ui/loader'
 import Link from 'next/link'
+import { mapToConnectedAccount } from '@/hooks/account-ctx'
 
 const ChatInput = ({
   onSubmit,
@@ -74,12 +75,21 @@ const ChatInput = ({
   const { open } = useSidebar()
   const { data: session } = authClient.useSession()
 
+  const { data: activeAccount } = useQuery({
+    queryKey: ['get-active-account'],
+    queryFn: async () => {
+      const res = await client.settings.active_account.$get()
+      const { account } = await res.json()
+      return account ? mapToConnectedAccount(account) : null
+    },
+  })
+
   const {
     data: ownTweets,
     refetch: refetchOwnTweets,
     isFetched,
   } = useQuery({
-    queryKey: ['get-own-tweets-sidebar'],
+    queryKey: ['get-own-tweets-sidebar', activeAccount?.id],
     queryFn: async () => {
       const res = await client.knowledge.get_own_tweets.$get()
       return await res.json()

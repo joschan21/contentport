@@ -89,6 +89,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     mutationFn: async ({ tweets }: { tweets: MemoryTweet[] }) => {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       const userNow = new Date()
+      const useNaturalTime = localStorage.getItem('useNaturalPostingTime') === 'true'
 
       const thread: PayloadTweet[] = tweets.map(toPayloadTweet)
 
@@ -96,6 +97,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         thread,
         timezone,
         userNow,
+        useNaturalTime,
       })
 
       return await res.json()
@@ -152,14 +154,17 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       scheduledUnix,
       thread,
       showToast = true,
+      useNaturalTime = false,
     }: {
       scheduledUnix: number
       thread: PayloadTweet[]
       showToast?: boolean
+      useNaturalTime?: boolean
     }) => {
       const promise = client.tweet.schedule.$post({
         scheduledUnix,
         thread,
+        useNaturalTime,
       })
 
       if (showToast) {
@@ -216,9 +221,11 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     mutationFn: async ({
       scheduledUnix,
       thread,
+      useNaturalTime = false,
     }: {
       scheduledUnix: number
       thread: PayloadTweet[]
+      useNaturalTime?: boolean
     }) => {
       if (!scheduledUnix) {
         toast.error('Something went wrong, please reload the page.')
@@ -234,6 +241,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         baseTweetId: editTweetData?.thread?.[0]?.id,
         scheduledUnix,
         thread,
+        useNaturalTime,
       })
 
       return await res.json()
@@ -292,7 +300,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     })
   }
 
-  const handleScheduleTweet = (date: Date, time: string) => {
+  const handleScheduleTweet = (date: Date, time: string, useNaturalTime?: boolean) => {
     const [hours, minutes] = time.split(':').map(Number)
     const scheduledDateTime = new Date(date)
     scheduledDateTime.setHours(hours || 0, minutes || 0, 0, 0)
@@ -320,10 +328,11 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     scheduleTweetMutation.mutate({
       thread,
       scheduledUnix,
+      useNaturalTime: useNaturalTime ?? false,
     })
   }
 
-  const handleRescheduleTweet = (date: Date, time: string) => {
+  const handleRescheduleTweet = (date: Date, time: string, useNaturalTime?: boolean) => {
     const [hours, minutes] = time.split(':').map(Number)
     const scheduledDateTime = new Date(date)
     scheduledDateTime.setHours(hours || 0, minutes || 0, 0, 0)

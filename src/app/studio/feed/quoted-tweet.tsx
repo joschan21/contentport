@@ -9,7 +9,7 @@ type Props = { tweet: EnrichedQuotedTweet; isNestedQuote: boolean }
 export const QuotedTweet = ({ tweet, isNestedQuote }: Props) => (
   <div
     className={cn(
-      'relative mt-3 py-5 pt-3 px-3 bg-gray-50 rounded-lg border border-black/5',
+      'relative w-full mt-3 py-5 pt-3 px-3 bg-gray-50 rounded-lg border border-black/5',
       {
         'bg-gray-100': isNestedQuote,
       },

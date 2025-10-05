@@ -247,7 +247,11 @@ const Page = () => {
               </SwiperSlide>
 
               <SwiperSlide className="mx-auto w-full p-1">
-                <AccountConnection />
+                <AccountConnection
+                  title="You're all set! 🎉"
+                  buttonText="Go to Dashboard"
+                  onClick={() => router.push('/studio')}
+                />
               </SwiperSlide>
             </Swiper>
           </div>

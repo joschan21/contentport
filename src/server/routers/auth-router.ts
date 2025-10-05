@@ -295,7 +295,7 @@ export const authRouter = j.router({
     }
 
     if (authAction === 'add-account') {
-      return c.redirect(`${getBaseUrl()}/studio/accounts`)
+      return c.redirect(`${getBaseUrl()}/studio/accounts?new_account_connected=true`)
     }
 
     return c.redirect(
