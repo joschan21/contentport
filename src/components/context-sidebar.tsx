@@ -97,7 +97,7 @@ export const LeftSidebar = () => {
               )}
             >
               <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
-                <Icons.pencil className="size-6" />
+                <Icons.pencil className="size-[18px]" />
               </div>
               <span
                 className={cn(
@@ -141,7 +141,7 @@ export const LeftSidebar = () => {
               )}
             >
               <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
-                <Icons.magnifier className="size-5" />
+                <Icons.magnifier className="size-[18px]" />
               </div>
               <span
                 className={cn(
@@ -186,7 +186,7 @@ export const LeftSidebar = () => {
                 )}
               >
                 <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
-                  <Icons.brain className="size-6" />
+                  <Icons.brain className="size-[20px]" />
                 </div>
                 <span
                   className={cn(
@@ -214,7 +214,7 @@ export const LeftSidebar = () => {
                 )}
               >
                 <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
-                  <Icons.calendar className="size-6" />
+                  <Icons.calendar className="size-[18px]" />
                 </div>
                 <span
                   className={cn(
@@ -242,7 +242,7 @@ export const LeftSidebar = () => {
                 )}
               >
                 <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
-                  <Icons.outboxTray className="size-6" />
+                  <Icons.outboxTray className="size-[18px]" />
                 </div>
                 <span
                   className={cn(
@@ -284,7 +284,7 @@ export const LeftSidebar = () => {
               )}
             >
               <div className="aspect-square h-full flex items-center justify-center flex-shrink-0">
-                <Icons.imageIcon className="size-6" />
+                <Icons.imageIcon className="size-[18px] -mt-[3px]" />
               </div>
               <span
                 className={cn(
@@ -363,7 +363,7 @@ export const LeftSidebar = () => {
                 className: 'text-muted-foreground hover:text-foreground',
               })}
             >
-              <Settings className="size-5" />
+              <Settings className="size-[18px]" />
             </Link>
           </div>
         </div>
