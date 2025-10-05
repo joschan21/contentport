@@ -11,7 +11,7 @@ import * as React from 'react'
 const Navbar = ({ title }: { title: string }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const { data: session } = authClient.useSession()
-  const isAuthenticated = !!session?.session
+  const isAuthenticated = Boolean(session?.session)
 
   React.useEffect(() => {
     const originalOverflow = document.body.style.overflow
@@ -52,11 +52,17 @@ const Navbar = ({ title }: { title: string }) => {
             </button>
           </div>
           <div className="hidden sm:flex items-center gap-2">
-            <Link href="/sign-in">
-              <DuolingoButton className="whitespace-nowrap" size="sm" variant="secondary">
-                Sign in
-              </DuolingoButton>
-            </Link>
+            {!isAuthenticated ? (
+              <Link href="/sign-in">
+                <DuolingoButton
+                  className="whitespace-nowrap"
+                  size="sm"
+                  variant="secondary"
+                >
+                  Sign in
+                </DuolingoButton>
+              </Link>
+            ) : null}
             {isAuthenticated ? (
               <Link href="/studio">
                 <DuolingoButton size="sm" className="whitespace-nowrap">
@@ -96,15 +102,17 @@ const Navbar = ({ title }: { title: string }) => {
               <div className="mt-6 flow-root">
                 <div className="-my-6 divide-y divide-gray-500/10">
                   <div className="py-6 flex flex-col gap-4">
-                    <Link href="/sign-in">
-                      <DuolingoButton
-                        className="whitespace-nowrap"
-                        size="sm"
-                        variant="secondary"
-                      >
-                        Sign in
-                      </DuolingoButton>
-                    </Link>
+                    {!isAuthenticated ? (
+                      <Link href="/sign-in">
+                        <DuolingoButton
+                          className="whitespace-nowrap"
+                          size="sm"
+                          variant="secondary"
+                        >
+                          Sign in
+                        </DuolingoButton>
+                      </Link>
+                    ) : null}
                     {isAuthenticated ? (
                       <Link href="/studio">
                         <DuolingoButton size="sm" className="whitespace-nowrap">
