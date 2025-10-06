@@ -192,7 +192,7 @@ export const authRouter = j.router({
       throw new HTTPException(404, { message: 'user not found' })
     }
 
-    const accounts = await getAccounts({ userId: user.id })
+    const accounts = await getAccounts({ userId: user.id, email: user.email })
 
     for (const account of accounts) {
       if (account.twitterId === accountId) {

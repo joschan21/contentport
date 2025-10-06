@@ -35,7 +35,13 @@ export const getAccount = async ({
   return payload
 }
 
-export const getAccounts = async ({ userId }: { userId: string }) => {
+export const getAccounts = async ({
+  userId,
+  email,
+}: {
+  userId: string
+  email: string
+}) => {
   const dbAccounts = await db
     .select({ id: accountSchema.id })
     .from(accountSchema)
@@ -43,7 +49,7 @@ export const getAccounts = async ({ userId }: { userId: string }) => {
 
   const accounts = await Promise.all(
     dbAccounts.map(async (account) => {
-      return await getAccount({ email: userId, accountId: account.id })
+      return await getAccount({ email, accountId: account.id })
     }),
   )
 

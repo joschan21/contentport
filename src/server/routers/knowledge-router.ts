@@ -69,7 +69,7 @@ export const knowledgeRouter = j.router({
       throw new HTTPException(404, { message: 'User not found' })
     }
 
-    const accounts = await getAccounts({ userId: user.id })
+    const accounts = await getAccounts({ userId: user.id, email: user.email })
 
     const url =
       process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
@@ -427,7 +427,7 @@ export const knowledgeRouter = j.router({
       return c.json({ shouldShow: false })
     }
 
-    const accounts = await getAccounts({ userId: user.id })
+    const accounts = await getAccounts({ userId: user.id, email: user.email })
 
     const accountStatuses = await Promise.all(
       accounts.map(async ({ id }) => {
