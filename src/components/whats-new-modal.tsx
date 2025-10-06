@@ -3,7 +3,7 @@
 import { Modal } from '@/components/ui/modal'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { client } from '@/lib/client'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 
 import { Dispatch, SetStateAction } from 'react'
@@ -14,6 +14,8 @@ interface WhatsNewModalProps {
 }
 
 export function WhatsNewModal({ open, onOpenChange }: WhatsNewModalProps) {
+  const queryClient = useQueryClient()
+
   const { mutate: handleReindex, isPending } = useMutation({
     mutationFn: async () => {
       const res = await client.knowledge.reindex_all_accounts.$post()
@@ -21,6 +23,8 @@ export function WhatsNewModal({ open, onOpenChange }: WhatsNewModalProps) {
     },
     onSuccess: () => {
       onOpenChange(false)
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+
       toast.success('Indexing started! You can use the chat once indexing completes.')
     },
     onError: () => {
@@ -29,11 +33,7 @@ export function WhatsNewModal({ open, onOpenChange }: WhatsNewModalProps) {
   })
 
   return (
-    <Modal
-      showModal={open}
-      setShowModal={onOpenChange}
-      className="max-w-xl"
-    >
+    <Modal showModal={open} setShowModal={onOpenChange} className="max-w-xl">
       <div className="flex flex-col items-stretch gap-6 p-8">
         <div className="relative z-10 isolate flex items-center -space-x-1.5">
           <img
