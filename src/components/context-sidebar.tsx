@@ -247,7 +247,7 @@ export const LeftSidebar = () => {
                 buttonVariants({
                   variant: 'ghost',
                   className:
-                    'w-full cursor-pointer h-12 group/scheduled justify-start gap-2 p-2 hover:bg-transparent',
+                    'w-full cursor-pointer h-14 pb-2 group/scheduled justify-start gap-2 p-2 hover:bg-transparent',
                 }),
               )}
             >
@@ -268,41 +268,6 @@ export const LeftSidebar = () => {
                   )}
                 >
                   Schedule
-                </span>
-              </div>
-            </Link>
-
-            <Link
-              suppressHydrationWarning
-              href={{
-                pathname: '/studio/posted',
-                search: serialize({ chatId: id }),
-              }}
-              className={cn(
-                buttonVariants({
-                  variant: 'ghost',
-                  className:
-                    'w-full cursor-pointer h-14 pb-2 group/posted justify-start gap-2 p-2 hover:bg-transparent',
-                }),
-              )}
-            >
-              <div
-                className={cn(
-                  'w-full h-10 flex group-hover/posted:bg-stone-200 transition-colors rounded-md items-center justify-start flex-shrink-0',
-                  { 'bg-stone-200': pathname === '/studio/posted' },
-                )}
-              >
-                <Icons.outboxTray className="size-[18px] w-12" />
-                <span
-                  data-state={isCollapsed ? 'collapsed' : 'expanded'}
-                  className={cn(
-                    'data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200',
-                    {
-                      'opacity-0': !isMounted,
-                    },
-                  )}
-                >
-                  Posted
                 </span>
               </div>
             </Link>
