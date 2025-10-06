@@ -59,14 +59,6 @@ type Bio = {
   id: string
 }
 
-type TSitemap = {
-  id: string
-  name: string
-  url: string
-  updatedAt: number // unix
-  length: number
-}
-
 export const knowledgeRouter = j.router({
   reindex_all_accounts: privateProcedure.post(async ({ c, ctx }) => {
     const { user } = ctx
@@ -79,13 +71,13 @@ export const knowledgeRouter = j.router({
 
     const accounts = await getAccounts({ userId: user.id })
 
-    const baseUrl =
+    const url =
       process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
 
     for (const account of accounts) {
       await Promise.all([
         qstash.publishJSON({
-          url: baseUrl + '/api/knowledge/index_tweets',
+          url: url + '/api/knowledge/index_tweets',
           body: {
             userId: user.id,
             accountId: account.id,
@@ -93,7 +85,7 @@ export const knowledgeRouter = j.router({
           },
         }),
         qstash.publishJSON({
-          url: baseUrl + '/api/knowledge/index_memories',
+          url: url + '/api/knowledge/index_memories',
           body: {
             userId: user.id,
             accountId: account.id,
