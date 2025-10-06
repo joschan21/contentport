@@ -1,15 +1,15 @@
 import { AccountAvatar, AccountVerifiedBadge } from '@/hooks/account-ctx'
-import { CaretRightIcon, HouseIcon } from '@phosphor-icons/react'
-import Link from 'next/link'
+import { cn } from '@/lib/utils';
 import { PropsWithChildren } from 'react'
 
 export const Container = ({
   children,
   title,
   description,
-}: PropsWithChildren<{ title: string; description: string }>) => {
+  className,
+}: PropsWithChildren<{ title: string; description: string, className?: string }>) => {
   return (
-    <div className="relative z-10">
+    <div className={cn("relative z-10", className)}>
       <img
         alt=""
         src="/banner.png"

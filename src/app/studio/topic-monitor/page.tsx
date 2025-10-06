@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-
 import { Container } from '@/components/container'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { Loader } from '@/components/ui/loader'
@@ -119,8 +118,11 @@ const Page = () => {
   })
 
   return (
-    <Container title="Topic Monitor" description="Monitor all keywords related to your brand or business.">
-      <div className="mt-6">
+    <Container
+      title="Topic Monitor"
+      description="Monitor all keywords related to your brand or business."
+    >
+      <div className="mt-6 border-b-2 border-stone-300">
         <div className="flex items-center justify-between mb-8">
           <div className="flex-1 flex flex-col">
             <div className="flex items-center gap-2 flex-wrap">
@@ -163,15 +165,6 @@ const Page = () => {
                   )
                 })}
               </TooltipProvider>
-
-              {/* {authData?.user.plan === 'free' && isKeywordsFetched && (
-                <button
-                  onClick={() => router.push('/studio/settings')}
-                  className="text-xs text-gray-600 underline"
-                >
-                  Upgrade to add more &rarr;
-                </button>
-              )} */}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-gray-500">Sort by:</p>

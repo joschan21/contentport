@@ -163,7 +163,7 @@ const Page = () => {
   const scheduledTweetsLimit = usageStats?.scheduledTweets.limit ?? (isPro ? Infinity : 3)
 
   return (
-    <Container title="Settings" description="Manage your Contentport account">
+    <Container className="pb-24" title="Settings" description="Manage your Contentport account">
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value)}
