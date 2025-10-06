@@ -217,7 +217,7 @@ const ChatInput = ({
             <p className="text-sm text-gray-500 mt-1">Indexing your tweets</p>
             <p className="text-gray-500 mt-1 text-sm">•</p>
             <Link
-              href="/studio/knowledge"
+              href="/studio/accounts"
               className="hover:underline text-sm text-gray-500 mt-1"
             >
               See status
