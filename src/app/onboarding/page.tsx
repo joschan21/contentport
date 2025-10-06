@@ -10,6 +10,7 @@ import { AccountConnection } from '@/components/account-connection'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { Label } from '@/components/ui/label'
 import { useConfetti } from '@/hooks/use-confetti'
+import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
 import { useMutation } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -21,12 +22,19 @@ import { MultiSelect } from './multi-select'
 const Page = () => {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { data: session } = authClient.useSession()
   const isAccountConnected = searchParams.get('account_connected')
   const [swiperRef, setSwiperRef] = useState<SwiperType | null>(null)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [input, setInput] = useState({ name: '' })
 
   const { fire, isReady } = useConfetti()
+
+  useEffect(() => {
+    if (session?.user?.name) {
+      setInput((prev) => ({ ...prev, name: session.user.name.split(' ')[0] }))
+    }
+  }, [session?.user?.name])
 
   useEffect(() => {
     if (isReady) {
@@ -67,17 +75,16 @@ const Page = () => {
     },
   ]
 
-  const handleNext = () => {
-    if (swiperRef) {
-      swiperRef.slideNext()
-    }
-  }
-
-  const handlePrev = () => {
-    if (swiperRef) {
-      swiperRef.slidePrev()
-    }
-  }
+  const { mutate: updateName } = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await client.settings.update_name.$post({ name })
+      return await res.json()
+    },
+    onError: () => {
+      toast.error('Failed to save name, please try again')
+      swiperRef?.slidePrev()
+    },
+  })
 
   const { mutate: createOAuthLink, isPending: isCreatingOAuthLink } = useMutation({
     mutationFn: async () => {
@@ -177,6 +184,7 @@ const Page = () => {
                           return
                         }
 
+                        updateName(input.name.trim())
                         swiperRef?.slideNext()
                       }}
                     >
@@ -244,14 +252,6 @@ const Page = () => {
                     </DuolingoButton>
                   </div>
                 </div>
-              </SwiperSlide>
-
-              <SwiperSlide className="mx-auto w-full p-1">
-                <AccountConnection
-                  title="You're all set! 🎉"
-                  buttonText="Go to Dashboard"
-                  onClick={() => router.push('/studio')}
-                />
               </SwiperSlide>
             </Swiper>
           </div>

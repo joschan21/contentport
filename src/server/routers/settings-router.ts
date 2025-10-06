@@ -1,13 +1,19 @@
 import { db } from '@/db'
-import { account as accountSchema } from '@/db/schema'
+import { account as accountSchema, tweets, user as userSchema } from '@/db/schema'
 import { chatLimiter } from '@/lib/chat-limiter'
 import { redis } from '@/lib/redis'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, isNotNull } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
-import { j, privateProcedure } from '../jstack'
+import { j, privateProcedure, qstashProcedure } from '../jstack'
 import { TwitterApi } from 'twitter-api-v2'
 import { vector } from '@/lib/vector'
+import { stripe } from '@/lib/stripe/client'
+import { qstash } from '@/lib/qstash'
+import { s3Client, BUCKET_NAME } from '@/lib/s3'
+import { DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
+import { getBaseUrl } from '@/constants/base-url'
+import { Ratelimit } from '@upstash/ratelimit'
 
 export type Account = {
   id: string
@@ -26,7 +32,323 @@ export const settingsRouter = j.router({
     return c.json({ remaining, reset })
   }),
 
-  delete_account: privateProcedure
+  usage_stats: privateProcedure.get(async ({ c, ctx }) => {
+    const { user } = ctx
+    const isPro = user.plan === 'pro'
+
+    const chatRequestsLimit = isPro ? Infinity : 5
+    const connectedAccountsLimit = isPro ? 3 : 1
+    const scheduledTweetsLimit = isPro ? Infinity : 3
+
+    const [chatLimiter, accountsCount, scheduledCount] = await Promise.all([
+      (async () => {
+        if (isPro) {
+          return {
+            used: 0,
+            limit: Infinity,
+            remaining: Infinity,
+          }
+        }
+
+        const limiter = new Ratelimit({ redis, limiter: Ratelimit.fixedWindow(5, '1d') })
+
+        const { remaining } = await limiter.getRemaining(user.email)
+        const used = chatRequestsLimit - remaining
+
+        return {
+          used: Math.max(0, used),
+          limit: chatRequestsLimit,
+          remaining,
+        }
+      })(),
+
+      db
+        .select({ id: accountSchema.id })
+        .from(accountSchema)
+        .where(
+          and(eq(accountSchema.userId, user.id), eq(accountSchema.providerId, 'twitter')),
+        )
+        .then((accounts) => ({
+          used: accounts.length,
+          limit: connectedAccountsLimit,
+        })),
+
+      (async () => {
+        const currentTime = new Date().getTime()
+
+        const accounts = await db
+          .select({ id: accountSchema.id })
+          .from(accountSchema)
+          .where(eq(accountSchema.userId, user.id))
+
+        const accountIds = accounts.map((a) => a.id)
+
+        if (accountIds.length === 0) {
+          return { used: 0, limit: scheduledTweetsLimit }
+        }
+
+        const futureScheduledTweets = await db.query.tweets.findMany({
+          where: and(
+            eq(tweets.userId, user.id),
+            eq(tweets.isScheduled, true),
+            eq(tweets.isError, false),
+            isNotNull(tweets.scheduledUnix),
+          ),
+          columns: { id: true, scheduledUnix: true, isReplyTo: true },
+        })
+
+        const count = futureScheduledTweets.filter(
+          (tweet) =>
+            tweet.scheduledUnix && tweet.scheduledUnix > currentTime && !tweet.isReplyTo,
+        ).length
+
+        return {
+          used: count,
+          limit: scheduledTweetsLimit,
+        }
+      })(),
+    ])
+
+    return c.json({
+      chatRequests: chatLimiter,
+      connectedAccounts: accountsCount,
+      scheduledTweets: scheduledCount,
+    })
+  }),
+
+  update_name: privateProcedure
+    .input(
+      z.object({
+        name: z.string().min(1, 'Name is required').max(100, 'Name is too long'),
+      }),
+    )
+    .post(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { name } = input
+
+      await db
+        .update(userSchema)
+        .set({ name, updatedAt: new Date() })
+        .where(eq(userSchema.id, user.id))
+
+      return c.json({ success: true, name })
+    }),
+
+  schedule_delete_my_account: privateProcedure.post(async ({ c, ctx }) => {
+    const { user } = ctx
+
+    const [dbUser] = await db.select().from(userSchema).where(eq(userSchema.id, user.id))
+
+    if (!dbUser) {
+      throw new HTTPException(404, { message: 'User not found' })
+    }
+
+    if (dbUser.stripeId) {
+      try {
+        const subscriptions = await stripe.subscriptions.list({
+          customer: dbUser.stripeId,
+          status: 'active',
+        })
+
+        if (subscriptions.data.length > 0) {
+          throw new HTTPException(400, {
+            message:
+              'Please cancel your active subscription before deleting your account.',
+          })
+        }
+      } catch (err) {
+        if (err instanceof HTTPException) {
+          throw err
+        }
+        console.error('Failed to check Stripe subscriptions:', err)
+      }
+    }
+
+    const baseUrl =
+      process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
+
+    await qstash.publishJSON({
+      url: baseUrl + '/api/settings/delete_my_account',
+      body: {
+        userId: user.id,
+      },
+    })
+
+    return c.json({ success: true })
+  }),
+
+  delete_my_account: qstashProcedure.post(async ({ c, ctx }) => {
+    const { body } = ctx
+    const { userId } = body
+
+    if (!userId) {
+      throw new HTTPException(400, { message: 'User ID is required' })
+    }
+
+    try {
+      const [user] = await db.select().from(userSchema).where(eq(userSchema.id, userId))
+
+      if (!user) {
+        throw new HTTPException(404, { message: 'User not found' })
+      }
+
+      const userAccounts = await db
+        .select()
+        .from(accountSchema)
+        .where(eq(accountSchema.userId, user.id))
+
+      for (const account of userAccounts) {
+        try {
+          await vector.deleteNamespace(account.id).catch(() => {})
+        } catch (err) {
+          console.error(
+            `Failed to delete vector namespace for account ${account.id}:`,
+            err,
+          )
+        }
+
+        try {
+          await Promise.all([
+            redis.json.del(`account:${user.email}:${account.id}`),
+            redis.del(`memories:${account.id}`),
+            redis.del(`posts:${account.id}`),
+            redis.del(`status:posts:${account.id}`),
+          ])
+        } catch (err) {
+          console.error(`Failed to delete Redis keys for account ${account.id}:`, err)
+        }
+      }
+
+      try {
+        await redis.json.del(`active-account:${user.email}`)
+      } catch (err) {
+        console.error('Failed to delete active account from Redis:', err)
+      }
+
+      const scheduledTweets = await db
+        .select()
+        .from(tweets)
+        .where(and(eq(tweets.userId, user.id), isNotNull(tweets.qstashId)))
+
+      for (const tweet of scheduledTweets) {
+        if (tweet.qstashId) {
+          try {
+            await qstash.messages.delete(tweet.qstashId)
+          } catch (err) {
+            console.error(`Failed to cancel QStash job ${tweet.qstashId}:`, err)
+          }
+        }
+      }
+
+      const s3Prefixes = [
+        `knowledge/${user.id}/`,
+        `chat/${user.id}/`,
+        `tweet-media/${user.id}/`,
+      ]
+
+      for (const prefix of s3Prefixes) {
+        try {
+          const listCommand = new ListObjectsV2Command({
+            Bucket: BUCKET_NAME!,
+            Prefix: prefix,
+          })
+          const listedObjects = await s3Client.send(listCommand)
+
+          if (listedObjects.Contents && listedObjects.Contents.length > 0) {
+            await Promise.all(
+              listedObjects.Contents.map(async (object) => {
+                if (object.Key) {
+                  try {
+                    await s3Client.send(
+                      new DeleteObjectCommand({
+                        Bucket: BUCKET_NAME!,
+                        Key: object.Key,
+                      }),
+                    )
+                  } catch (err) {
+                    console.error(`Failed to delete S3 object ${object.Key}:`, err)
+                  }
+                }
+              }),
+            )
+          }
+        } catch (err) {
+          console.error(`Failed to list/delete S3 objects with prefix ${prefix}:`, err)
+        }
+      }
+
+      try {
+        const sitemaps = await redis.hgetall(`sitemaps:${user.email}`)
+        if (sitemaps && Object.keys(sitemaps).length > 0) {
+          for (const sitemapId of Object.keys(sitemaps)) {
+            try {
+              await vector.deleteNamespace(`sitemap:${sitemapId}`).catch(() => {})
+              await redis.del(`sitemap:${sitemapId}`)
+            } catch (err) {
+              console.error(`Failed to delete sitemap ${sitemapId}:`, err)
+            }
+          }
+          await redis.del(`sitemaps:${user.email}`)
+        }
+      } catch (err) {
+        console.error('Failed to delete sitemaps:', err)
+      }
+
+      try {
+        const chatHistoryList = await redis.get<Array<{ id: string }>>(
+          `chat:history-list:${user.email}`,
+        )
+        if (chatHistoryList && chatHistoryList.length > 0) {
+          await Promise.all([
+            ...chatHistoryList.map((chat) => redis.del(`chat:history:${chat.id}`)),
+            ...chatHistoryList.map((chat) => redis.del(`website-contents:${chat.id}`)),
+            redis.del(`chat:history-list:${user.email}`),
+          ])
+        }
+      } catch (err) {
+        console.error('Failed to delete chat history:', err)
+      }
+
+      if (user.stripeId) {
+        try {
+          const subscriptions = await stripe.subscriptions.list({
+            customer: user.stripeId,
+            status: 'active',
+          })
+
+          for (const subscription of subscriptions.data) {
+            try {
+              await stripe.subscriptions.cancel(subscription.id)
+            } catch (err) {
+              console.error(
+                `Failed to cancel Stripe subscription ${subscription.id}:`,
+                err,
+              )
+            }
+          }
+
+          try {
+            await stripe.customers.del(user.stripeId)
+          } catch (err) {
+            console.error(`Failed to delete Stripe customer ${user.stripeId}:`, err)
+          }
+        } catch (err) {
+          console.error('Failed to handle Stripe cleanup:', err)
+        }
+      }
+
+      await db.delete(userSchema).where(eq(userSchema.id, user.id))
+
+      return c.json({ success: true, message: 'Account successfully deleted' })
+    } catch (error) {
+      console.error('Account deletion error:', error)
+      throw new HTTPException(500, {
+        message: 'Failed to delete account. Please contact support.',
+      })
+    }
+  }),
+
+  delete_twitter_account: privateProcedure
     .input(
       z.object({
         accountId: z.string(),
@@ -60,7 +382,7 @@ export const settingsRouter = j.router({
 
       // cleanup tweets
       await redis.del(`posts:${accountId}`)
-      await vector.deleteNamespace(`${accountId}`).catch(() => {})
+      await vector.deleteNamespace(accountId).catch(() => {})
 
       return c.json({ success: true })
     }),

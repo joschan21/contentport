@@ -151,13 +151,18 @@ export const stripeRouter = j.router({
     },
   ),
 
-  subscription: privateProcedure.query(async ({ c, ctx }) => {
+  get_active_subscription: privateProcedure.query(async ({ c, ctx }) => {
     const { user } = ctx
 
-    if (user.plan === 'pro') {
-      return c.json({ status: 'active' })
+    if (!user.stripeId) {
+      return c.json({ hasActiveSubscription: false })
     }
 
-    return c.json({ status: 'inactive' })
+    const subscriptions = await stripe.subscriptions.list({
+      customer: user.stripeId,
+      status: 'active',
+    })
+
+    return c.json({ hasActiveSubscription: subscriptions.data.length > 0 })
   }),
 })

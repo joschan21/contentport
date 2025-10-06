@@ -13,3 +13,18 @@ nice to have
 - web browsing for assistant
 - voice input for assistant
 - peronalize ideas shown as examples ("It would be AMAZING if these examples weren’t random but instead based on my background, who I am, what I do, and what’s happening out there in X that I could speak about."
+
+pending:
+- invite flow broken because `ctx.user.name` doesnt exist:
+    await redis.set(`invite:name:${inviteId}`, ctx.user.name, { ex: 60 * 60 * 24 })
+- when adding first keywords to topic monitor, it doesnt auto-refetch
+- while typing a new keyword to topic monitor, count that as enter when pressing "save"
+- rename "new keyword" in topic monitor CTA to something better
+- allow video playback in tweet editor
+- when deleting an account: delete all scheduled tweets for it too
+- no profile picture if you signed up w/ email
+- queue shows fixed amount of days regardless of actual scheduled tweets
+- some bug in posted tweets, they arent shown correctly
+
+NEXT UP:
+set up stripe to work locally w/ test mode locally / prod mode in production

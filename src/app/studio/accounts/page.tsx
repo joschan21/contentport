@@ -151,7 +151,7 @@ export default function AccountsPage() {
     variables: deleteAccountVariables,
   } = useMutation({
     mutationFn: async ({ accountId }: { accountId: string }) => {
-      await client.settings.delete_account.$post({ accountId })
+      await client.settings.delete_twitter_account.$post({ accountId })
     },
     onSuccess: () => {
       toast.success('Account deleted successfully')
@@ -206,6 +206,7 @@ export default function AccountsPage() {
       >
         <AccountConnection
           title="Account connected! 🎉"
+          description="We're analyzing your tweets and learning your writing style in the background."
           buttonText="Close"
           onClick={() => setShowNewAccountConnectedModal(false)}
         />
@@ -227,7 +228,7 @@ export default function AccountsPage() {
                   <DuolingoButton
                     size="sm"
                     onClick={() => {
-                      toast('🔒 Please upgrade to Pro to add unlimited accounts')
+                      toast('🔒 Upgrade to add more Twitter accounts')
                     }}
                     className="w-auto relative z-20 transition-all duration-200"
                   >
@@ -236,7 +237,7 @@ export default function AccountsPage() {
                   </DuolingoButton>
                 </TooltipTrigger>
                 <TooltipContent className="bg-gray-900 text-white border-gray-700">
-                  <p>Upgrade to Pro to add unlimited accounts</p>
+                  <p>Upgrade to add more Twitter accounts</p>
                 </TooltipContent>
               </Tooltip>
             ) : (

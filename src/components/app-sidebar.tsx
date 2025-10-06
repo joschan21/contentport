@@ -43,13 +43,7 @@ import {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AttachmentItem } from './attachment-item'
 import { Messages } from './chat/messages'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog'
+import { Modal } from './ui/modal'
 import DuolingoButton from './ui/duolingo-button'
 import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-upload'
 import { PromptSuggestion } from './ui/prompt-suggestion'
@@ -642,59 +636,60 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
         <SidebarRail />
       </Sidebar>
 
-      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <DialogContent className="bg-white rounded-2xl p-6 max-w-2xl max-h-[80vh] overflow-hidden">
+      <Modal
+        showModal={isHistoryOpen}
+        setShowModal={setIsHistoryOpen}
+        className="max-w-2xl max-h-[80vh]"
+      >
+        <div className="p-6 space-y-4">
           <div className="size-12 bg-gray-100 rounded-full flex items-center justify-center">
             <History className="size-6" />
           </div>
-          <DialogHeader className="py-2">
-            <DialogTitle className="text-lg font-semibold leading-6">
-              Chat History
-            </DialogTitle>
-            <DialogDescription className="leading-none">
+
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold">Chat History</h2>
+            <p className="text-sm text-gray-500">
               {isHistoryPending
                 ? 'Loading...'
                 : chatHistoryData?.chatHistory?.length
                   ? `Showing ${chatHistoryData?.chatHistory?.length} most recent chats`
                   : 'No chat history yet'}
-            </DialogDescription>
-          </DialogHeader>
+            </p>
+          </div>
 
-          {
-            <div className="overflow-y-auto max-h-[60vh] -mx-2 px-2">
-              <div className="space-y-2">
-                {chatHistoryData?.chatHistory?.length ? (
-                  chatHistoryData.chatHistory.map((chat) => (
-                    <button
-                      key={chat.id}
-                      onClick={() => handleChatSelect(chat.id)}
-                      className="w-full text-left p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-sm text-gray-900 truncate">
-                            {chat.title}
-                          </h3>
-                        </div>
-                        <span className="text-xs text-gray-400 whitespace-nowrap">
-                          {formatDistanceToNow(new Date(chat.lastUpdated), {
-                            addSuffix: true,
-                          })}
-                        </span>
+          <div className="overflow-y-auto max-h-[60vh] -mx-2 px-2">
+            <div className="space-y-2">
+              {chatHistoryData?.chatHistory?.length ? (
+                chatHistoryData.chatHistory.map((chat) => (
+                  <button
+                    key={chat.id}
+                    onClick={() => handleChatSelect(chat.id)}
+                    className="w-full text-left p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm text-gray-900 truncate">
+                          {chat.title}
+                        </h3>
                       </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <p className="text-sm">No chat history yet</p>
-                    <p className="text-xs mt-1">Start a conversation to see it here</p>
-                  </div>
-                )}
-              </div>
+                      <span className="text-xs text-gray-400 whitespace-nowrap">
+                        {formatDistanceToNow(new Date(chat.lastUpdated), {
+                          addSuffix: true,
+                        })}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p className="text-sm">No chat history yet</p>
+                  <p className="text-xs mt-1">Start a conversation to see it here</p>
+                </div>
+              )}
             </div>
-          }
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }

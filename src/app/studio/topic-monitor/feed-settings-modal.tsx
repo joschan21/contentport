@@ -14,6 +14,7 @@ import { authClient } from '@/lib/auth-client'
 import { HTTPException } from 'hono/http-exception'
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export interface Keyword {
   text: string
@@ -62,7 +63,7 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
       queryClient.invalidateQueries({ queryKey: ['get-feed'] })
       setIsOpen(false)
 
-      toast.success("Settings saved")
+      toast.success('Settings saved')
 
       // trigger onSave only if at least one keyword text changed (not just settings)
       if (
@@ -144,8 +145,8 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
   return (
     <>
       <DuolingoButton className="whitespace-nowrap" onClick={() => setIsOpen(true)}>
-        <PlusIcon className="size-4 mr-1.5" weight="bold" />
-        New Keyword
+        <GearIcon className="size-4 mr-1.5" weight="bold" />
+        Settings
       </DuolingoButton>
 
       <Modal
@@ -204,7 +205,7 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
                                 onClick={() => removeKeyword(i)}
                                 className="text-sm text-red-500 hover:text-red-600 rounded-md p-3 hover:bg-red-50 hover:underline"
                               >
-                                <TrashIcon className='size-4' weight='bold' />
+                                <TrashIcon className="size-4" weight="bold" />
                               </button>
                             </div>
                           </div>
@@ -258,35 +259,37 @@ export function FeedSettingsModal({ onSave, isOpen, setIsOpen }: FeedSettingsMod
             )}
           </div>
 
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add a keyword..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={onKeyDown}
-                
-                disabled={isAtLimit}
-              />
+          {userData?.user.plan === 'pro' && (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add a keyword..."
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  disabled={isAtLimit}
+                />
+              </div>
+              <p className="text-xs text-gray-500">Press Enter to add</p>
             </div>
-            <p className="text-xs text-gray-500">Press Enter to add</p>
-          </div>
+          )}
 
           {userData?.user.plan !== 'pro' && (
             <div className="border-l-4 border-indigo-400 bg-indigo-50 p-4 rounded-r-xl">
               <div className="flex">
                 <div className="shrink-0">
-                  <SketchLogoIcon aria-hidden="true" className="size-5 text-indigo-400" />
+                  <SketchLogoIcon weight="bold" aria-hidden="true" className="size-5 text-indigo-400" />
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-indigo-700">
-                    This is a Pro feature.{' '}
-                    <span
-                      onClick={() => router.push('/studio/settings')}
+                    The topic monitor is a Pro feature.{' '}
+                    <Link
+                      href="/studio/settings"
                       className="font-medium cursor-pointer text-indigo-700 underline hover:text-indigo-600"
                     >
-                      Upgrade your account to monitor multiple keywords.
-                    </span>
+                      Upgrade your account
+                    </Link>{' '}
+                    to add your own keywords.
                   </p>
                 </div>
               </div>

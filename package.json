@@ -69,7 +69,7 @@
     "@vercel/analytics": "^1.5.0",
     "@vercel/functions": "^2.2.3",
     "ai": "^5.0.0-beta.32",
-    "better-auth": "^1.2.7",
+    "better-auth": "^1.3.26",
     "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

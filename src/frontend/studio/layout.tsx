@@ -1,16 +1,20 @@
 'use client'
 
-import { PropsWithChildren, useEffect, useState } from 'react'
+import { Dispatch, PropsWithChildren, SetStateAction, useEffect, useState } from 'react'
 
+import { AccountConnection } from '@/components/account-connection'
 import { AppSidebar } from '@/components/app-sidebar'
 import { LeftSidebar } from '@/components/context-sidebar'
 import { AppSidebarInset } from '@/components/providers/app-sidebar-inset'
 import { DashboardProviders } from '@/components/providers/dashboard-providers'
+import { Modal } from '@/components/ui/modal'
 import { SidebarProvider } from '@/components/ui/sidebar'
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { WhatsNewModal } from '@/components/whats-new-modal'
-import { useQuery } from '@tanstack/react-query'
 import { client } from '@/lib/client'
+import { LexicalComposer } from '@lexical/react/LexicalComposer'
+import { useQuery } from '@tanstack/react-query'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useConfetti } from '@/hooks/use-confetti'
 
 interface LayoutProps extends PropsWithChildren {
   hideAppSidebar?: boolean
@@ -40,6 +44,14 @@ export default function ClientLayout({
   hideAppSidebar,
 }: LayoutProps) {
   const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false)
+  const [isOnboardingComplete, setIsOnboardingComplete] = useState(false)
+
+  const searchParams = useSearchParams()
+  const onboarding = searchParams.get('onboarding')
+
+  useEffect(() => {
+    if (onboarding) setIsOnboardingComplete(true)
+  }, [onboarding])
 
   const { data } = useQuery({
     queryKey: ['are-tweets-indexed'],
@@ -51,10 +63,7 @@ export default function ClientLayout({
   })
 
   useEffect(() => {
-    if (data.shouldShow) {
-      console.log('yep should show')
-      setIsWhatsNewOpen(true)
-    }
+    if (data.shouldShow) setIsWhatsNewOpen(true)
   }, [data])
 
   let defaultOpen = true
@@ -67,6 +76,10 @@ export default function ClientLayout({
     <DashboardProviders>
       <div className="flex">
         <WhatsNewModal open={isWhatsNewOpen} onOpenChange={setIsWhatsNewOpen} />
+        <OnboardingCompleteModal
+          open={isOnboardingComplete}
+          onOpenChange={setIsOnboardingComplete}
+        />
 
         <SidebarProvider className="w-fit" defaultOpen={false}>
           <LeftSidebar />
@@ -85,5 +98,32 @@ export default function ClientLayout({
         </SidebarProvider>
       </div>
     </DashboardProviders>
+  )
+}
+
+function OnboardingCompleteModal({
+  open,
+  onOpenChange,
+}: {
+  open: boolean
+  onOpenChange: Dispatch<SetStateAction<boolean>>
+}) {
+  const { fire } = useConfetti()
+
+  useEffect(() => {
+    if (open) fire({ angle: 75, spread: 90 })
+    if (open) fire({ angle: 90, spread: 90 })
+    if (open) fire({ angle: 105, spread: 90 })
+  }, [open, fire])
+
+  return (
+    <Modal className="p-6" showModal={open} setShowModal={onOpenChange}>
+      <AccountConnection
+        title="You're all set! 🎉"
+        description="Welcome to Contentport! We're analyzing your tweets and learning your writing style in the background."
+        buttonText="Go to Dashboard"
+        onClick={() => onOpenChange(false)}
+      />
+    </Modal>
   )
 }

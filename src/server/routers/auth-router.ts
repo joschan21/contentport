@@ -299,7 +299,7 @@ export const authRouter = j.router({
     }
 
     return c.redirect(
-      `${getBaseUrl()}/onboarding?account_connected=true&id=${connectedAccount.id}`,
+      `${getBaseUrl()}/studio?onboarding=true`,
     )
   }),
 })

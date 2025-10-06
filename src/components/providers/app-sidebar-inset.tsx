@@ -29,13 +29,7 @@ import { useConfetti } from '@/hooks/use-confetti'
 import { $getRoot } from 'lexical'
 import posthog from 'posthog-js'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '../ui/dialog'
+import { Modal } from '../ui/modal'
 import { Calendar20 } from '../tweet-editor/date-picker'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { HTTPException } from 'hono/http-exception'
@@ -482,6 +476,57 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         isPosting={isPosting}
       />
 
+      <Modal
+        showModal={isScheduleDialogOpen}
+        setShowModal={setIsScheduleDialogOpen}
+        className="max-w-2xl"
+      >
+        <div className="p-6 space-y-4">
+          <div className="">
+            <h2 className="text-lg font-semibold">Schedule</h2>
+            {/* <p className="text-gray-500">All times in <span className="font-medium">Europe / Berlin</span> timezone</p> */}
+          </div>
+
+          <Calendar20
+            editMode={editMode}
+            onSchedule={handleScheduleTweet}
+            isPending={scheduleTweetMutation.isPending}
+            initialScheduledTime={
+              editTweetData?.thread?.[0]?.scheduledUnix
+                ? new Date(editTweetData.thread[0].scheduledUnix)
+                : undefined
+            }
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        showModal={isRescheduleDialogOpen}
+        setShowModal={setIsRescheduleDialogOpen}
+        className="max-w-2xl"
+      >
+        <div className="p-6 space-y-4">
+          <div className="size-12 bg-gray-100 rounded-full flex items-center justify-center">
+            <CalendarIcon className="size-6" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold">Reschedule Post</h2>
+          </div>
+
+          <Calendar20
+            editMode={editMode}
+            onSchedule={handleRescheduleTweet}
+            isPending={updateTweetMutation.isPending}
+            initialScheduledTime={
+              editTweetData?.thread?.[0]?.scheduledUnix
+                ? new Date(editTweetData.thread[0].scheduledUnix)
+                : undefined
+            }
+          />
+        </div>
+      </Modal>
+
       <SidebarInset className="w-full flex-1 overflow-x-hidden bg-stone-100">
         {/* Dot Pattern Background */}
         <div
@@ -508,35 +553,14 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                 <div>
                   {Boolean(editMode) ? (
                     <div className="flex items-center gap-2">
-                      <Dialog
-                        open={isRescheduleDialogOpen}
-                        onOpenChange={setIsRescheduleDialogOpen}
+                      <DuolingoButton
+                        onClick={() => setIsRescheduleDialogOpen(true)}
+                        size="sm"
+                        variant="secondary"
+                        className="group/toggle-button"
                       >
-                        <DialogTrigger asChild>
-                          <DuolingoButton
-                            size="sm"
-                            variant="secondary"
-                            className="group/toggle-button"
-                          >
-                            <CalendarIcon className="size-3.5 mr-1.5" /> Reschedule
-                          </DuolingoButton>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl w-full">
-                          <DialogHeader>
-                            <DialogTitle>Reschedule Post</DialogTitle>
-                          </DialogHeader>
-                          <Calendar20
-                            editMode={editMode}
-                            onSchedule={handleRescheduleTweet}
-                            isPending={updateTweetMutation.isPending}
-                            initialScheduledTime={
-                              editTweetData?.thread?.[0]?.scheduledUnix
-                                ? new Date(editTweetData.thread[0].scheduledUnix)
-                                : undefined
-                            }
-                          />
-                        </DialogContent>
-                      </Dialog>
+                        <CalendarIcon className="size-3.5 mr-1.5" /> Reschedule
+                      </DuolingoButton>
                       <DuolingoButton
                         onClick={handleUpdateTweet}
                         loading={updateTweetMutation.isPending}
@@ -549,56 +573,30 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                   ) : (
                     <div className="flex items-center gap-2">
                       <div className="flex">
-                        <Dialog
-                          open={isScheduleDialogOpen}
-                          onOpenChange={setIsScheduleDialogOpen}
-                        >
-                          <TooltipProvider delayDuration={0}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <DialogTrigger
-                                  onClick={() => setIsScheduleDialogOpen(true)}
-                                  asChild
-                                >
-                                  <DuolingoButton
-                                    size="sm"
-                                    className="group/toggle-button rounded-r-none h-10"
-                                  >
-                                    Schedule
-                                  </DuolingoButton>
-                                </DialogTrigger>
-                              </TooltipTrigger>
-                              <TooltipContent
-                                side="bottom"
-                                className="bg-stone-800 text-white p-2.5"
+                        <TooltipProvider delayDuration={0}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <DuolingoButton
+                                onClick={() => setIsScheduleDialogOpen(true)}
+                                size="sm"
+                                className="group/toggle-button rounded-r-none h-10"
                               >
-                                <div className="text-left">
-                                  <div className="">Schedule</div>
-                                  <div className="text-xs opacity-70">
-                                    Pick a time for this post
-                                  </div>
+                                Schedule
+                              </DuolingoButton>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="bottom"
+                              className="bg-stone-800 text-white p-2.5"
+                            >
+                              <div className="text-left">
+                                <div className="">Schedule</div>
+                                <div className="text-xs opacity-70">
+                                  Pick a time for this post
                                 </div>
-                              </TooltipContent>
-                              <DialogContent className="max-w-2xl w-full">
-                                <DialogHeader>
-                                  <DialogTitle>Schedule Post</DialogTitle>
-                                </DialogHeader>
-
-                                {/* dialog body */}
-                                <Calendar20
-                                  editMode={editMode}
-                                  onSchedule={handleScheduleTweet}
-                                  isPending={scheduleTweetMutation.isPending}
-                                  initialScheduledTime={
-                                    editTweetData?.thread?.[0]?.scheduledUnix
-                                      ? new Date(editTweetData.thread[0].scheduledUnix)
-                                      : undefined
-                                  }
-                                />
-                              </DialogContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </Dialog>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <TooltipProvider delayDuration={0}>
                           <Tooltip>
                             <TooltipTrigger asChild>

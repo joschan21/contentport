@@ -107,7 +107,7 @@ export function Modal({
 
   return (
     <Dialog.Root
-      open={setShowModal ? showModal : true}
+      open={showModal}
       onOpenChange={(open) => {
         if (!open) {
           closeModal()
@@ -116,15 +116,13 @@ export function Modal({
     >
       <Dialog.Portal>
         <Dialog.Overlay
-          // for detecting when there's an active opened modal
           id="modal-backdrop"
-          className="animate-fade-in fixed inset-0 z-40 bg-neutral-100 bg-opacity-50 backdrop-blur-md"
+          className="fixed inset-0 z-40 bg-neutral-100 bg-opacity-50 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out duration-200"
         />
         <Dialog.Content
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
           onPointerDownOutside={(e) => {
-            // Prevent dismissal when clicking inside a toast
             if (e.target instanceof Element && e.target.closest('[data-sonner-toast]')) {
               e.preventDefault()
             }
@@ -132,7 +130,10 @@ export function Modal({
           className={cn(
             'fixed inset-0 z-40 m-auto h-fit w-full max-w-md',
             'border border-neutral-200 bg-white p-0 shadow-xl sm:rounded-2xl',
-            'scrollbar-hide animate-scale-in overflow-y-auto',
+            'scrollbar-hide overflow-y-auto',
+            'data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-[.97]',
+            'data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-[.97]',
+            'duration-200',
             className,
           )}
         >

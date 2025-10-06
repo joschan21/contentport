@@ -164,14 +164,14 @@ const Page = () => {
                 })}
               </TooltipProvider>
 
-              {authData?.user.plan === 'free' && isKeywordsFetched && (
+              {/* {authData?.user.plan === 'free' && isKeywordsFetched && (
                 <button
                   onClick={() => router.push('/studio/settings')}
                   className="text-xs text-gray-600 underline"
                 >
                   Upgrade to add more &rarr;
                 </button>
-              )}
+              )} */}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-gray-500">Sort by:</p>

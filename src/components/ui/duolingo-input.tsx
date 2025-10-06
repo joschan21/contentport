@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import { cva } from "class-variance-authority"
 
 const inputVariants = cva(
-  "w-full rounded-xl bg-white border-2 font-medium transition-all duration-200 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2",
+  "w-full disabled:cursor-not-allowed disabled:opacity-50 rounded-xl bg-white border-2 font-medium transition-all duration-200 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2",
   {
     variants: {
       variant: {
@@ -75,7 +75,7 @@ const DuolingoInput = forwardRef<HTMLInputElement, DuolingoInputProps>(
     const labelClassName = "block text-sm font-medium text-gray-700 mb-1.5"
 
     return (
-      <div className={cn("relative", fullWidth ? "w-full" : "max-w-sm")}>
+      <div className={cn("relative", fullWidth ? "w-full" : "w-full max-w-sm")}>
         {label && <label className={labelClassName}>{label}</label>}
         <div className="relative">
           {icon && (
