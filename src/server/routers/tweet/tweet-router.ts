@@ -627,7 +627,7 @@ export const tweetRouter = j.router({
         )
 
       if (!tweet.isReplyTo) {
-        await redis.sadd(`posts:${userId}`, tweet.twitterId)
+        await redis.sadd(`posts:${accountId}`, tweet.twitterId)
         await vector.namespace(accountId).upsert({
           id: res.data.id,
           data: tweet.content,
