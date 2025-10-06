@@ -317,7 +317,9 @@ export const tweetRouter = j.router({
       await deleteTweet(baseTweetId)
 
       const newBaseTweetId = crypto.randomUUID()
-      const finalScheduledUnix = useNaturalTime ? applyNaturalPostingTime(scheduledUnix) : scheduledUnix
+      const finalScheduledUnix = useNaturalTime
+        ? applyNaturalPostingTime(scheduledUnix)
+        : scheduledUnix
 
       const { messageId } = await postWithQStash({
         accountId: dbAccount.id,
@@ -401,7 +403,9 @@ export const tweetRouter = j.router({
 
       const tweetId = crypto.randomUUID()
 
-      const finalScheduledUnix = useNaturalTime ? applyNaturalPostingTime(scheduledUnix) : scheduledUnix
+      const finalScheduledUnix = useNaturalTime
+        ? applyNaturalPostingTime(scheduledUnix)
+        : scheduledUnix
 
       const { messageId } = await postWithQStash({
         tweetId,
@@ -607,7 +611,7 @@ export const tweetRouter = j.router({
         throw new HTTPException(500, { message: first.detail })
       }
 
-      await db
+      const [updatedTweet] = await db
         .update(tweets)
         .set({
           twitterId: res.data.id,
@@ -625,12 +629,13 @@ export const tweetRouter = j.router({
             eq(tweets.accountId, accountId),
           ),
         )
+        .returning()
 
-      if (!tweet.isReplyTo) {
-        await redis.sadd(`posts:${accountId}`, tweet.twitterId)
+      if (!tweet.isReplyTo && updatedTweet && updatedTweet.twitterId) {
+        await redis.sadd(`posts:${accountId}`, updatedTweet.twitterId)
         await vector.namespace(accountId).upsert({
-          id: res.data.id,
-          data: tweet.content,
+          id: updatedTweet.twitterId,
+          data: updatedTweet.content,
           metadata: {
             replyIds: [],
             isReply: Boolean(replyToTwitterId),
@@ -961,7 +966,9 @@ export const tweetRouter = j.router({
       }
 
       const scheduledUnix = nextSlot.getTime()
-      const finalScheduledUnix = useNaturalTime ? applyNaturalPostingTime(scheduledUnix) : scheduledUnix
+      const finalScheduledUnix = useNaturalTime
+        ? applyNaturalPostingTime(scheduledUnix)
+        : scheduledUnix
       const baseTweetId = crypto.randomUUID()
 
       const { messageId } = await postWithQStash({
