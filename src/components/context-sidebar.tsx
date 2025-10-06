@@ -46,7 +46,14 @@ export const LeftSidebar = () => {
 
   return (
     <Sidebar collapsible="icon" side="left" className="z-30 border-r border-border/40">
-      <SidebarHeader className="p-0">
+      <SidebarHeader className="relative p-0">
+        {isCollapsed && (
+          <div
+            aria-hidden="true"
+            className="absolute pointer-events-none bottom-0 left-4 right-4 border-b border-stone-200"
+          />
+        )}
+
         <button
           onClick={toggleSidebar}
           className={cn(
@@ -76,7 +83,7 @@ export const LeftSidebar = () => {
           {isCollapsed && (
             <div
               aria-hidden="true"
-              className="absolute pointer-events-none bottom-0 left-0 right-0 border-b border-border/40"
+              className="absolute pointer-events-none bottom-0 left-4 right-4 border-b border-stone-200"
             />
           )}
           <SidebarGroupContent>
@@ -122,7 +129,7 @@ export const LeftSidebar = () => {
           {isCollapsed && (
             <div
               aria-hidden="true"
-              className="absolute pointer-events-none bottom-0 left-0 right-0 border-b border-border/40"
+              className="absolute pointer-events-none bottom-0 left-4 right-4 border-b border-stone-200"
             />
           )}
 
@@ -304,12 +311,6 @@ export const LeftSidebar = () => {
 
         {/* Account Group */}
         <SidebarGroup className="relative p-0">
-          {isCollapsed && (
-            <div
-              aria-hidden="true"
-              className="absolute pointer-events-none bottom-0 left-4 right-4 border-b border-stone-200"
-            />
-          )}
           <SidebarGroupLabel
             data-state={isCollapsed ? 'collapsed' : 'expanded'}
             className={cn(
@@ -360,7 +361,7 @@ export const LeftSidebar = () => {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-0">
+      <SidebarFooter className="relative p-0">
         {isCollapsed && (
           <div className="absolute w-10 mx-auto top-0 left-0 right-0 border-t border-stone-200" />
         )}
