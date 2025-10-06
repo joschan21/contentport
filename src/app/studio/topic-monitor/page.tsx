@@ -122,7 +122,7 @@ const Page = () => {
       title="Topic Monitor"
       description="Monitor all keywords related to your brand or business."
     >
-      <div className="mt-6 border-b-2 border-stone-300">
+      <div className="mt-6">
         <div className="flex items-center justify-between mb-8">
           <div className="flex-1 flex flex-col">
             <div className="flex items-center gap-2 flex-wrap">
