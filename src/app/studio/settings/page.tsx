@@ -16,7 +16,7 @@ import {
   SignOutIcon,
   SketchLogoIcon,
   TrashIcon,
-  WarningIcon
+  WarningIcon,
 } from '@phosphor-icons/react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -88,21 +88,33 @@ const Page = () => {
     }
   }, [data])
 
-  const { mutate: createBillingPortalUrl, isPending: isCreatingBillingPortalUrl } =
-    useMutation({
-      mutationFn: async () => {
+  const { mutate: handleBillingAction, isPending: isBillingActionPending } = useMutation({
+    mutationKey: ['handle-billing-action', subscription?.hasActiveSubscription],
+    mutationFn: async () => {
+      const hasActiveSubscription = subscription?.hasActiveSubscription
+
+      if (hasActiveSubscription) {
         const res = await client.stripe.billing_portal.$get()
         const data = await res.json()
         return data
-      },
-      onSuccess: ({ url }) => {
+      } else {
+        const res = await client.stripe.checkout_session.$get({ trial: false })
+        const data = await res.json()
+        return data
+      }
+    },
+    onSuccess: ({ url }) => {
+      if (url) {
         router.push(url)
-      },
-      onError: (error) => {
-        console.error(error)
-        toast.error('Something went wrong, please try again.')
-      },
-    })
+      } else {
+        toast.error('Unable to create session. Please try again.')
+      }
+    },
+    onError: (error) => {
+      console.error(error)
+      toast.error('Something went wrong, please try again.')
+    },
+  })
 
   const { mutate: updateName, isPending: isUpdatingName } = useMutation({
     mutationFn: async (name: string) => {
@@ -266,11 +278,13 @@ const Page = () => {
               </CardHeader>
               <CardContent>
                 <DuolingoButton
-                  onClick={() => createBillingPortalUrl()}
+                  onClick={() => handleBillingAction()}
                   className="w-fit"
+                  loading={isBillingActionPending}
+                  disabled={isBillingActionPending}
                 >
                   <SketchLogoIcon className="size-4 mr-1.5" weight="bold" />
-                  Upgrade Now
+                  {isPro ? 'Manage Billing' : 'Upgrade Now'}
                 </DuolingoButton>
               </CardContent>
             </Card>
@@ -312,7 +326,9 @@ const Page = () => {
                       <span className="text-2xl font-bold text-gray-900">
                         {connectedAccountsUsed}
                       </span>
-                      <span className="text-sm text-gray-500">/ {connectedAccountsLimit}</span>
+                      <span className="text-sm text-gray-500">
+                        / {connectedAccountsLimit}
+                      </span>
                     </div>
                     <Progress
                       value={(connectedAccountsUsed / connectedAccountsLimit) * 100}
