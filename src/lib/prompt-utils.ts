@@ -290,7 +290,6 @@ export const styleGuide = async ({
     topK: 20,
     includeData: true,
     includeMetadata: true,
-    filter: 'isRetweet = true OR isReply = true',
   })
 
   const relevant = knowledge
