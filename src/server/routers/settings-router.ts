@@ -405,12 +405,18 @@ export const settingsRouter = j.router({
         const postIndexingStatus = await redis.get<'started' | 'success' | 'error'>(
           `status:posts:${account.id}`,
         )
+        const hasAttemptedIndexing = await redis.hexists(
+          `attempted_indexing_users`,
+          user.id,
+        )
 
         return {
           ...account,
           ...accountData,
           isActive: activeAccount?.id === account.id,
-          postIndexingStatus: postIndexingStatus || (doPostsExists ? 'success' : 'error'),
+          postIndexingStatus:
+            postIndexingStatus ||
+            (doPostsExists ? 'success' : !hasAttemptedIndexing ? undefined : 'error'),
         }
       }),
     )
