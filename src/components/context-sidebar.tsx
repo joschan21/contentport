@@ -405,7 +405,7 @@ export const LeftSidebar = () => {
                 },
               )}
             >
-              Billing & Settings
+              Settings
             </span>
           </div>
         </Link>
