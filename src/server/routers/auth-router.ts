@@ -195,7 +195,7 @@ export const authRouter = j.router({
     const accounts = await getAccounts({ userId: user.id })
 
     for (const account of accounts) {
-      if (account.id === accountId) {
+      if (account.twitterId === accountId) {
         await db
           .update(accountSchema)
           .set({ accessToken, accessSecret, updatedAt: new Date() })
