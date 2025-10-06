@@ -76,6 +76,7 @@ export const knowledgeRouter = j.router({
 
     for (const account of accounts) {
       await Promise.all([
+        redis.set(`status:posts:${account.id}`, 'started', { ex: 60 * 2 }),
         qstash.publishJSON({
           url: url + '/api/knowledge/index_tweets',
           body: {
