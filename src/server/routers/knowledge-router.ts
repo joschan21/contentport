@@ -3,6 +3,7 @@ import { db } from '@/db'
 import {
   account as accountSchema,
   knowledgeDocument,
+  user,
   user as userSchema,
 } from '@/db/schema'
 import { firecrawl } from '@/lib/firecrawl'
@@ -98,187 +99,6 @@ export const knowledgeRouter = j.router({
 
     return c.json({ success: true })
   }),
-
-  get_sitemaps: privateProcedure.get(async ({ c, ctx }) => {
-    const { user } = ctx
-
-    const sitemaps = await redis.hgetall<
-      Record<string, { id: string; name: string; url: string; updatedAt: number }>
-    >(`sitemaps:${user.email}`)
-
-    if (!sitemaps) {
-      return c.json({
-        sitemaps: {} as Record<
-          string,
-          { id: string; name: string; url: string; length: number; updatedAt: number }
-        >,
-      })
-    }
-
-    const sitemapsWithLength: Record<
-      string,
-      { id: string; name: string; url: string; length: number; updatedAt: number }
-    > = {}
-
-    await Promise.all(
-      Object.entries(sitemaps).map(async ([key, sitemap]) => {
-        const length = await redis.scard(`sitemap:${sitemap.id}`)
-
-        sitemapsWithLength[key] = { ...sitemap, length }
-      }),
-    )
-
-    return c.json({ sitemaps: sitemapsWithLength })
-  }),
-
-  delete_sitemap: privateProcedure
-    .input(z.object({ id: z.string() }))
-    .post(async ({ c, ctx, input }) => {
-      const { user } = ctx
-      const { id } = input
-
-      const sitemap = await redis.hget<{
-        id: string
-        name: string
-        url: string
-        updatedAt: number
-      }>(`sitemaps:${user.email}`, id)
-
-      if (sitemap) {
-        await redis.hdel(`sitemaps:${user.email}`, id)
-        await redis.del(`sitemap:${sitemap.url}`)
-      }
-
-      vector.deleteNamespace(`sitemap:${id}`)
-
-      return c.json({ success: true })
-    }),
-
-  refresh_sitemap: privateProcedure
-    .input(z.object({ id: z.string() }))
-    .post(async ({ c, ctx, input }) => {
-      const { user } = ctx
-      const { id } = input
-
-      const namespace = vector.namespace(`sitemap:${id}`)
-
-      const sitemap = await redis.hget<{
-        id: string
-        name: string
-        url: string
-        updatedAt: number
-      }>(`sitemaps:${user.email}`, id)
-
-      if (!sitemap) {
-        throw new HTTPException(404, { message: 'Sitemap not found' })
-      }
-
-      const map = await firecrawl.mapUrl(sitemap.url)
-
-      if (map.error) {
-        throw new HTTPException(500, { message: `Unable to index sitemap: ${map.error}` })
-      }
-
-      if (map.success && map.links) {
-        await redis.del(`sitemap:${sitemap.id}`)
-        await redis.sadd(`sitemap:${sitemap.id}`, ...(map.links as [string]))
-
-        const batchSize = 1_000
-
-        await namespace.reset()
-
-        // upstash vector has max batch size of 1_000
-        for (let i = 0; i < map.links.length; i += batchSize) {
-          const batch = map.links.slice(i, i + batchSize)
-          await namespace.upsert(
-            batch.map((link) => ({
-              id: link,
-              data: link,
-              metadata: { userId: user.id },
-            })),
-          )
-        }
-      }
-
-      return c.json({ success: true })
-    }),
-
-  // start_indexing_sitemap: privateProcedure
-  //   .input(z.object({ name: z.string(), url: z.string() }))
-  //   .post(async ({ c, ctx, input }) => {
-  //     const { user } = ctx
-  //     const { name, url } = input
-
-  //     const id = randomUUID()
-
-  //     const baseUrl =
-  //       process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
-
-  //     await qstash.publishJSON({
-  //       url: baseUrl + '/api/knowledge/index_sitemap',
-  //       method: 'POST',
-  //       body: { id, name, url, userId: user.id },
-  //     })
-
-  //     return c.json({ success: true, id })
-  //   }),
-  index_sitemap: privateProcedure
-    .input(
-      z.object({
-        name: z.string(),
-        url: z.string(),
-      }),
-    )
-    .post(async ({ c, ctx, input }) => {
-      const { user } = ctx
-      const { name, url } = input
-
-      const [dbUser] = await db
-        .select()
-        .from(userSchema)
-        .where(eq(userSchema.id, user.id))
-
-      if (!dbUser) {
-        throw new HTTPException(404, { message: 'User not found' })
-      }
-
-      const id = nanoid()
-
-      await redis.hset(`sitemaps:${dbUser.email}`, {
-        [id]: { id, name, url, updatedAt: new Date().getTime() },
-      })
-
-      const map = await firecrawl.mapUrl(url)
-
-      if (map.error) {
-        throw new HTTPException(500, { message: `Unable to index sitemap: ${map.error}` })
-      }
-
-      const namespace = vector.namespace(`sitemap:${id}`)
-
-      if (map.success && map.links) {
-        await redis.del(`sitemap:${id}`)
-        await redis.sadd(`sitemap:${id}`, ...(map.links as [string]))
-
-        await namespace.reset()
-
-        const batchSize = 1_000
-
-        // upstash vector has max batch size of 1_000
-        for (let i = 0; i < map.links.length; i += batchSize) {
-          const batch = map.links.slice(i, i + batchSize)
-          await namespace.upsert(
-            batch.map((link) => ({
-              id: link,
-              data: link,
-              metadata: { userId: user.id },
-            })),
-          )
-        }
-      }
-
-      return c.json({ success: true })
-    }),
 
   get_own_tweets: privateProcedure.get(async ({ c, ctx, input }) => {
     const { user } = ctx
@@ -513,10 +333,13 @@ export const knowledgeRouter = j.router({
     const { userId, accountId, handle } = body
 
     // clear existing tweets
-    await redis.del(`posts:${accountId}`)
-    await vector.deleteNamespace(`${accountId}`).catch(() => {})
+    const pipeline = redis.pipeline()
+    pipeline.del(`posts:${accountId}`)
+    pipeline.set(`status:posts:${accountId}`, 'started')
+    pipeline.hset(`attempted_indexing_users`, { [userId]: true })
+    await pipeline.exec()
 
-    await redis.set(`status:posts:${accountId}`, 'started')
+    await vector.deleteNamespace(`${accountId}`).catch(() => {})
 
     try {
       const res = await fetch(
