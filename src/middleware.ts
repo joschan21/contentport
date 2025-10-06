@@ -25,6 +25,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if (session?.user) {
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/studio', request.url))
+    }
+
     const account = await redis.exists(`active-account:${session.user.email}`)
     const isOnboarded = Boolean(account)
 
@@ -41,5 +45,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/onboarding', '/studio'],
+  matcher: ['/', '/onboarding', '/studio'],
 }
