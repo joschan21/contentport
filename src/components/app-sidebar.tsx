@@ -69,40 +69,36 @@ const ChatInput = ({
   const { open } = useSidebar()
   const { data: session } = authClient.useSession()
 
-  const { data: activeAccount } = useQuery({
-    queryKey: ['get-active-account'],
+  const { data: accounts, refetch: refetchAccounts } = useQuery({
+    queryKey: ['accounts'],
     queryFn: async () => {
-      const res = await client.settings.active_account.$get()
-      const { account } = await res.json()
-      return account ? mapToConnectedAccount(account) : null
+      const res = await client.settings.list_accounts.$get()
+      const { accounts } = await res.json()
+
+      return accounts
     },
   })
 
-  const {
-    data: ownTweets,
-    refetch: refetchOwnTweets,
-    isFetched,
-  } = useQuery({
-    queryKey: ['get-own-tweets-sidebar', activeAccount?.id],
-    queryFn: async () => {
-      const res = await client.knowledge.get_own_tweets.$get()
-      return await res.json()
+  const { status } = useRealtime<RealtimeEvents>({
+    channel: session?.user.id,
+    enabled:
+      Boolean(Boolean(session?.user.id)) &&
+      Boolean(open) &&
+      Boolean(
+        accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+      ),
+    events: {
+      index_memories: { status: () => refetchAccounts() },
+      index_tweets: { status: () => refetchAccounts() },
     },
-    refetchOnWindowFocus: false,
   })
 
-  const isIndexing = !ownTweets?.length && isFetched
+  const isIndexing = status === 'connecting' || status === 'connected'
 
   useEffect(() => {
     if (isIndexing) editor.setEditable(false)
     else editor.setEditable(true)
   }, [isIndexing, editor])
-
-  useRealtime<RealtimeEvents>({
-    channel: session?.user.id,
-    enabled: Boolean(session?.user.id) && isIndexing && open,
-    events: { index_tweets: { status: () => refetchOwnTweets() } },
-  })
 
   const { attachments, removeAttachment, hasUploading } = useAttachments()
 

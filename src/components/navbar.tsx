@@ -72,7 +72,7 @@ const Navbar = ({ title }: { title: string }) => {
             ) : (
               <Link href="/sign-up">
                 <DuolingoButton size="sm" className="whitespace-nowrap">
-                  Get started
+                  Get Started
                 </DuolingoButton>
               </Link>
             )}
@@ -122,7 +122,7 @@ const Navbar = ({ title }: { title: string }) => {
                     ) : (
                       <Link href="/sign-up">
                         <DuolingoButton size="sm" className="whitespace-nowrap">
-                          Get started
+                          Get Started
                         </DuolingoButton>
                       </Link>
                     )}

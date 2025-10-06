@@ -1,6 +1,9 @@
 import { redis } from '@/lib/redis'
 import { Account } from '../settings-router'
 import { TwitterApi } from 'twitter-api-v2'
+import { db } from '@/db'
+import { account as accountSchema } from '@/db/schema'
+import { and, eq } from 'drizzle-orm'
 
 const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN as string).readOnly
 
@@ -30,4 +33,19 @@ export const getAccount = async ({
   }
 
   return payload
+}
+
+export const getAccounts = async ({ userId }: { userId: string }) => {
+  const dbAccounts = await db
+    .select({ id: accountSchema.id })
+    .from(accountSchema)
+    .where(and(eq(accountSchema.userId, userId), eq(accountSchema.providerId, 'twitter')))
+
+  const accounts = await Promise.all(
+    dbAccounts.map(async (account) => {
+      return await getAccount({ email: userId, accountId: account.id })
+    }),
+  )
+
+  return accounts.filter(Boolean)
 }

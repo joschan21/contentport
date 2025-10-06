@@ -1,6 +1,6 @@
 import { getBaseUrl } from '@/constants/base-url'
 import { db } from '@/db'
-import { account, user, user as userSchema } from '@/db/schema'
+import { account as accountSchema, user, user as userSchema } from '@/db/schema'
 import { redis } from '@/lib/redis'
 import { eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
@@ -14,6 +14,7 @@ import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 import { PostHog } from 'posthog-node'
 import { qstash } from '@/lib/qstash'
+import { getAccounts } from './utils/get-account'
 
 const posthog = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   host: 'https://eu.i.posthog.com',
@@ -74,7 +75,7 @@ export const authRouter = j.router({
         })
       }
 
-      console.log('ℹ️ Creating twitter link:', `${getBaseUrl()}/api/auth_router/callback`);
+      console.log('ℹ️ Creating twitter link:', `${getBaseUrl()}/api/auth_router/callback`)
 
       try {
         const { url, oauth_token, oauth_token_secret } = await client.generateAuthLink(
@@ -138,6 +139,7 @@ export const authRouter = j.router({
   callback: publicProcedure.get(async ({ c }) => {
     const oauth_token = c.req.query('oauth_token')
     const oauth_verifier = c.req.query('oauth_verifier')
+    const baseUrl = getBaseUrl()
 
     const [storedSecret, userId, authAction, inviteId] = await Promise.all([
       redis.get<string>(`twitter_oauth_secret:${oauth_token}`),
@@ -190,43 +192,36 @@ export const authRouter = j.router({
       throw new HTTPException(404, { message: 'user not found' })
     }
 
-    const accounts = await redis.scan(0, { match: `account:${user.email}:*` })
+    const accounts = await getAccounts({ userId: user.id })
 
-    const [, accountKeys] = accounts
-    for (const accountKey of accountKeys) {
-      const existingAccount = await redis.json.get<Account>(accountKey)
+    for (const account of accounts) {
+      if (account.id === accountId) {
+        await db
+          .update(accountSchema)
+          .set({ accessToken, accessSecret, updatedAt: new Date() })
+          .where(eq(accountSchema.id, account.id))
 
-      if (existingAccount?.username === userProfile.screen_name) {
         if (authAction === 'invite') {
-          return c.redirect(`${getBaseUrl()}/invite/success?id=${inviteId}`)
+          return c.redirect(baseUrl + `/invite/success?id=${inviteId}`)
         }
 
         if (authAction === 'add-account' || authAction === 're-authenticate') {
-          await db
-            .update(account)
-            .set({
-              accessToken,
-              accessSecret,
-              updatedAt: new Date(),
-            })
-            .where(eq(account.id, existingAccount.id))
-
-          return c.redirect(`${getBaseUrl()}/studio/accounts`)
+          return c.redirect(baseUrl + `/studio/accounts`)
         }
 
-        return c.redirect(
-          `${getBaseUrl()}/onboarding?account_connected=true&id=${existingAccount.id}`,
-        )
+        if (authAction === 'onboarding') {
+          return c.redirect(baseUrl + `/studio?onboarding=true`)
+        }
       }
     }
 
     const dbAccountId = nanoid()
 
     await db
-      .insert(account)
+      .insert(accountSchema)
       .values({
         id: dbAccountId,
-        accountId: accountId,
+        accountId,
         createdAt: new Date(),
         updatedAt: new Date(),
         providerId: 'twitter',
@@ -245,22 +240,21 @@ export const authRouter = j.router({
       twitterId: data.id,
     }
 
-    await redis.json.set(`account:${user.email}:${dbAccountId}`, '$', connectedAccount)
-
-    const exists = await redis.exists(`active-account:${user.email}`)
+    const [_, exists] = await Promise.all([
+      redis.json.set(`account:${user.email}:${dbAccountId}`, '$', connectedAccount),
+      redis.exists(`active-account:${user.email}`),
+    ])
 
     if (!exists) {
       await redis.json.set(`active-account:${user.email}`, '$', connectedAccount)
     }
 
-    const baseUrl =
-      process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
-
-    console.log('ℹ️ℹ️ℹ️ calling qstash')
+    const url = process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : baseUrl
 
     await Promise.all([
+      redis.set(`status:posts:${connectedAccount.id}`, 'started', { ex: 60 * 2 }),
       qstash.publishJSON({
-        url: baseUrl + '/api/knowledge/index_tweets',
+        url: url + '/api/knowledge/index_tweets',
         body: {
           userId: user.id,
           accountId: connectedAccount.id,
@@ -268,7 +262,7 @@ export const authRouter = j.router({
         },
       }),
       qstash.publishJSON({
-        url: baseUrl + '/api/knowledge/index_memories',
+        url: url + '/api/knowledge/index_memories',
         body: {
           userId: user.id,
           accountId: connectedAccount.id,
@@ -277,29 +271,14 @@ export const authRouter = j.router({
       }),
     ])
 
-    posthog.capture({
-      distinctId: user.id,
-      event: 'user_account_connected',
-      properties: {
-        userId: user.id,
-        accountId: dbAccountId,
-        accountName: userProfile.name,
-        reason: authAction,
-      },
-    })
-
-    await posthog.shutdown().catch(() => {})
-
     if (authAction === 'invite') {
-      return c.redirect(`${getBaseUrl()}/invite/success?id=${inviteId}`)
+      return c.redirect(baseUrl + `/invite/success?id=${inviteId}`)
     }
 
     if (authAction === 'add-account') {
-      return c.redirect(`${getBaseUrl()}/studio/accounts?new_account_connected=true`)
+      return c.redirect(baseUrl + `/studio/accounts?new_account_connected=true`)
     }
 
-    return c.redirect(
-      `${getBaseUrl()}/studio?onboarding=true`,
-    )
+    return c.redirect(baseUrl + `/studio?onboarding=true`)
   }),
 })

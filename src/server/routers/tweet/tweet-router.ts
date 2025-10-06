@@ -20,27 +20,7 @@ import { fetchMediaFromS3 } from './fetch-media-from-s3'
 
 import { getNextAvailableQueueSlot, applyNaturalPostingTime } from './queue-utils'
 import { vector } from '@/lib/vector'
-
-async function getFutureScheduledTweetsCount(
-  userId: string,
-  accountId: string,
-): Promise<number> {
-  const currentTime = new Date().getTime()
-
-  const futureScheduledTweets = await db.query.tweets.findMany({
-    where: and(
-      eq(tweets.userId, userId),
-      eq(tweets.accountId, accountId),
-      eq(tweets.isScheduled, true),
-      eq(tweets.isError, false),
-      gt(tweets.scheduledUnix, currentTime),
-      isNull(tweets.isReplyTo),
-    ),
-    columns: { id: true },
-  })
-
-  return futureScheduledTweets.length
-}
+import { getScheduledTweetCount } from '../utils/get-scheduled-tweet-count'
 
 const consumerKey = process.env.TWITTER_CONSUMER_KEY as string
 const consumerSecret = process.env.TWITTER_CONSUMER_SECRET as string
@@ -112,7 +92,7 @@ export const tweetRouter = j.router({
         message: 'No account found',
       })
     }
-    const scheduledTweetsCount = await getFutureScheduledTweetsCount(user.id, account.id)
+    const scheduledTweetsCount = await getScheduledTweetCount(user.id)
 
     return c.json({ count: scheduledTweetsCount })
   }),
@@ -389,10 +369,7 @@ export const tweetRouter = j.router({
       }
 
       if (user.plan !== 'pro') {
-        const currentScheduledCount = await getFutureScheduledTweetsCount(
-          user.id,
-          account.id,
-        )
+        const currentScheduledCount = await getScheduledTweetCount(user.id)
         if (currentScheduledCount >= 3) {
           throw new HTTPException(402, {
             message:
@@ -928,10 +905,7 @@ export const tweetRouter = j.router({
       }
 
       if (user.plan !== 'pro') {
-        const currentScheduledCount = await getFutureScheduledTweetsCount(
-          user.id,
-          account.id,
-        )
+        const currentScheduledCount = await getScheduledTweetCount(user.id)
         if (currentScheduledCount >= 3) {
           throw new HTTPException(402, {
             message:

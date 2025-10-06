@@ -1,6 +1,10 @@
 import { getBaseUrl } from '@/constants/base-url'
 import { db } from '@/db'
-import { account as accounts, knowledgeDocument, user as userSchema } from '@/db/schema'
+import {
+  account as accountSchema,
+  knowledgeDocument,
+  user as userSchema,
+} from '@/db/schema'
 import { firecrawl } from '@/lib/firecrawl'
 import { qstash } from '@/lib/qstash'
 import { realtime } from '@/lib/realtime'
@@ -16,7 +20,7 @@ import { TwitterApi } from 'twitter-api-v2'
 import { z } from 'zod'
 import { j, privateProcedure, qstashProcedure } from '../jstack'
 import { Account } from './settings-router'
-import { getAccount } from './utils/get-account'
+import { getAccount, getAccounts } from './utils/get-account'
 import { getTweet } from './utils/get-tweet'
 
 const openrouter = createOpenRouter({
@@ -73,51 +77,31 @@ export const knowledgeRouter = j.router({
       throw new HTTPException(404, { message: 'User not found' })
     }
 
-    const accounts = await redis.scan(0, { match: `account:${dbUser.email}:*` })
-    const [, accountKeys] = accounts
-
-    if (accountKeys.length === 0) {
-      throw new HTTPException(404, { message: 'No accounts found' })
-    }
+    const accounts = await getAccounts({ userId: user.id })
 
     const baseUrl =
       process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
 
-    const indexingPromises = []
-
-    for (const accountKey of accountKeys) {
-      const account = await redis.json.get<{
-        id: string
-        username: string
-        name: string
-        profile_image_url: string
-        verified: boolean
-        twitterId: string
-      }>(accountKey)
-
-      if (account) {
-        indexingPromises.push(
-          qstash.publishJSON({
-            url: baseUrl + '/api/knowledge/index_tweets',
-            body: {
-              userId: user.id,
-              accountId: account.id,
-              handle: account.username,
-            },
-          }),
-          qstash.publishJSON({
-            url: baseUrl + '/api/knowledge/index_memories',
-            body: {
-              userId: user.id,
-              accountId: account.id,
-              handle: account.username,
-            },
-          }),
-        )
-      }
+    for (const account of accounts) {
+      await Promise.all([
+        qstash.publishJSON({
+          url: baseUrl + '/api/knowledge/index_tweets',
+          body: {
+            userId: user.id,
+            accountId: account.id,
+            handle: account.username,
+          },
+        }),
+        qstash.publishJSON({
+          url: baseUrl + '/api/knowledge/index_memories',
+          body: {
+            userId: user.id,
+            accountId: account.id,
+            handle: account.username,
+          },
+        }),
+      ])
     }
-
-    await Promise.all(indexingPromises)
 
     return c.json({ success: true })
   }),
@@ -451,13 +435,12 @@ export const knowledgeRouter = j.router({
       return c.json({ shouldShow: false })
     }
 
-    const accounts = await redis.scan(0, { match: `account:${user.email}:*` })
-
-    const [_, accountKeys] = accounts
+    const accounts = await getAccounts({ userId: user.id })
 
     const accountStatuses = await Promise.all(
-      accountKeys.map(async (key) => {
-        const account = await redis.json.get<Account>(key)
+      accounts.map(async ({ id }) => {
+        const account = await getAccount({ email: user.email, accountId: id })
+
         const status = await redis.get<'started' | 'success' | 'error'>(
           `status:posts:${account?.id}`,
         )
@@ -490,13 +473,13 @@ export const knowledgeRouter = j.router({
       const { user } = ctx
 
       const [dbAccount] = await db
-        .select({ id: accounts.id })
-        .from(accounts)
+        .select({ id: accountSchema.id })
+        .from(accountSchema)
         .where(
           and(
-            eq(accounts.userId, user.id),
-            eq(accounts.providerId, 'twitter'),
-            eq(accounts.id, input.accountId),
+            eq(accountSchema.userId, user.id),
+            eq(accountSchema.providerId, 'twitter'),
+            eq(accountSchema.id, input.accountId),
           ),
         )
 
@@ -569,7 +552,8 @@ export const knowledgeRouter = j.router({
       console.error('[ERROR] Indexing tweets:', err)
     }
 
-    await redis.expire(`status:posts:${accountId}`, 60 * 60 * 24)
+    // should take max 2 mins
+    await redis.expire(`status:posts:${accountId}`, 60 * 2)
 
     const namespace = realtime.channel(userId)
     await namespace.index_tweets.status.emit({ status: 'resolved' })
@@ -624,87 +608,6 @@ export const knowledgeRouter = j.router({
 
       return c.json({ success: true })
     }),
-
-  //   summarize_user: privateProcedure.post(async ({ c, ctx, input }) => {
-  //     const { user } = ctx
-
-  //     const account = await getAccount({
-  //       email: user.email,
-  //     })
-
-  //     if (!account?.id) {
-  //       throw new HTTPException(400, {
-  //         message: 'Please connect your Twitter account',
-  //       })
-  //     }
-
-  //     let bios: Array<Bio> = []
-
-  //     const twitterUser = await client.v2.user(account.twitterId!, {
-  //       'user.fields': ['description', 'entities'],
-  //     })
-
-  //     bios.push({
-  //       username: twitterUser.data.username,
-  //       name: twitterUser.data.name,
-  //       description: twitterUser.data.description || '',
-  //       id: twitterUser.data.id,
-  //     })
-
-  //     const mentionedUsers = twitterUser.data?.entities?.description?.mentions
-
-  //     if (mentionedUsers && mentionedUsers.length > 0) {
-  //       const mentionedUsernames = mentionedUsers.map((mention) => mention.username)
-  //       const usersResponse = await client.v2.usersByUsernames(mentionedUsernames, {
-  //         'user.fields': ['description', 'entities'],
-  //       })
-
-  //       bios.push(
-  //         ...usersResponse.data?.map((user) => ({
-  //           username: user.username,
-  //           name: user.name,
-  //           description: user.description || '',
-  //           id: user.id,
-  //         })),
-  //       )
-  //     }
-
-  //     const result = await generateText({
-  //       model: openrouter.chat('anthropic/claude-sonnet-4'),
-  //       prompt: `summarize this twitter user in 1-2 sentences and an unordered list of up to 5 bullet points. respond in markdown.
-
-  // - Write this in a conversational, understated tone, like you're casually telling a friend who this person is
-  // - Avoid marketing language and buzzwords
-  // - Keep it straightforward and matter-of-fact
-
-  // don't write headings for each section, just respond with the two sections directly.
-
-  // for example
-  // - memory one
-  // - memory two
-  // - memory three
-
-  // their (and perhaps relevant entities they are related to) twitter bios:
-
-  // ${JSON.stringify(bios, null, 2)}`,
-  //     })
-
-  //     // output to array
-  //     const memories = result.text
-  //       .split('\n')
-  //       .map((line) => line.trim())
-  //       .map((line) => (line.startsWith('-') ? line.slice(1).trim() : line))
-
-  //     await Memories.deleteAll(user.id)
-
-  //     await Promise.all(
-  //       memories.map((memory) => {
-  //         return Memories.add(user.id, memory)
-  //       }),
-  //     )
-
-  //     return c.json({ success: true })
-  //   }),
 
   getDocument: privateProcedure
     .input(z.object({ id: z.string() }))

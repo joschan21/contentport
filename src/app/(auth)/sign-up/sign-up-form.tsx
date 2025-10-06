@@ -94,7 +94,7 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<'div'>)
           Sign in
         </DuolingoButton>
         <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
-          <span className="bg-gray-50 text-muted-foreground relative z-10 px-2">OR</span>
+          <span className="bg-gray-50 text-stone-400 relative z-10 px-4">OR</span>
         </div>
         <DuolingoButton
           loading={isGoogleLoading}
@@ -106,7 +106,7 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<'div'>)
           Google
         </DuolingoButton>
       </div>
-      <div className="text-left text-gray-500 text-sm">
+      <div className="text-left text-gray-500">
         Already have an account?{' '}
         <Link href="/sign-in" className="underline underline-offset-2 text-indigo-600">
           Sign in

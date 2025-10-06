@@ -58,7 +58,7 @@ const Page = () => {
               <>
                 <span className="font-medium text-gray-700">Writing style:</span>
                 <span className="ml-1.5">
-                  Contentport automatically learns from your past & most successful
+                  Contentport automatically learns from your latest & most successful
                   tweets.
                 </span>
               </>
@@ -66,8 +66,7 @@ const Page = () => {
               <>
                 <span className="font-medium text-gray-700">Memories:</span>
                 <span className="ml-1.5">
-                  Store important context, preferences, and insights for personalized
-                  content.
+                  Let the AI know where you work, which projects you're working on, or how you like to write
                 </span>
               </>
             )}

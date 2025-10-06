@@ -8,6 +8,7 @@ import { headers } from 'next/headers'
 import Link from 'next/link'
 import Script from 'next/script'
 import Pricing from '@/frontend/studio/components/Pricing'
+import { Icons } from '@/components/icons'
 
 const Footer = () => {
   return (
@@ -17,9 +18,7 @@ const Footer = () => {
           <p className="text-gray-600 text-base">
             Your content engine for growing on Twitter.
           </p>
-          <p className="text-gray-500 text-sm">
-            © 2025 Contentport.
-          </p>
+          <p className="text-gray-500 text-sm">© 2025 Contentport.</p>
         </div>
       </div>
     </footer>
@@ -51,26 +50,27 @@ const Page = async () => {
                     </span>{' '}
                     for growing on Twitter
                   </h1>
-                  <p className="mt-6 text-gray-500 text-lg sm:text-xl max-w-2xl">
-                    Contentport helps you{' '}
-                    <span className="text-gray-900">
-                      create, schedule & manage twitter content
-                    </span>{' '}
-                    at scale. Perfect for busy founders & content managers.
+                  <p className="mt-6 text-gray-500 text-pretty text-lg sm:text-xl max-w-2xl">
+                    Grow on Twitter 10x faster with a content engine that deeply knows you
+                    and your writing style. Contentport helps you{' '}
+                    <span className="text-gray-900 font-medium">
+                      create & schedule twitter content at scale
+                    </span>
+                    .
                   </p>
 
                   <div className="max-w-lg w-full mt-8 flex flex-col gap-4 items-center">
                     <div className="flex mt-4 flex-col gap-2 max-w-sm w-full">
                       {session?.user ? (
                         <Link href="/studio">
-                          <DuolingoButton className="w-full h-14 sm:px-8">
-                            Start Posting More →
+                          <DuolingoButton className="w-full h-12 sm:px-8">
+                            Start Growing on <Icons.twitter className="size-4 ml-1.5" /> 
                           </DuolingoButton>
                         </Link>
                       ) : (
                         <Link href="/sign-in">
-                          <DuolingoButton className="w-full h-14 sm:px-8">
-                            Start Posting More →
+                          <DuolingoButton className="w-full h-12 sm:px-8">
+                            Start Growing on <Icons.twitter className="size-4 ml-1.5" /> 
                           </DuolingoButton>
                         </Link>
                       )}
@@ -118,8 +118,7 @@ const Page = async () => {
                         </div>
                         <p className="text-base text-left text-gray-600">
                           Trusted by{' '}
-                          <span className="font-medium text-gray-900">1.370</span>{' '}
-                          founders
+                          <span className="font-medium text-gray-900">1.817</span> founders
                         </p>
                       </div>
                     </div>
@@ -227,22 +226,6 @@ const Page = async () => {
                         </svg>
                         <p className="text-gray-600">Closed source, zero transparency</p>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <svg
-                          className="w-6 h-6 text-red-500 mt-0.5 flex-shrink-0"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        <p className="text-gray-600">
-                          Generic output that tries to work for everyone
-                        </p>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -327,22 +310,7 @@ const Page = async () => {
                           100% open-source, transparent & auditable
                         </p>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <svg
-                          className="w-6 h-6 text-green-400 mt-0.5 flex-shrink-0"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        <p className="text-gray-600">
-                          Designed for technical founders & content managers
-                        </p>
-                      </div>
+                      
                     </div>
                   </div>
                 </div>
@@ -358,11 +326,10 @@ const Page = async () => {
                   Within 60 seconds:
                 </span>
                 <span className="block mt-4 text-gray-800 text-3xl sm:text-4xl space-y-2">
-                  <span className="block opacity-70">get an idea.</span>
-                  <span className="block opacity-80">draft a tweet.</span>
-                  <span className="block opacity-90">add a beautiful visual.</span>
+                  <span className="block opacity-80">draft a tweet</span>
+                  <span className="block opacity-90">add a beautiful visual</span>
                   <span className="block opacity-100">
-                    queue for peak activity times.
+                    queue for peak activity times
                   </span>
                 </span>
               </h2>{' '}
@@ -606,7 +573,6 @@ const Page = async () => {
               <Pricing targetUrl="/login" />
             </div>
           </section>
-
         </div>
       </section>
 

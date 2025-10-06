@@ -14,6 +14,7 @@ import { s3Client, BUCKET_NAME } from '@/lib/s3'
 import { DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
 import { getBaseUrl } from '@/constants/base-url'
 import { Ratelimit } from '@upstash/ratelimit'
+import { getScheduledTweetCount } from './utils/get-scheduled-tweet-count'
 
 export type Account = {
   id: string
@@ -74,38 +75,23 @@ export const settingsRouter = j.router({
         })),
 
       (async () => {
-        const currentTime = new Date().getTime()
-
         const accounts = await db
           .select({ id: accountSchema.id })
           .from(accountSchema)
-          .where(eq(accountSchema.userId, user.id))
+          .where(
+            and(
+              eq(accountSchema.userId, user.id),
+              eq(accountSchema.providerId, 'twitter'),
+            ),
+          )
 
-        const accountIds = accounts.map((a) => a.id)
-
-        if (accountIds.length === 0) {
+        if (accounts.length === 0) {
           return { used: 0, limit: scheduledTweetsLimit }
         }
 
-        const futureScheduledTweets = await db.query.tweets.findMany({
-          where: and(
-            eq(tweets.userId, user.id),
-            eq(tweets.isScheduled, true),
-            eq(tweets.isError, false),
-            isNotNull(tweets.scheduledUnix),
-          ),
-          columns: { id: true, scheduledUnix: true, isReplyTo: true },
-        })
+        const count = await getScheduledTweetCount(user.id)
 
-        const count = futureScheduledTweets.filter(
-          (tweet) =>
-            tweet.scheduledUnix && tweet.scheduledUnix > currentTime && !tweet.isReplyTo,
-        ).length
-
-        return {
-          used: count,
-          limit: scheduledTweetsLimit,
-        }
+        return { used: count, limit: scheduledTweetsLimit }
       })(),
     ])
 
@@ -151,7 +137,7 @@ export const settingsRouter = j.router({
         })
 
         const activeNonCancelledSubscriptions = subscriptions.data.filter(
-          (sub) => !sub.cancel_at_period_end
+          (sub) => !sub.cancel_at_period_end,
         )
 
         if (activeNonCancelledSubscriptions.length > 0) {
@@ -321,7 +307,7 @@ export const settingsRouter = j.router({
           })
 
           const activeNonCancelledSubscriptions = subscriptions.data.filter(
-            (sub) => !sub.cancel_at_period_end
+            (sub) => !sub.cancel_at_period_end,
           )
 
           for (const subscription of activeNonCancelledSubscriptions) {
@@ -425,7 +411,6 @@ export const settingsRouter = j.router({
           ...accountData,
           isActive: activeAccount?.id === account.id,
           postIndexingStatus: postIndexingStatus || (doPostsExists ? 'success' : 'error'),
-          // isMemoriesIndexed,
         }
       }),
     )

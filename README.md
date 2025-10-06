@@ -3,20 +3,23 @@
 ### public roadmap
 
 urgent & often requested:
+
 - support creating threads
 - showing OG images when pasting URLs
 - becoming responsive
 - make it much easier to upgrade to PRO & improved upgrading UX
 
 nice to have
+
 - use posted tweets as style reference/context for assistant
 - web browsing for assistant
 - voice input for assistant
 - peronalize ideas shown as examples ("It would be AMAZING if these examples weren’t random but instead based on my background, who I am, what I do, and what’s happening out there in X that I could speak about."
 
 pending:
+
 - invite flow broken because `ctx.user.name` doesnt exist:
-    await redis.set(`invite:name:${inviteId}`, ctx.user.name, { ex: 60 * 60 * 24 })
+  await redis.set(`invite:name:${inviteId}`, ctx.user.name, { ex: 60 _ 60 _ 24 })
 - when adding first keywords to topic monitor, it doesnt auto-refetch
 - while typing a new keyword to topic monitor, count that as enter when pressing "save"
 - rename "new keyword" in topic monitor CTA to something better
@@ -28,3 +31,23 @@ pending:
 
 NEXT UP:
 set up stripe to work locally w/ test mode locally / prod mode in production
+
+POSSIBLE NEXT FEATURES:
+
+- community posting
+- auto-delay
+- auto-plug
+- natural posting times
+- auto-retweet
+- timezones for queue
+- adjustable queue slots (how many / when)
+- in-app support
+- nice upgrade modal / paywall / emails
+- 7-day or 3-day free trial
+- for email auth, send code instead of link
+
+bigger
+
+- proactively create posts for users
+  - code screenshot editor?
+- viral tweet library
