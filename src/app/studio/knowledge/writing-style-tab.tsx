@@ -23,7 +23,11 @@ export const WritingStyleTab = () => {
     },
   })
 
-  const { data, isPending, isFetched, refetch } = useQuery({
+  const {
+    data,
+    isPending,
+    refetch: refetchOwnTweets,
+  } = useQuery({
     queryKey: ['get-own-tweets', activeAccount?.id],
     queryFn: async () => {
       const res = await client.knowledge.get_own_tweets.$get()
@@ -51,8 +55,18 @@ export const WritingStyleTab = () => {
         accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
       ),
     events: {
-      index_memories: { status: () => refetchAccounts() },
-      index_tweets: { status: () => refetchAccounts() },
+      index_memories: {
+        status: () => {
+          refetchOwnTweets()
+          refetchAccounts()
+        },
+      },
+      index_tweets: {
+        status: () => {
+          refetchOwnTweets()
+          refetchAccounts()
+        },
+      },
     },
   })
 
