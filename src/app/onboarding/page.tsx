@@ -278,7 +278,7 @@ const Page = () => {
           </p>
         </div>
 
-        <div className="relative hidden lg:block shadow-inner w-full bg-red-500 h-full overflow-hidden">
+        <div className="relative hidden lg:block shadow-inner w-full bg-stone-200 h-full overflow-hidden">
           <img
             className="object-cover pointer-events-none select-none w-full h-full"
             src="/cover.png"
