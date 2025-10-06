@@ -163,6 +163,10 @@ export const stripeRouter = j.router({
       status: 'active',
     })
 
-    return c.json({ hasActiveSubscription: subscriptions.data.length > 0 })
+    const activeNonCancelledSubscriptions = subscriptions.data.filter(
+      (sub) => !sub.cancel_at_period_end
+    )
+
+    return c.json({ hasActiveSubscription: activeNonCancelledSubscriptions.length > 0 })
   }),
 })

@@ -150,7 +150,11 @@ export const settingsRouter = j.router({
           status: 'active',
         })
 
-        if (subscriptions.data.length > 0) {
+        const activeNonCancelledSubscriptions = subscriptions.data.filter(
+          (sub) => !sub.cancel_at_period_end
+        )
+
+        if (activeNonCancelledSubscriptions.length > 0) {
           throw new HTTPException(400, {
             message:
               'Please cancel your active subscription before deleting your account.',
@@ -316,7 +320,11 @@ export const settingsRouter = j.router({
             status: 'active',
           })
 
-          for (const subscription of subscriptions.data) {
+          const activeNonCancelledSubscriptions = subscriptions.data.filter(
+            (sub) => !sub.cancel_at_period_end
+          )
+
+          for (const subscription of activeNonCancelledSubscriptions) {
             try {
               await stripe.subscriptions.cancel(subscription.id)
             } catch (err) {
