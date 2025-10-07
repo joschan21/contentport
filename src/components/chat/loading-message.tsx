@@ -43,7 +43,7 @@ export const LoadingMessage = memo(
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="text-gray-500 text-sm"
+              className="text-gray-500 text-base"
             >
               {message}
             </motion.div>

@@ -50,7 +50,6 @@ export type TAttachment = z.infer<typeof attachmentSchema>
 
 const messageMetadataSchema = z.object({
   attachments: z.array(attachmentSchema).optional(),
-  length: z.enum(['short', 'long', 'thread']),
 })
 
 export type Attachment = z.infer<typeof attachmentSchema>
@@ -60,7 +59,6 @@ export type Metadata = {
   userMessage: string
   attachments: Array<TAttachment>
   tweets: PayloadTweet[]
-  length: 'short' | 'long' | 'thread'
 }
 
 export interface ChatHistoryItem {
@@ -78,8 +76,11 @@ export type MyUIMessage = UIMessage<
     }
     'tool-output': {
       text: string
-      index: number
       status: 'processing' | 'streaming' | 'complete'
+    }
+    'tool-reasoning': {
+      text: string
+      status: 'processing' | 'reasoning' | 'complete'
     }
     write_tweet: {
       status: 'processing'
@@ -93,10 +94,6 @@ export type MyUIMessage = UIMessage<
         title: string
         content: string
       }
-    }
-    lookup_involved_project: {
-      input: { involved_project_name: string }
-      output: string[]
     }
   }
 >
@@ -180,14 +177,14 @@ export const chatRouter = j.router({
       const { links, attachments } = parsedAttachments
 
       const content = new XmlPrompt()
-      const userContent = message.parts.reduce(
+      const rawUserMessage = message.parts.reduce(
         (acc, curr) => (curr.type === 'text' ? acc + curr.text : ''),
         '',
       )
 
       content.open('message', { date: format(new Date(), 'EEEE, yyyy-MM-dd') })
 
-      content.tag('user_message', userContent)
+      content.tag('user_message', rawUserMessage)
 
       if (!history || history.length === 0) {
         const memories = await redis.lrange(`memories:${account.id}`, 0, -1)
@@ -269,12 +266,10 @@ export const chatRouter = j.router({
             ctx: {
               plan: user.plan as 'free' | 'pro',
               tweets: message.metadata?.tweets ?? [],
-              instructions: userContent,
               messages,
-              userContent,
+              rawUserMessage,
               userId: user.id,
               attachments: { attachments, links },
-              length: message.metadata?.length ?? 'long',
               redisKeys: {
                 thread: `thread:${id}:${generationId}`,
                 style: `style:${user.email}:${account.id}`,
@@ -296,7 +291,6 @@ export const chatRouter = j.router({
             tools: {
               write_tweet,
               read_website_content,
-              // ...(sitemaps ? { lookup } : undefined),
             },
             stopWhen: stepCountIs(5),
             experimental_transform: smoothStream({

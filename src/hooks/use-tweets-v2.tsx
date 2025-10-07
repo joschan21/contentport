@@ -53,6 +53,7 @@ type TweetContextType = {
     index?: number
   }) => void
   removeTweet: (tweetId: string) => void
+  clearTweet: (tweetId: string) => Promise<void>
 
   // media files
   addMediaFile: (tweetId: string, file: Omit<MediaFile, 'id'>) => void
@@ -189,6 +190,36 @@ export const TweetV2Provider = ({ children }: { children: React.ReactNode }) => 
     const newShadowEditors = { ...shadowEditors.current }
     delete newShadowEditors[tweetId]
     shadowEditors.current = newShadowEditors
+  }
+
+  const clearTweet = async (tweetId: string) => {
+    const tweet = tweets.find((t) => t.id === tweetId)
+    if (!tweet) return
+
+    await new Promise<void>((resolve) => {
+      tweet.editor?.update(
+        () => {
+          const root = $getRoot()
+          root.clear()
+
+          const paragraph = $createParagraphNode()
+          root.append(paragraph)
+        },
+        { onUpdate: resolve, tag: 'force-sync' },
+      )
+    })
+
+    setTweets((prev) =>
+      prev.map((t) =>
+        t.id === tweetId
+          ? {
+              ...t,
+              mediaFiles: [],
+              previewLinks: [],
+            }
+          : t,
+      ),
+    )
   }
 
   /**
@@ -415,6 +446,7 @@ export const TweetV2Provider = ({ children }: { children: React.ReactNode }) => 
         updateTweet,
         addTweet,
         removeTweet,
+        clearTweet,
         // media
         addMediaFile,
         updateMediaFile,

@@ -1,15 +1,8 @@
-import { PayloadTweet } from '@/hooks/use-tweets-v2'
 import { avoidPrompt, editToolSystemPrompt, styleGuide } from '@/lib/prompt-utils'
 import { redis } from '@/lib/redis'
 import { XmlPrompt } from '@/lib/xml-prompt'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
-import {
-  convertToModelMessages,
-  generateId,
-  streamText,
-  tool,
-  UIMessageStreamWriter,
-} from 'ai'
+import { convertToModelMessages, generateId, streamText, tool } from 'ai'
 import { format } from 'date-fns'
 import { HTTPException } from 'hono/http-exception'
 import { nanoid } from 'nanoid'
@@ -17,72 +10,13 @@ import { z } from 'zod'
 import { Account } from '../../settings-router'
 import { MyUIMessage } from '../chat-router'
 import { WebsiteContent } from '../read-website-content'
-import { parseAttachments } from '../utils'
+import { Context } from './shared'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 })
 
-interface Context {
-  writer: UIMessageStreamWriter
-  ctx: {
-    plan: 'free' | 'pro'
-    tweets: PayloadTweet[]
-    instructions: string
-    userContent: string
-    messages: MyUIMessage[]
-    attachments: Awaited<ReturnType<typeof parseAttachments>>
-    length: 'short' | 'long' | 'thread'
-    userId: string
-    redisKeys: {
-      thread: string
-      style: string
-      account: string
-      websiteContent: string
-    }
-  }
-}
-
 const singleTweetSchema = z.object({
-  index: z
-    .number()
-    .describe(
-      `The index of the tweet to edit. When creating a thread, using a non-existing index will create a new tweet at this index.`,
-    ),
-  instruction: z.string().describe(
-    `Capture the user's instruction EXACTLY as they wrote it - preserve every detail including:
-- Exact wording and phrasing
-- Original capitalization
-- Punctuation and special characters
-- Typos or informal language
-- Numbers and formatting
-
-DO NOT paraphrase, summarize, or modify up the instruction in any way EXCEPT if the user asks for MULTIPLE tweets. If the user asks for multiple tweets, slightly alternate the instruction for each call to not get the same result.
-
-<examples>
-  <example>
-  <user_message>tweet about ai being overhyped</user_message>
-  <result>tweet about ai being overhyped</result>
-  </example>
-
-  <example>
-  <user_message>write 2 tweets about why nextjs 15 is AMAZING!!!</user_message>
-  <result note="user asked for two tweets, this tool call is responsible for one">tweet about why nextjs 15 is AMAZING!!!</result>
-  </example>
-
-  <example>
-  <user_message>write something funny</user_message>
-  <result>write something funny</result>
-  </example>
-
-  <example>
-  <user_message>write a thread about car engines</user_message>
-  <result>write a thread about car engines</result>
-  </example>
-</examples>
-
-Remember: This tool creates/edits ONE tweet or thread per call. If the user wants 2 tweets, call this tool 2 times. For each of the parallel calls, frame the instruction as being for one tweet.`,
-  ),
   tweetContent: z
     .string()
     .optional()
@@ -100,17 +34,26 @@ Remember: This tool creates/edits ONE tweet or thread per call. If the user want
 
 export const createTweetTool = ({ writer, ctx }: Context) => {
   return tool({
-    description: 'my tool',
+    description:
+      'Used to create tweets. Can create a single tweet, a thread (tweets separated by ---), multiple separate tweets (separated by ===), or multiple threads.',
     inputSchema: singleTweetSchema,
-    execute: async ({ instruction, tweetContent, imageDescriptions, index }) => {
+    execute: async ({ tweetContent, imageDescriptions }) => {
       const generationId = nanoid()
+
+      writer.write({
+        type: 'data-tool-reasoning',
+        id: generationId,
+        data: {
+          text: '',
+          status: 'processing',
+        },
+      })
 
       writer.write({
         type: 'data-tool-output',
         id: generationId,
         data: {
           text: '',
-          index,
           status: 'processing',
         },
       })
@@ -128,10 +71,20 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
 
       prompt.open('prompt', { date: format(new Date(), 'EEEE, yyyy-MM-dd') })
 
-      // system
-      prompt.open('system')
-      prompt.text(editToolSystemPrompt({ name: account.name, length: ctx.length }))
-      prompt.close('system')
+      prompt.open('output_format', {
+        note: 'Follow these formatting rules for your output based on what the user is requesting',
+      })
+      prompt.text(
+        `- For THREADS: Separate each tweet in the thread with three hyphens (---) on their own line
+- For MULTIPLE SEPARATE TWEETS: Separate each distinct tweet with three equals signs (===) on their own line  
+- For a SINGLE TWEET: Just output the tweet text directly with no delimiters
+
+Examples:
+* Single tweet: "Just the tweet text"
+* Thread: "First tweet---Second tweet---Third tweet"
+* Multiple tweets: "Tweet 1===Tweet 2===Tweet 3"`,
+      )
+      prompt.close('output_format')
 
       prompt.open('language_rules', {
         note: 'be EXTREMELY strict with these rules. NEVER use ANY of the forbidden words. If you are tempted to use one: you are probably overcomplicating your language. We need a simple, easy to understand 4-th grade level tweet.',
@@ -176,7 +129,7 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
       if (ctx.tweets.length > 1) {
         prompt.open('thread_draft')
         ctx.tweets.forEach((tweet) => {
-          prompt.tag('tweet_draft', tweet.content, { index: index })
+          prompt.tag('tweet_draft', tweet.content)
         })
         prompt.close('thread_draft')
       } else {
@@ -184,7 +137,7 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
       }
 
       // current job
-      prompt.tag('current_user_request', instruction, {
+      prompt.tag('user_request', ctx.rawUserMessage, {
         note: 'it is upon you to decide whether the user is referencing their previous history when iterating or if they are asking for changes in the current tweet drafts.',
       })
 
@@ -195,54 +148,22 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
       // style
       const style = await styleGuide({
         accountId: account.id,
-        topic: instruction,
+        topic: ctx.rawUserMessage,
       })
 
       prompt.tag('style', style)
 
-      if (ctx.length === 'short') {
-        prompt.tag(
-          'expected_length',
-          'Regardless of previous tweets lengths: You are expected to respond with a VERY SHORT tweet now (NEVER exceed a single sentence).',
-          {
-            note: 'Adjust the tweet length exactly to this requirement.',
-          },
-        )
-      } else if (ctx.length === 'long') {
-        prompt.tag(
-          'expected_length',
-          'Regardless of previous tweets lengths: You are expected to respond with a short tweet now (around 160 characters).',
-          {
-            note: 'Adjust the tweet length exactly to this requirement.',
-          },
-        )
-      } else if (ctx.length === 'thread') {
-        prompt.tag(
-          'expected_length',
-          `Regardless of previous tweets lengths: You are expected to respond with a thread now (multiple tweets). VERY IMPORTANT: To do this, separate each thread tweet with three hyphens (no break lines) to indicate moving on to the next tweet in the thread.
-
-<thread_example>
-  <tweet index="0">first tweet</tweet>
-  ---
-  <tweet index="1">second tweet</tweet>
-  ---
-  <tweet index="2">third tweet</tweet>
-</thread_example>`,
-          {
-            note: 'Adjust the tweet length exactly to this requirement.',
-          },
-        )
-      }
-
       const memories = await redis.lrange(`memories:${account.id}`, 0, -1)
 
-      prompt.open('memories', {
-        note: 'These are the memories you have about this user. Its on you to decide which perspective/context from these memories might or might not be relevant to write a tweet.',
-        perspective:
-          'When responding, adopt the perspective of the user. Use first-person ("I", "my", "we") when discussing their projects, companies, or work. Use third-person when discussing external things they are not directly involved with.',
-      })
-      memories.forEach((memory) => prompt.tag('memory', memory))
-      prompt.close('memories')
+      if (memories.length) {
+        prompt.open('memories', {
+          note: 'These are the memories you have about this user. Its on you to decide which perspective/context from these memories might or might not be relevant to write a tweet.',
+          perspective:
+            'When responding, adopt the perspective of the user. Use first-person ("I", "my", "we") when discussing their projects, companies, or work. Use third-person when discussing external things they are not directly involved with.',
+        })
+        memories.forEach((memory) => prompt.tag('memory', memory))
+        prompt.close('memories')
+      }
 
       prompt.close('prompt')
 
@@ -264,18 +185,45 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
       console.log('⚠️⚠️⚠️ PROMPT', JSON.stringify(prompt.toString(), null, 2))
 
       const model = openrouter.chat('anthropic/claude-sonnet-4.5', {
-        reasoning: { enabled: false, effort: 'low' },
+        reasoning: { enabled: true, effort: 'low' },
         models: ['anthropic/claude-sonnet-4', 'anthropic/claude-3.7-sonnet'],
       })
 
+      let reasoning = ''
+      let isReasoningComplete = false
+
       const result = streamText({
         model,
-        system: `${editToolSystemPrompt({ name: account.name, length: ctx.length })}
+        system: `${editToolSystemPrompt({ name: account.name })}
         
-${avoidPrompt()}
-
-Remember: NEVER use prohibited words. Instead of banned words, use easy, 6-th grade level alternatives.`,
+        ${avoidPrompt()}
+        
+        Remember: NEVER use prohibited words. Instead of banned words, use easy, 6-th grade level alternatives.`,
         messages: convertToModelMessages(messages),
+        onChunk: ({ chunk }) => {
+          if (chunk.type === 'reasoning-delta' && !isReasoningComplete) {
+            reasoning += chunk.text
+
+            writer.write({
+              type: 'data-tool-reasoning',
+              id: generationId,
+              data: { text: reasoning, status: 'reasoning' },
+            })
+          }
+        },
+        onStepFinish: (step) => {
+          const reasoningContent = step.content.find((c) => c.type === 'reasoning')
+
+          if (reasoningContent && reasoningContent.type === 'reasoning') {
+            isReasoningComplete = true
+
+            writer.write({
+              type: 'data-tool-reasoning',
+              id: generationId,
+              data: { text: reasoning, status: 'complete' },
+            })
+          }
+        },
         onError(error) {
           console.log('❌❌❌ ERROR:', JSON.stringify(error, null, 2))
 
@@ -297,7 +245,6 @@ Remember: NEVER use prohibited words. Instead of banned words, use easy, 6-th gr
           id: generationId,
           data: {
             text: fullText,
-            index,
             status: 'streaming',
           },
         })
@@ -308,7 +255,6 @@ Remember: NEVER use prohibited words. Instead of banned words, use easy, 6-th gr
         id: generationId,
         data: {
           text: fullText,
-          index,
           status: 'complete',
         },
       })

@@ -11,6 +11,11 @@ import { WebsiteMockup } from './website-mockup'
 import { ScrollButton } from '../ui/scroll-button'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from '@/components/ai-elements/reasoning'
 
 export const Messages = memo(
   ({
@@ -85,6 +90,15 @@ export const Messages = memo(
                     }
                   >
                     {message.parts.map((part, i) => {
+                      if (part.type === 'data-tool-reasoning') {
+                        return (
+                          <Reasoning key={i} className="w-full" isStreaming={part.data.status === "reasoning"}>
+                            <ReasoningTrigger />
+                            <ReasoningContent>{part.data.text}</ReasoningContent>
+                          </Reasoning>
+                        )
+                      }
+
                       if (part.type === 'text') {
                         if (!part.text) return null
 
@@ -96,14 +110,6 @@ export const Messages = memo(
                               text={message.metadata?.userMessage || part.text}
                             />
                           </div>
-                        )
-                      }
-
-                      if (part.type === 'tool-lookup_involved_project') {
-                        return (
-                          <p className="text-gray-500" key={i}>
-                            Searching knowledge base...
-                          </p>
                         )
                       }
 
@@ -136,43 +142,59 @@ export const Messages = memo(
 
                       if (part.type === 'data-tool-output') {
                         if (part.data.status === 'processing') {
-                          return <TweetMockup key={i} isLoading index={part.data.index} />
+                          return <TweetMockup key={i} isLoading index={0} />
                         }
 
-                        const threads = part.data.text.split('---')
+                        const separateTweets = part.data.text.split('===')
 
                         return (
-                          <div
-                            key={`part-${i}`}
-                            className={cn('relative w-full min-w-0 rounded-2xl', {
-                              'border px-3 py-6 border-black border-opacity-[0.01] bg-clip-padding group bg-white shadow-[0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)]':
-                                threads.length > 1,
-                            })}
-                          >
-                            {threads.map((thread, i) => (
-                              <div key={`part-${i}-thread-${i}`} className="relative">
-                                <TweetMockup
-                                  isConnectedAfter={
-                                    threads.length > 1 && i < threads.length - 1
-                                  }
-                                  isConnectedBefore={i > 0}
-                                  threads={threads}
-                                  text={thread.trim()}
-                                  index={i}
-                                >
-                                  <StreamingMessage animate={true} text={thread.trim()} />
-                                </TweetMockup>
+                          <div key={`part-${i}`} className="space-y-4">
+                            {separateTweets.map((tweetOrThread, tweetIndex) => {
+                              const threads = tweetOrThread.split('---')
 
-                                {threads.length > 1 && i < threads.length - 1 && (
-                                  <motion.div
-                                    initial={{ height: 0 }}
-                                    animate={{ height: '100%' }}
-                                    transition={{ duration: 0.5 }}
-                                    className="absolute z-10 left-[35px] top-[44px] w-0.5 bg-gray-200/75 h-full"
-                                  />
-                                )}
-                              </div>
-                            ))}
+                              return (
+                                <div
+                                  key={`tweet-${tweetIndex}`}
+                                  className={cn('relative w-full min-w-0 rounded-2xl', {
+                                    'border px-3 py-6 border-black border-opacity-[0.01] bg-clip-padding group bg-white shadow-[0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)]':
+                                      threads.length > 1,
+                                  })}
+                                >
+                                  {threads.map((thread, threadIndex) => (
+                                    <div
+                                      key={`thread-${threadIndex}`}
+                                      className="relative"
+                                    >
+                                      <TweetMockup
+                                        isConnectedAfter={
+                                          threads.length > 1 &&
+                                          threadIndex < threads.length - 1
+                                        }
+                                        isConnectedBefore={threadIndex > 0}
+                                        threads={threads}
+                                        text={thread.trim()}
+                                        index={threadIndex}
+                                      >
+                                        <StreamingMessage
+                                          animate={true}
+                                          text={thread.trim()}
+                                        />
+                                      </TweetMockup>
+
+                                      {threads.length > 1 &&
+                                        threadIndex < threads.length - 1 && (
+                                          <motion.div
+                                            initial={{ height: 0 }}
+                                            animate={{ height: '100%' }}
+                                            transition={{ duration: 0.5 }}
+                                            className="absolute z-10 left-[35px] top-[44px] w-0.5 bg-gray-200/75 h-full"
+                                          />
+                                        )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )
+                            })}
                           </div>
                         )
                       }

@@ -68,7 +68,7 @@ interface TweetItemProps {
 }
 
 const TweetItem = ({ tweet, index }: TweetItemProps) => {
-  const { removeTweet, addMediaFile, updateMediaFile } = useTweetsV2()
+  const { removeTweet, clearTweet, addMediaFile, updateMediaFile } = useTweetsV2()
   const [isDragging, setIsDragging] = useState(false)
   const [isDrawerOpen, setisDrawerOpen] = useState(false)
 
@@ -442,24 +442,30 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
                       e.target.value = ''
                     }}
                   />
-                  {index !== 0 && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <DuolingoButton
-                          variant="secondary"
-                          size="icon"
-                          className="rounded-md"
-                          onClick={() => removeTweet(tweet.id)}
-                        >
-                          <Trash2 className="size-4" />
-                          <span className="sr-only">Remove tweet</span>
-                        </DuolingoButton>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Remove tweet</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DuolingoButton
+                        variant="secondary"
+                        size="icon"
+                        className="rounded-md"
+                        onClick={() => {
+                          if (index === 0) {
+                            clearTweet(tweet.id)
+                          } else {
+                            removeTweet(tweet.id)
+                          }
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                        <span className="sr-only">
+                          {index === 0 ? 'Clear tweet' : 'Remove tweet'}
+                        </span>
+                      </DuolingoButton>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{index === 0 ? 'Clear tweet' : 'Remove tweet'}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </TooltipProvider>
 
                 <div className="w-px h-4 bg-stone-300 mx-2" />

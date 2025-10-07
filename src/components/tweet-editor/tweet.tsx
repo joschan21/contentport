@@ -44,7 +44,7 @@ export default function Tweet({ editMode = false }: TweetProps) {
       )}
 
       <Card
-        className={cn('p-3', {
+        className={cn('p-3 gap-0', {
           'border border-indigo-300': editMode,
         })}
       >
@@ -53,7 +53,7 @@ export default function Tweet({ editMode = false }: TweetProps) {
             <div
               key={tweet.id}
               className={cn('relative z-50', {
-                'pt-6': index > 0,
+                'pb-0': index > 0 && index < tweets.length - 1,
               })}
             >
               <TweetItem tweet={tweet} index={index} />

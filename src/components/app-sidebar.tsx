@@ -58,12 +58,11 @@ const ChatInput = ({
   disabled,
   handleFilesAdded,
 }: {
-  onSubmit: (text: string, length: 'short' | 'long' | 'thread') => void
+  onSubmit: (text: string) => void
   onStop: () => void
   disabled: boolean
   handleFilesAdded: (files: File[]) => void
 }) => {
-  const [length, setLength] = useState<'short' | 'long' | 'thread'>('short')
   const [editor] = useLexicalComposerContext()
   const { isDragging } = useContext(FileUploadContext)
   const { open } = useSidebar()
@@ -105,13 +104,7 @@ const ChatInput = ({
   const handleSubmit = () => {
     const text = editor.read(() => $getRoot().getTextContent().trim())
 
-    if (text.toLowerCase().includes('thread')) {
-      // auto-detect threads
-      setLength('thread')
-      onSubmit(text, 'thread')
-    } else {
-      onSubmit(text, length)
-    }
+    onSubmit(text)
 
     editor.update(() => {
       const root = $getRoot()
@@ -132,12 +125,7 @@ const ChatInput = ({
             const text = root.getTextContent().trim()
             if (!text) return
 
-            if (text.toLowerCase().includes('thread')) {
-              setLength('thread')
-              onSubmit(text, 'thread')
-            } else {
-              onSubmit(text, length)
-            }
+            onSubmit(text)
 
             root.clear()
             const paragraph = $createParagraphNode()
@@ -178,7 +166,7 @@ const ChatInput = ({
       removeCommand?.()
       removePasteCommand?.()
     }
-  }, [editor, length, onSubmit])
+  }, [editor, onSubmit])
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
@@ -294,42 +282,6 @@ const ChatInput = ({
                       <Paperclip className="text-stone-600 size-5" />
                     </DuolingoButton>
                   </FileUploadTrigger>
-
-                  <div className="flex items-center gap-1.5">
-                    <DuolingoButton
-                      disabled={isIndexing}
-                      onClick={() => {
-                        setLength((prev) => {
-                          if (prev === 'short') return 'long'
-                          if (prev === 'long') return 'thread'
-                          else return 'short'
-                        })
-                      }}
-                      type="button"
-                      variant="secondary"
-                      size="icon"
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <div
-                          className={cn('h-1 w-4 bg-gray-300 rounded-full', {
-                            'bg-gray-700': length === 'thread',
-                          })}
-                        />
-                        <div
-                          className={cn('h-1 w-4 bg-gray-300 rounded-full', {
-                            'bg-gray-700': length === 'long' || length === 'thread',
-                          })}
-                        />
-                        <div className={cn('h-1 w-4 bg-gray-700 rounded-full', {})} />
-                      </div>
-                    </DuolingoButton>
-                    <div className="">
-                      <p className="text-xs text-gray-600">Length</p>
-                      <p className="text-xs text-gray-400">
-                        {length.slice(0, 1).toUpperCase() + length.slice(1)}
-                      </p>
-                    </div>
-                  </div>
                 </div>
 
                 {disabled ? (
@@ -393,7 +345,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
   )
 
   const handleSubmit = useCallback(
-    async (text: string, length: 'short' | 'long' | 'thread') => {
+    async (text: string) => {
       if (!text.trim()) return
 
       if (!Boolean(searchParams.get('chatId'))) {
@@ -404,7 +356,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
 
       sendMessage({
         text,
-        metadata: { attachments, tweets: payloadTweets, userMessage: text, length },
+        metadata: { attachments, tweets: payloadTweets, userMessage: text },
       })
 
       if (attachments.length > 0) {
