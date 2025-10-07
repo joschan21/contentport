@@ -25,7 +25,7 @@ import toast from 'react-hot-toast'
 
 const Page = () => {
   const router = useRouter()
-  const { data, refetch } = authClient.useSession()
+  const { data: session, refetch } = authClient.useSession()
   const [activeTab, setActiveTab] = useState('billing')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [name, setName] = useState('')
@@ -64,10 +64,10 @@ const Page = () => {
   })
 
   useEffect(() => {
-    if (data?.user.name) {
-      setName(data.user.name)
+    if (session?.user.name) {
+      setName(session.user.name)
     }
-  }, [data?.user.name])
+  }, [session?.user.name])
 
   useEffect(() => {
     if (status) {
@@ -77,7 +77,7 @@ const Page = () => {
       }
 
       if (status === 'processing') {
-        if (data?.user.plan === 'pro') {
+        if (session?.user.plan === 'pro') {
           toast.success('Upgraded to pro.')
           router.push('/studio/settings')
           return
@@ -86,7 +86,7 @@ const Page = () => {
         return
       }
     }
-  }, [data])
+  }, [session])
 
   const { mutate: handleBillingAction, isPending: isBillingActionPending } = useMutation({
     mutationKey: ['handle-billing-action', subscription?.hasActiveSubscription],
@@ -151,7 +151,7 @@ const Page = () => {
     },
   })
 
-  const isPro = data?.user.plan === 'pro'
+  const isPro = session?.user.plan === 'pro'
 
   const chatRequestsUsed = usageStats?.chatRequests.used ?? 0
   const chatRequestsLimit = usageStats?.chatRequests.limit ?? (isPro ? Infinity : 5)
@@ -163,7 +163,11 @@ const Page = () => {
   const scheduledTweetsLimit = usageStats?.scheduledTweets.limit ?? (isPro ? Infinity : 3)
 
   return (
-    <Container className="pb-24" title="Settings" description="Manage your Contentport account">
+    <Container
+      className="pb-24"
+      title="Settings"
+      description="Manage your Contentport account"
+    >
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value)}
@@ -208,7 +212,7 @@ const Page = () => {
                   className="w-fit"
                   onClick={() => updateName(name)}
                   loading={isUpdatingName}
-                  disabled={isUpdatingName || !name.trim() || name === data?.user.name}
+                  disabled={isUpdatingName || !name.trim() || name === session?.user.name}
                 >
                   Save
                 </DuolingoButton>
@@ -223,10 +227,13 @@ const Page = () => {
                 </p>
               </CardHeader>
               <CardContent>
+                {session?.user.isAdmin ? (
+                  <p className="text-xs text-gray-500">[ADMIN]: {session?.user.id}</p>
+                ) : null}
                 <DuolingoInput
                   className="max-w-md w-full"
                   placeholder="John"
-                  defaultValue={data?.user.email || ''}
+                  defaultValue={session?.user.email || ''}
                   readOnly
                   disabled
                 />

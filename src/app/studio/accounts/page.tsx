@@ -345,6 +345,9 @@ export default function AccountsPage() {
                               )}
                             </p>
                             <p className="text-sm opacity-60">@{acc.username}</p>
+                            {session?.user.isAdmin ? (
+                              <p className="text-xs text-gray-500">[ADMIN]: {acc.id}</p>
+                            ) : null}
                           </div>
                         </div>
 

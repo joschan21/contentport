@@ -3,7 +3,6 @@ import { db } from '@/db'
 import {
   account as accountSchema,
   knowledgeDocument,
-  user,
   user as userSchema,
 } from '@/db/schema'
 import { firecrawl } from '@/lib/firecrawl'
@@ -242,9 +241,9 @@ export const knowledgeRouter = j.router({
   show_indexing_modal: privateProcedure.query(async ({ c, ctx, input }) => {
     const { user } = ctx
 
-    const passedIndexing = await redis.hget(`passed_indexing_users`, user.id)
+    const attemptedIndexing = await redis.hget(`attempted_indexing_users`, user.id)
 
-    if (passedIndexing) {
+    if (attemptedIndexing) {
       return c.json({ shouldShow: false })
     }
 
@@ -341,6 +340,14 @@ export const knowledgeRouter = j.router({
 
     await vector.deleteNamespace(`${accountId}`).catch(() => {})
 
+    const [user] = await db.select().from(userSchema).where(eq(userSchema.id, userId))
+    if (!user) throw new HTTPException(404, { message: 'User not found' })
+
+    const account = await getAccount({ email: user.email, accountId })
+    if (!account) throw new HTTPException(404, { message: 'Account not found' })
+
+    console.log('index_tweets', accountId, account.twitterId, handle)
+
     try {
       const res = await fetch(
         process.env.TWITTER_API_SERVICE + '/knowledge/index_tweets',
@@ -348,6 +355,7 @@ export const knowledgeRouter = j.router({
           method: 'POST',
           body: JSON.stringify({
             accountId,
+            accountTwitterId: account.twitterId,
             handle,
           }),
           headers: {
