@@ -105,7 +105,7 @@ export const TweetMedia = ({
               <video
                 src={mediaFiles[0].url}
                 className="w-full max-h-[510px] object-cover"
-                controls={false}
+                controls
               />
             ) : (
               <img
@@ -129,7 +129,7 @@ export const TweetMedia = ({
                   <video
                     src={mediaFile.url}
                     className="w-full h-full object-cover"
-                    controls={false}
+                    controls
                   />
                 ) : (
                   <img
@@ -153,7 +153,7 @@ export const TweetMedia = ({
                 <video
                   src={mediaFiles[0].url}
                   className="w-full h-full object-cover"
-                  controls={false}
+                  controls
                 />
               ) : (
                 <img
@@ -173,7 +173,7 @@ export const TweetMedia = ({
                     <video
                       src={mediaFile.url}
                       className="w-full h-full object-cover"
-                      controls={false}
+                      controls
                     />
                   ) : (
                     <img
@@ -192,14 +192,14 @@ export const TweetMedia = ({
 
       {mediaFiles.length === 4 && (
         <div className="grid grid-cols-2 grid-rows-2 gap-0.5 rounded-2xl overflow-hidden border border-stone-200 h-[254px]">
-          {mediaFiles.map((mediaFile, index) => (
+          {mediaFiles.map((mediaFile) => (
             <div key={mediaFile.url} className="relative group">
               <div className="relative overflow-hidden h-full">
                 {mediaFile.type === 'video' ? (
                   <video
                     src={mediaFile.url}
                     className="w-full h-full object-cover"
-                    controls={false}
+                    controls
                   />
                 ) : (
                   <img
