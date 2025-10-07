@@ -115,7 +115,7 @@ const config: Config = {
   },
   plugins: [
     require("tailwindcss-animate"),
-    require("@tailwindcss/typography")
+    require("@tailwindcss/typography"),
     function({ addUtilities }: { addUtilities: any }) {
       addUtilities({
         '.ring-3': {

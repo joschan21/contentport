@@ -13,7 +13,7 @@ import { WhatsNewModal } from '@/components/whats-new-modal'
 import { client } from '@/lib/client'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { useQuery } from '@tanstack/react-query'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useConfetti } from '@/hooks/use-confetti'
 
 interface LayoutProps extends PropsWithChildren {

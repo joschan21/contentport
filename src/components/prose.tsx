@@ -10,7 +10,7 @@ export function Prose({ children, html, className }: ProseProps) {
   return (
     <article
       className={cn(
-        "mx-auto prose prose-sm md:prose-base max-w-none dark:prose-invert prose-h1:text-xl prose-h2:font-semibold prose-p:text-justify prose-a:text-blue-600",
+        "mx-auto prose prose-sm md:prose-base max-w-none dark:prose-invert marker:text-primary prose-h1:text-xl prose-h2:font-semibold prose-p:text-justify prose-a:text-primary",
         className,
       )}
     >
