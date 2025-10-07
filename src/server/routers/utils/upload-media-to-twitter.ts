@@ -8,15 +8,15 @@ const consumerSecret = process.env.TWITTER_CONSUMER_SECRET as string
 
 export const validateMediaUploadAge = async (mediaId: string): Promise<boolean> => {
   const uploadTimestamp = await redis.get<number>(`tweet-media-upload:${mediaId}`)
-  
+
   if (!uploadTimestamp) {
     return false
   }
-  
+
   const now = Date.now()
   const twentyFourHoursInMs = 24 * 60 * 60 * 1000
-  
-  return (now - uploadTimestamp) < twentyFourHoursInMs
+
+  return now - uploadTimestamp < twentyFourHoursInMs
 }
 
 export const ensureValidMedia = async ({
@@ -27,23 +27,25 @@ export const ensureValidMedia = async ({
   mediaItems: { s3Key: string; media_id: string }[]
 }): Promise<{ s3Key: string; media_id: string }[]> => {
   const validatedMedia: { s3Key: string; media_id: string }[] = []
-  
+
   for (const mediaItem of mediaItems) {
     const isValid = await validateMediaUploadAge(mediaItem.media_id)
-    
+
     if (isValid) {
       validatedMedia.push(mediaItem)
     } else {
       const mediaUrl = `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${mediaItem.s3Key}`
       const response = await fetch(mediaUrl)
-      
+
       if (!response.ok) {
-        throw new HTTPException(400, { message: `Failed to fetch media from S3: ${mediaItem.s3Key}` })
+        throw new HTTPException(400, {
+          message: `Failed to fetch media from S3: ${mediaItem.s3Key}`,
+        })
       }
-      
+
       const contentType = response.headers.get('content-type') || ''
       let mediaType: string
-      
+
       if (contentType.startsWith('image/gif')) {
         mediaType = 'gif'
       } else if (contentType.startsWith('image/')) {
@@ -51,27 +53,29 @@ export const ensureValidMedia = async ({
       } else if (contentType.startsWith('video/')) {
         mediaType = 'video'
       } else {
-        throw new HTTPException(400, { message: `Unsupported media type: ${contentType}` })
+        throw new HTTPException(400, {
+          message: `Unsupported media type: ${contentType}`,
+        })
       }
-      
+
       const { mediaId: newMediaId } = await uploadMediaToTwitter({
         account,
         s3Key: mediaItem.s3Key,
         mediaType,
       })
-      
+
       const nowUnix = Date.now()
       await redis.set(`tweet-media-upload:${newMediaId}`, nowUnix, {
         ex: 60 * 60 * 24,
       })
-      
+
       validatedMedia.push({
         s3Key: mediaItem.s3Key,
         media_id: newMediaId,
       })
     }
   }
-  
+
   return validatedMedia
 }
 
@@ -118,6 +122,7 @@ export const uploadMediaToTwitter = async ({
 
   const mediaBuffer = Buffer.from(buffer)
   const mediaId = await client.v1.uploadMedia(mediaBuffer, {
+    longVideo: mediaType === 'video',
     mimeType,
     additionalOwners,
   })
