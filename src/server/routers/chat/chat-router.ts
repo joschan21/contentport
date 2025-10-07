@@ -204,7 +204,7 @@ export const chatRouter = j.router({
           // single tweet
           content.tag('tweet_draft', message.metadata.tweets[0].content)
         } else if (message.metadata.tweets.length > 1) {
-          content.open('thread_draft', { note: 'please read this thread.' })
+          content.open('thread_draft')
           message.metadata.tweets.forEach((tweet) => {
             content.tag('tweet_draft', tweet.content, {
               index: tweet.index,
