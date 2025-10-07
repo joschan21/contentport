@@ -11,7 +11,7 @@ import type { Metadata } from 'next'
 export const revalidate = 60 * 60 // 1 hour
 
 export async function generateMetadata(): Promise<Metadata> {
-  const data = await getSinglePost('terms-of-service')
+  const data = await getSinglePost('privacy-policy')
 
   if (!data || !data.post) {
     return {}
