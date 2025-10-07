@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
+import { Dispatch, SetStateAction, useEffect, useState } from 'react'
+import { Modal } from './ui/modal'
 import DuolingoButton from './ui/duolingo-button'
-import DuolingoCheckbox from './ui/duolingo-checkbox'
 import { Icons } from './icons'
+import { AccountHandle, AccountName } from '@/hooks/account-ctx'
+import { Separator } from './ui/separator'
 
 interface TweetPostConfirmationDialogProps {
   open: boolean
-  onOpenChange: (open: boolean) => void
+  onOpenChange: Dispatch<SetStateAction<boolean>>
   onConfirm: () => void
   onCancel?: () => void
   isPosting?: boolean
@@ -21,47 +22,34 @@ export default function TweetPostConfirmationDialog({
   onCancel,
   isPosting = false,
 }: TweetPostConfirmationDialogProps) {
-  const [skipPostConfirmation, setSkipPostConfirmation] = useState(false)
-
-  useEffect(() => {
-    setSkipPostConfirmation(localStorage.getItem('skipPostConfirmation') === 'true')
-  }, [])
-
-  const toggleSkipConfirmation = (checked: boolean) => {
-    setSkipPostConfirmation(checked)
-    if (checked) {
-      localStorage.setItem('skipPostConfirmation', 'true')
-    } else {
-      localStorage.removeItem('skipPostConfirmation')
-    }
-  }
-
   const handleConfirm = () => {
     onOpenChange(false)
     onConfirm()
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">Post to Twitter</DialogTitle>
-        </DialogHeader>
-        <div className="">
-          <p className="text-base text-muted-foreground mb-4">
-            This will post to Twitter. Continue?
+    <Modal showModal={open} setShowModal={onOpenChange} className="max-w-md">
+      <div className="p-6 space-y-4">
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">Post to Twitter</h2>
+          <p className="text-gray-500">
+            This tweet will be posted immediately. Continue?
           </p>
-          <DuolingoCheckbox
-            id="skip-post-confirmation"
-            label="Don't show this again"
-            checked={skipPostConfirmation}
-            onChange={(e) => toggleSkipConfirmation(e.target.checked)}
-          />
+
+          <div className="">
+            <hr className="h-px bg-stone-200 my-4 w-12" />
+          </div>
+
+          <p className="font-medium text-gray-900">
+            <span>Posting as:</span> <AccountName />
+          </p>
         </div>
-        <div className="flex justify-end gap-3">
+
+        <div className="flex gap-3">
           <DuolingoButton
             variant="secondary"
             size="sm"
+            className="h-11 flex-1"
             onClick={() => {
               onOpenChange(false)
               onCancel?.()
@@ -69,12 +57,17 @@ export default function TweetPostConfirmationDialog({
           >
             Cancel
           </DuolingoButton>
-          <DuolingoButton size="sm" onClick={handleConfirm} disabled={isPosting}>
+          <DuolingoButton
+            loading={isPosting}
+            size="sm"
+            className="h-11 flex-1"
+            onClick={handleConfirm}
+          >
             <Icons.twitter className="size-4 mr-2" />
             {isPosting ? 'Posting...' : 'Post Now'}
           </DuolingoButton>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </Modal>
   )
 }

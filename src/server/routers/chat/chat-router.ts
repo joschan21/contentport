@@ -1,12 +1,11 @@
 import { assistantPrompt } from '@/lib/prompt-utils'
-import { DiffWithReplacement } from '@/lib/utils'
 import { XmlPrompt } from '@/lib/xml-prompt'
 import {
   convertToModelMessages,
-  CoreMessage,
   createIdGenerator,
   createUIMessageStream,
   createUIMessageStreamResponse,
+  smoothStream,
   stepCountIs,
   streamText,
   UIMessage,
@@ -20,36 +19,15 @@ import { j, privateProcedure } from '../../jstack'
 import { create_read_website_content } from './read-website-content'
 import { parseAttachments } from './utils'
 
+import { PayloadTweet } from '@/hooks/use-tweets-v2'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { Ratelimit } from '@upstash/ratelimit'
 import { getAccount } from '../utils/get-account'
 import { createTweetTool } from './tools/create-tweet-tool'
-import { Ratelimit } from '@upstash/ratelimit'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 })
-
-// ==================== Types ====================
-
-export interface EditTweetToolResult {
-  id: string
-  improvedText: string
-  diffs: DiffWithReplacement[]
-}
-
-// Custom message type that ensures all messages have an ID
-export type ChatMessage = Omit<UIMessage, 'content'> & {
-  content: string | UIMessage['parts']
-  role: CoreMessage['role']
-  id: string
-  metadata?: MessageMetadata
-  chatId?: string
-}
-
-export interface Chat {
-  id: string
-  messages: ChatMessage[]
-}
 
 export interface WebScrapingResult {
   url: string
@@ -77,18 +55,16 @@ const messageMetadataSchema = z.object({
 export type Attachment = z.infer<typeof attachmentSchema>
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>
 
-const chatMessageSchema = z.object({
-  id: z.string(),
-  chatId: z.string(),
-  role: z.enum(['user', 'assistant', 'system']),
-  content: z.string(),
-  metadata: messageMetadataSchema.optional(),
-})
-
 export type Metadata = {
   userMessage: string
   attachments: Array<TAttachment>
-  editorContent: string
+  tweets: PayloadTweet[]
+}
+
+export interface ChatHistoryItem {
+  id: string
+  title: string
+  lastUpdated: string
 }
 
 export type MyUIMessage = UIMessage<
@@ -102,12 +78,16 @@ export type MyUIMessage = UIMessage<
       text: string
       status: 'processing' | 'streaming' | 'complete'
     }
-    writeTweet: {
+    'tool-reasoning': {
+      text: string
+      status: 'processing' | 'reasoning' | 'complete'
+    }
+    write_tweet: {
       status: 'processing'
     }
   },
   {
-    readWebsiteContent: {
+    read_website_content: {
       input: { website_url: string }
       output: {
         url: string
@@ -124,7 +104,6 @@ export const chatRouter = j.router({
     .input(z.object({ chatId: z.string().nullable() }))
     .get(async ({ c, input, ctx }) => {
       const { chatId } = input
-      const { user } = ctx
 
       if (!chatId) {
         return c.superjson({ messages: [] })
@@ -136,17 +115,18 @@ export const chatRouter = j.router({
         return c.superjson({ messages: [] })
       }
 
-      // const chat = await redis.json.get<{ messages: UIMessage[] }>(
-      //   `chat:${user.email}:${chatId}`,
-      // )
-
-      // const visibleMessages = chat ? filterVisibleMessages(chat.messages) : []
-
       return c.superjson({ messages })
     }),
 
-  conversation: privateProcedure.post(({ c }) => {
-    return c.json({ id: crypto.randomUUID() })
+  history: privateProcedure.query(async ({ c, ctx }) => {
+    const { user } = ctx
+
+    const historyKey = `chat:history-list:${user.email}`
+    const chatHistory = (await redis.get<ChatHistoryItem[]>(historyKey)) || []
+
+    return c.superjson({
+      chatHistory: chatHistory.slice(0, 20),
+    })
   }),
 
   chat: privateProcedure
@@ -180,7 +160,7 @@ export const chatRouter = j.router({
         if (!success) {
           if (user.plan === 'pro') {
             throw new HTTPException(429, {
-              message: "You've been rate-limited, please try again soon.",
+              message: `You've reached a rate-limit. Please try again soon.`,
             })
           } else {
             throw new HTTPException(429, {
@@ -197,14 +177,21 @@ export const chatRouter = j.router({
       const { links, attachments } = parsedAttachments
 
       const content = new XmlPrompt()
-      const userContent = message.parts.reduce(
+      const rawUserMessage = message.parts.reduce(
         (acc, curr) => (curr.type === 'text' ? acc + curr.text : ''),
         '',
       )
 
       content.open('message', { date: format(new Date(), 'EEEE, yyyy-MM-dd') })
 
-      content.tag('user_message', userContent)
+      content.tag('user_message', rawUserMessage)
+
+      if (!history || history.length === 0) {
+        const memories = await redis.lrange(`memories:${account.id}`, 0, -1)
+        content.tag('memories', memories.join('\n'), {
+          note: 'These are memories you have about this user. These have been attached by the SYSTEM, not by the USER.',
+        })
+      }
 
       if (Boolean(links.length)) {
         content.open('attached_links', { note: 'please read these links.' })
@@ -212,8 +199,19 @@ export const chatRouter = j.router({
         content.close('attached_links')
       }
 
-      if (message.metadata?.editorContent) {
-        content.tag('tweet_draft', message.metadata.editorContent)
+      if (message.metadata?.tweets) {
+        if (message.metadata.tweets[0] && message.metadata.tweets.length === 1) {
+          // single tweet
+          content.tag('tweet_draft', message.metadata.tweets[0].content)
+        } else if (message.metadata.tweets.length > 1) {
+          content.open('thread_draft')
+          message.metadata.tweets.forEach((tweet) => {
+            content.tag('tweet_draft', tweet.content, {
+              index: tweet.index,
+            })
+          })
+          content.close('thread_draft')
+        }
       }
 
       content.close('message')
@@ -233,6 +231,25 @@ export const chatRouter = j.router({
         }),
         onFinish: async ({ messages }) => {
           await redis.set(`chat:history:${id}`, messages)
+          await redis.del(`website-contents:${id}`)
+
+          const historyKey = `chat:history-list:${user.email}`
+          const existingHistory = (await redis.get<ChatHistoryItem[]>(historyKey)) || []
+
+          const title = messages[0]?.metadata?.userMessage ?? 'Unnamed chat'
+
+          const chatHistoryItem: ChatHistoryItem = {
+            id,
+            title,
+            lastUpdated: new Date().toISOString(),
+          }
+
+          const updatedHistory = [
+            chatHistoryItem,
+            ...existingHistory.filter((item) => item.id !== id),
+          ]
+
+          await redis.set(historyKey, updatedHistory)
         },
         onError(error) {
           console.log('❌❌❌ ERROR:', JSON.stringify(error, null, 2))
@@ -242,17 +259,19 @@ export const chatRouter = j.router({
           })
         },
         execute: async ({ writer }) => {
+          const generationId = crypto.randomUUID()
           // tools
-          const writeTweet = createTweetTool({
+          const write_tweet = createTweetTool({
             writer,
             ctx: {
               plan: user.plan as 'free' | 'pro',
-              editorContent: message.metadata?.editorContent ?? '',
-              instructions: userContent,
+              tweets: message.metadata?.tweets ?? [],
               messages,
-              userContent,
+              rawUserMessage,
+              userId: user.id,
               attachments: { attachments, links },
               redisKeys: {
+                thread: `thread:${id}:${generationId}`,
                 style: `style:${user.email}:${account.id}`,
                 account: `active-account:${user.email}`,
                 websiteContent: `website-contents:${id}`,
@@ -260,20 +279,24 @@ export const chatRouter = j.router({
             },
           })
 
-          const readWebsiteContent = create_read_website_content({ chatId: id })
-
-          const modelName =
-            user.plan === 'pro' ? 'openai/gpt-4.1' : 'openrouter/horizon-beta'
+          const read_website_content = create_read_website_content({ chatId: id })
 
           const result = streamText({
-            model: openrouter.chat(modelName, {
+            model: openrouter.chat('openai/gpt-4.1', {
               models: ['openai/gpt-4o'],
               reasoning: { enabled: false, effort: 'low' },
             }),
-            system: assistantPrompt({ editorContent: message.metadata?.editorContent }),
+            system: assistantPrompt({ tweets: message.metadata?.tweets ?? [] }),
             messages: convertToModelMessages(messages),
-            tools: { writeTweet, readWebsiteContent },
-            stopWhen: stepCountIs(3),
+            tools: {
+              write_tweet,
+              read_website_content,
+            },
+            stopWhen: stepCountIs(5),
+            experimental_transform: smoothStream({
+              delayInMs: 20,
+              chunking: /[^-]*---/,
+            }),
           })
 
           writer.merge(result.toUIMessageStream())

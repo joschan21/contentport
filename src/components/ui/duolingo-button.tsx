@@ -19,16 +19,16 @@ interface DuolingoButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const baseStyles =
-  'font-semibold w-full rounded-lg relative transition-transform active:translate-y-0.5 active:shadow-none focus:outline-none flex items-center justify-center'
+  'font-semibold h-10 w-full rounded-lg relative transition-transform active:translate-y-0.5 focus:outline-none flex items-center justify-center focus-visible:ring-2 focus-visible:ring-transparent focus-visible:ring-offset-2'
 
 export const variantStyles = {
   primary:
-    'bg-indigo-600 text-white border bg-clip-padding border-b-2 border-indigo-700 hover:bg-indigo-500 shadow-[0_3px_0_#3730a3] focus:ring-indigo-600',
+    'bg-indigo-600 text-white border bg-clip-padding border-b-2 border-indigo-700 hover:bg-indigo-500 shadow-[0_3px_0_#3730a3] focus-visible:ring-indigo-600',
   secondary:
-    'bg-[#FFFFFF] border bg-clip-padding text-stone-800 border-b-2 border-[#E5E5E5] hover:bg-light-gray shadow-[0_3px_0_#E5E5E5] focus:ring-[#E5E5E5]',
+    'bg-[#FFFFFF] border bg-clip-padding text-stone-800 border-b-2 border-[#E5E5E5] hover:bg-light-gray shadow-[0_3px_0_#E5E5E5] focus-visible:ring-indigo-200',
   disabled:
     'bg-[#E5E5E5] text-[#AFAFAF] border-b-2 border-[#CCCCCC] cursor-not-allowed shadow-[0_3px_0_#CCCCCC]',
-  icon: 'bg-indigo-600 text-white border-b-2 border-indigo-700 hover:bg-indigo-500 shadow-[0_3px_0_#4338CA] focus:ring-indigo-600 p-0 flex items-center justify-center',
+  icon: 'bg-indigo-600 text-white border-b-2 border-indigo-700 hover:bg-indigo-500 shadow-[0_3px_0_#4338CA] focus:ring-indigo-600 p-0 flex items-center justify-center focus-visible:ring-indigo-200',
   destructive:
     'bg-red-500 text-white border-b-2 border-red-600 hover:bg-red-600 shadow-[0_3px_0_#B91C1C] focus:ring-red-500',
   dashedOutline:

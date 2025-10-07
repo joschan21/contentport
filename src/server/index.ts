@@ -13,15 +13,17 @@ const api = j
   .basePath('/api')
   .use(
     cors({
-      origin: [
-        'http://localhost:3000',
-        'https://contentport.io',
-        'https://www.contentport.io',
-        'https://contentport.vercel.app',
-        'https://www.contentport.vercel.app',
+      origin: (origin) => origin,
+      allowHeaders: [
+        'Content-Type',
+        'Authorization',
+        'x-is-superjson',
+        'content-type',
+        'authorization',
+        'x-requested-with',
       ],
-      allowHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
-      exposeHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
+      allowMethods: ['POST', 'GET', 'OPTIONS'],
+      exposeHeaders: ['x-is-superjson', 'Content-Type', 'content-type', 'Content-Length'],
       credentials: true,
     }),
   )
@@ -33,14 +35,14 @@ const api = j
  */
 const appRouter = j.mergeRouters(api, {
   file: dynamic(() => import('./routers/file-router')),
-  tweet: dynamic(() => import('./routers/tweet-router')),
+  tweet: dynamic(() => import('./routers/tweet/tweet-router')),
   knowledge: dynamic(() => import('./routers/knowledge-router')),
   chat: dynamic(() => import('./routers/chat/chat-router')),
-  waitlist: dynamic(() => import('./routers/waitlist-router')),
   style: dynamic(() => import('./routers/style-router')),
   settings: dynamic(() => import('./routers/settings-router')),
   auth_router: dynamic(() => import('./routers/auth-router')),
   stripe: dynamic(() => import('./routers/stripe-router')),
+  feed: dynamic(() => import("./routers/feed-router"))
 })
 
 export type AppRouter = typeof appRouter

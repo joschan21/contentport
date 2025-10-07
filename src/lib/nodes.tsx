@@ -1,11 +1,9 @@
 import {
   $applyNodeReplacement,
-  DecoratorNode,
   DOMConversionMap,
   DOMConversionOutput,
   DOMExportOutput,
   EditorConfig,
-  LexicalEditor,
   LexicalNode,
   NodeKey,
   SerializedElementNode,
@@ -19,11 +17,6 @@ import { LinkNode } from '@lexical/link'
 export type DiffNodeType = 'addition' | 'unchanged' | 'deletion'
 
 import { ElementNode } from 'lexical'
-import { ReactNode } from 'react'
-
-interface SerializedCodeNode extends SerializedElementNode {
-  language: string
-}
 
 export class InlineNode extends ElementNode {
   static getType(): string {

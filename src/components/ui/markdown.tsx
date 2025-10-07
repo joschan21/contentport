@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils'
 import { marked } from 'marked'
 import { memo, useId, useMemo } from 'react'
 import ReactMarkdown, { Components } from 'react-markdown'
@@ -29,21 +30,21 @@ function extractLanguage(className?: string): string {
 const INITIAL_COMPONENTS: Partial<Components> = {
   ul: function UlComponent({ children, ...props }) {
     return (
-      <ul className="list-disc pl-6 space-y-1" {...props}>
+      <ul className="list-disc pl-4 -my-1" {...props}>
         {children}
       </ul>
     )
   },
   ol: function OlComponent({ children, ...props }) {
     return (
-      <ol className="list-decimal pl-6 space-y-1" {...props}>
+      <ol className="list-decimal pl-4">
         {children}
       </ol>
     )
   },
   li: function LiComponent({ children, ...props }) {
     return (
-      <li className="ml-2" {...props}>
+      <li className="ml-2 -my-1">
         {children}
       </li>
     )
@@ -96,7 +97,7 @@ function MarkdownComponent({
   const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children])
 
   return (
-    <div className={className}>
+    <div className={cn("whitespace-pre-wrap space-y-4",className)}>
       {blocks.map((block, index) => (
         <MemoizedMarkdownBlock
           key={`${blockId}-block-${index}`}

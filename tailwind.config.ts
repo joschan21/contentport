@@ -11,7 +11,10 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        elegant: ["var(--font-elegant)"],
+        inter: ["var(--font-inter)"],
+      },
+      boxShadow: {
+        "subtle": "0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)"
       },
       colors: {
         "light-gray": "#FBFAF9",
@@ -110,6 +113,16 @@ const config: Config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@tailwindcss/typography")
+    function({ addUtilities }: { addUtilities: any }) {
+      addUtilities({
+        '.ring-3': {
+          'box-shadow': 'var(--tw-ring-inset) 0 0 0 3px var(--tw-ring-color)',
+        },
+      })
+    },
+  ],
 }
 export default config

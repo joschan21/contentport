@@ -37,21 +37,17 @@ export default function InviteClient({ isInvalid, inviteId, inviterName }: Props
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl bg-clip-padding border border-stone-900 border-opacity-10 p-8 text-center">
+        <div className="bg-white rounded-2xl shadow-xl bg-clip-padding border border-stone-900 border-opacity-10 p-8 text-left">
           {isInvalid ? (
             <div>
               <div className="inline-flex items-center justify-center w-12 h-12 bg-red-50 rounded-full mb-6">
-                <X className="size-6 text-red-600" />
+                <X className="size-4 text-red-600" />
               </div>
             </div>
-          ) : (
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-50 rounded-full mb-6">
-              <UserPlus className="size-6 text-indigo-600" />
-            </div>
-          )}
+          ) : null}
 
-          <h1 className="text-2xl font-bold text-stone-900 mb-2">
-            {isInvalid ? 'Invalid Invite' : "You've been invited!"}
+          <h1 className="text-2xl font-bold mb-4 text-stone-900">
+            {isInvalid ? 'Invalid Invite' : "You've been invited! 🎉"}
           </h1>
 
           <p className="text-stone-600 mb-8 leading-relaxed">
@@ -62,9 +58,9 @@ export default function InviteClient({ isInvalid, inviteId, inviterName }: Props
               </span>
             ) : (
               <span>
-                <span className="font-semibold">{inviterName}</span> has invited you to
-                create content for your Twitter account. To do this, you need to grant
-                access to your Twitter account.
+                <span className="font-semibold">{inviterName}</span> wants to create
+                content for your Twitter account. To do this, you need to grant access to
+                your Twitter account.
               </span>
             )}
           </p>
@@ -77,10 +73,10 @@ export default function InviteClient({ isInvalid, inviteId, inviterName }: Props
                 className="w-full"
               >
                 <Icons.twitter className="mr-2 size-5" />
-                Connect Twitter Account
+                Connect Twitter
               </DuolingoButton>
 
-              <p className="text-xs text-stone-500">
+              <p className="text-sm text-stone-500">
                 You'll be redirected to Twitter to authorize your account
               </p>
             </div>

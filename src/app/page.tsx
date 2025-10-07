@@ -1,3 +1,5 @@
+import TestimonialCard from '@/frontend/studio/components/TestimonialCard'
+import { LogoCloud } from '@/components/logo-cloud'
 import Navbar from '@/components/navbar'
 import Footer from '@/components/footer'
 import DuolingoButton from '@/components/ui/duolingo-button'
@@ -6,6 +8,23 @@ import MuxPlayer from '@mux/mux-player-react'
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import Script from 'next/script'
+import Pricing from '@/frontend/studio/components/Pricing'
+import { Icons } from '@/components/icons'
+
+const Footer = () => {
+  return (
+    <footer className="bg-white border-t border-gray-200">
+      <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12">
+        <div className="text-center space-y-4">
+          <p className="text-gray-600 text-base">
+            Your content engine for growing on Twitter.
+          </p>
+          <p className="text-gray-500 text-sm">© 2025 Contentport.</p>
+        </div>
+      </div>
+    </footer>
+  )
+}
 
 const Page = async () => {
   const session = await auth.api.getSession({
@@ -19,35 +38,26 @@ const Page = async () => {
           <Navbar title={session ? 'Studio' : 'Get Started'} />
         </div>
 
-        <div className="relative isolate pt-14">
-          <div
-            aria-hidden="true"
-            className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
-          >
-            <div
-              style={{
-                clipPath:
-                  'polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)',
-              }}
-              className="relative left-[calc(50%-11rem)] aspect-1155/678 w-144.5 -translate-x-1/2 rotate-30 bg-linear-to-tr from-[#ff80b5] to-[#9089fc] opacity-30 sm:left-[calc(50%-30rem)] sm:w-288.75"
-            />
-          </div>
-          <div className="py-24 sm:pt-12 sm:pb-32">
+        <div className="relative isolate pt-20">
+          <section className="py-24">
             <div className="mx-auto max-w-7xl px-6 lg:px-8 space-y-20">
               <div className="max-w-4xl mx-auto text-center">
                 <div className="flex flex-col justify-center items-center">
                   <h1 className="text-5xl font-semibold tracking-tight text-balance text-gray-900 sm:text-6xl">
-                    Your <span className="text-indigo-600">content engine </span> for
-                    growing on Twitter
-                  </h1>
-                  <p className="mt-8 text-gray-500 text-base text-pretty sm:text-xl/8 max-w-2xl">
-                    <span className="">Contentport helps you </span>
-                    <span className="text-black">
-                      create, schedule & manage twitter content
+                    Your{' '}
+                    <span className="relative whitespace-nowrap text-indigo-600">
+                      <span className="absolute z-0 bg-indigo-500/10 w-[103%] h-[100%] -left-[1%] -top-[2.5%] -rotate-1" />
+                      content engine <span className="hidden sm:inline">📈</span>
                     </span>{' '}
-                    <span className="">
-                      at scale. Perfect for busy founders & content managers.
+                    for growing on Twitter
+                  </h1>
+                  <p className="mt-6 text-gray-500 text-pretty text-lg sm:text-xl max-w-2xl">
+                    Grow on Twitter 10x faster with a content engine that deeply knows you
+                    and your writing style. Contentport helps you{' '}
+                    <span className="text-gray-900 font-medium">
+                      create & schedule twitter content at scale
                     </span>
+                    .
                   </p>
 
                   <div className="max-w-lg w-full mt-8 flex flex-col gap-4 items-center">
@@ -55,19 +65,19 @@ const Page = async () => {
                       {session?.user ? (
                         <Link href="/studio">
                           <DuolingoButton className="w-full h-12 sm:px-8">
-                            Start Posting More →
+                            Start Growing on <Icons.twitter className="size-4 ml-1.5" /> 
                           </DuolingoButton>
                         </Link>
                       ) : (
-                        <Link href="/login">
+                        <Link href="/sign-in">
                           <DuolingoButton className="w-full h-12 sm:px-8">
-                            Start Posting More →
+                            Start Growing on <Icons.twitter className="size-4 ml-1.5" /> 
                           </DuolingoButton>
                         </Link>
                       )}
                     </div>
 
-                    <div className="mt-2 flex items-center justify-center gap-4">
+                    <div className="mt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
                       <div className="flex -space-x-2">
                         <img
                           className="h-10 w-10 rounded-full ring-2 ring-white"
@@ -95,7 +105,7 @@ const Page = async () => {
                           alt="User testimonial"
                         />
                       </div>
-                      <div className="flex flex-col items-start">
+                      <div className="flex flex-col justify-center items-center sm:items-start">
                         <div className="flex mb-1">
                           {[...Array(5)].map((_, i) => (
                             <svg
@@ -107,15 +117,16 @@ const Page = async () => {
                             </svg>
                           ))}
                         </div>
-                        <p className="text-base text-gray-600">
+                        <p className="text-base text-left text-gray-600">
                           Trusted by{' '}
-                          <span className="font-medium text-gray-900">1.140</span> founders
+                          <span className="font-medium text-gray-900">1.817</span> founders
                         </p>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+
               <div className="relative flex items-center h-fit -m-2 rounded-xl bg-gray-900/5 p-2 ring-1 ring-gray-900/10 ring-inset lg:-m-4 lg:rounded-2xl lg:p-4 shadow-2xl">
                 <MuxPlayer
                   accentColor="#4f46e5"
@@ -127,83 +138,448 @@ const Page = async () => {
                 />
               </div>
 
-              <>
-                <Script
-                  src="https://widget.senja.io/widget/72519276-9e16-4bc4-9911-49ffb12b73b4/platform.js"
-                  type="text/javascript"
-                  async
-                ></Script>
+              <LogoCloud />
+            </div>
+          </section>
+
+          <section className="py-24 bg-white">
+            <div className="mx-auto max-w-7xl px-6 lg:px-8">
+              <div className="text-center mb-16">
+                <h2 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+                  How does Contentport compare?
+                </h2>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+                <div className="relative">
+                  <div className="rounded-3xl border-4 border-gray-200 bg-gray-100 p-8 h-full">
+                    <div className="text-left">
+                      <div className="w-full h-80 bg-gray-100 rounded-2xl mb-6 overflow-hidden">
+                        <img
+                          src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExbG5scnI4dmJ0N3g5eWdvbjlpMzhmNG1udjhlYXNrejFpOWFpdTZ3OCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/xdLH51eNWZAHrwy5mf/giphy.gif"
+                          alt="You Without Social Proof"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl  font-semibold text-gray-900 mb-6">
+                        Competitors
+                      </h3>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-6 h-6 text-red-500 mt-0.5 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <p className="text-gray-600">
+                          Can't manage multiple accounts / pay per account
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-6 h-6 text-red-500 mt-0.5 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <p className="text-gray-600">
+                          Tweets look boring & perform poorly
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-6 h-6 text-red-500 mt-0.5 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <p className="text-gray-600">Outdated AI models from 2024</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-6 h-6 text-red-500 mt-0.5 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <p className="text-gray-600">Closed source, zero transparency</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <div className="rounded-3xl border-4 border-indigo-600 bg-gray-100 p-8 h-full text-white">
+                    <div className="text-left">
+                      <div className="w-full h-80 bg-purple-800/30 rounded-2xl mb-6 overflow-hidden border border-purple-400/20">
+                        <img
+                          src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExbW9udHE4eHg3eng0M3R1Y3kzcndqMjhnc3Jza2FzN2g1NGV1NHk4dCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/DhstvI3zZ598Nb1rFf/giphy.gif"
+                          alt="Contentport"
+                          className="w-full h-full object-cover object-top opacity-90"
+                        />
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-6">
+                        Contentport
+                      </h3>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-6 h-6 text-green-400 mt-0.5 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <p className="text-gray-600">
+                          All personal & company accounts in one place
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-6 h-6 text-green-400 mt-0.5 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <p className="text-gray-600">
+                          Create beautiful tweet visuals without design skills
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-6 h-6 text-green-400 mt-0.5 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <p className="text-gray-600">
+                          The most modern AI models available
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-6 h-6 text-green-400 mt-0.5 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <p className="text-gray-600">
+                          100% open-source, transparent & auditable
+                        </p>
+                      </div>
+                      
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="py-24">
+            <div className="space-y-12">
+              <h2 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl text-center">
+                <span className="relative text-indigo-600">
+                  <span className="absolute z-0 bg-indigo-500/10 w-[105%] h-[105%] -left-[2.5%] -top-[2.5%] -rotate-1" />
+                  Within 60 seconds:
+                </span>
+                <span className="block mt-4 text-gray-800 text-3xl sm:text-4xl space-y-2">
+                  <span className="block opacity-80">draft a tweet</span>
+                  <span className="block opacity-90">add a beautiful visual</span>
+                  <span className="block opacity-100">
+                    queue for peak activity times
+                  </span>
+                </span>
+              </h2>{' '}
+              <div className="max-w-xs w-full mx-auto">
+                <Link href="/sign-in">
+                  <DuolingoButton className="w-full h-14 sm:px-8">
+                    Get Started Now →
+                  </DuolingoButton>
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          <section className="py-24 bg-white">
+            <div className="space-y-12">
+              <div className="text-center max-w-3xl mx-auto">
+                <h2 className="text-4xl text-balance font-semibold tracking-tight text-gray-900 sm:text-5xl">
+                  Used by busy founders & content managers
+                </h2>
+              </div>
+              <div className="mx-auto max-w-7xl px-6 lg:px-8 space-y-12">
+                <TestimonialCard></TestimonialCard>
                 <div
-                  className="senja-embed block w-full mt-20"
+                  className="senja-embed block w-full"
                   data-id="72519276-9e16-4bc4-9911-49ffb12b73b4"
                   data-mode="shadow"
                   data-lazyload="false"
                 ></div>
-              </>
+              </div>
             </div>
-          </div>
-          <div
-            aria-hidden="true"
-            className="absolute inset-x-0 top-[calc(100%-13rem)] -z-10 transform-gpu overflow-hidden blur-3xl sm:top-[calc(100%-30rem)]"
-          >
-            <div
-              style={{
-                clipPath:
-                  'polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)',
-              }}
-              className="relative left-[calc(50%+3rem)] aspect-1155/678 w-144.5 -translate-x-1/2 bg-linear-to-tr from-[#ff80b5] to-[#9089fc] opacity-30 sm:left-[calc(50%+36rem)] sm:w-288.75"
-            />
-          </div>
+          </section>
+
+          <section className="py-24">
+            <div className="mx-auto max-w-7xl px-6 lg:px-8">
+              <div className="space-y-6">
+                <div className="text-center max-w-3xl mx-auto">
+                  <h2 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+                    What you can achieve with Contentport{' '}
+                    <span className="relative text-indigo-600">
+                      <span className="absolute z-0 bg-indigo-500/10 w-[105%] h-[105%] -left-[2.5%] -top-[2.5%] -rotate-1" />
+                      in just 7 days
+                    </span>
+                  </h2>
+                </div>
+
+                <div className="grid max-w-5xl mx-auto grid-cols-1 md:grid-cols-3 gap-4 pt-16">
+                  <div>
+                    <div className="px-8 py-3 bg-gray-800 text-white rounded-full text-sm font-medium mb-4 w-fit mx-auto">
+                      Today
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-2xl p-8 space-y-6">
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        Start creating
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-3">
+                          <svg
+                            className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <p className="text-gray-600">Contentport learns your style</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <svg
+                            className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <p className="text-gray-600">
+                            Go from idea to ready-to-post tweets
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <svg
+                            className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <p className="text-gray-600">
+                            Queue 3+ days of content so you're instantly consistent
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="px-8 py-3 bg-gray-200 text-gray-600 rounded-full text-sm font-medium mb-4 w-fit mx-auto">
+                      Day 3
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-2xl p-8 space-y-6">
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        Grow without losing focus
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-3">
+                          <svg
+                            className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <p className="text-gray-600">
+                            Multiple posts lined up and scheduled
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <svg
+                            className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <p className="text-gray-600">
+                            You keep posting, even when you're busy coding
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <svg
+                            className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <p className="text-gray-600">Engagement starts building</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="px-8 py-3 bg-gray-200 text-gray-600 rounded-full text-sm font-medium mb-4 w-fit mx-auto">
+                      Day 7
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-2xl p-8 space-y-6">
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        Build a system
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-3">
+                          <svg
+                            className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <p className="text-gray-600">
+                            Save 5+ hours per week on content creation{' '}
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <svg
+                            className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <p className="text-gray-600">
+                            Post consistently, even on busy days
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <svg
+                            className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <p className="text-gray-600">Repeatable, proven workflow</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-16 text-center">
+                  <div className="max-w-xs mx-auto">
+                    <Link href="/sign-in">
+                      <DuolingoButton className="w-full h-14 sm:px-8">
+                        Start Building Your System →
+                      </DuolingoButton>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Pricing */}
+          <section className=" bg-white ">
+            <div className="mx-auto max-w-7xl px-6 lg:px-8">
+              <Pricing targetUrl="/login" />
+            </div>
+          </section>
         </div>
       </section>
 
-      {/* <div className="text-left w-full max-w-md sm:max-w-2xl space-y-3 sm:space-y-2 text-sm sm:text-base px-4 sm:px-0">
-                      <div className="flex items-start gap-3 sm:gap-2 text-gray-500">
-                        <span className="text-lg sm:text-base sm:mt-0">✅</span>
-                        <p className="text-gray-800 leading-relaxed">
-                          Turn ideas, company updates, or insights into content
-                        </p>
-                      </div>
-                      <div className="flex items-start gap-3 sm:gap-2 text-gray-500">
-                        <span className="text-lg sm:text-base sm:mt-0">✅</span>
-                        <p className="text-gray-800 leading-relaxed">
-                          Plan & schedule a week of content at once
-                        </p>
-                      </div>
-                      <div className="flex items-start gap-3 sm:gap-2 text-gray-500">
-                        <span className="text-lg sm:text-base sm:mt-0">✅</span>
-                        <p className="text-gray-800 leading-relaxed">
-                          Create beautiful visuals (no design skills needed)
-                        </p>
-                      </div>
-                    </div> */}
-
-      {/* <section className="bg-gray-50 py-24 sm:py-32">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mx-auto flex flex-col items-center max-w-3xl text-center mb-16">
-            <h2 className="text-4xl text-balance font-semibold tracking-tight text-gray-900 sm:text-5xl mb-6">
-              Create weeks worth of content at once
-            </h2>
-            <p className="max-w-xl text-base text-pretty text-gray-500 sm:text-xl/8 text-center">
-              A built-in AI assistant that helps you put your ideas into clear words
-              people care about.
-              
-            </p>
-          </div>
-
-          <div className="relative flow-root">
-            <img
-              src="/images/demo.png"
-              className="absolute -top-40 left-0 hidden xl:block"
-            />
-          </div>
-        </div>
-      </section> */}
       <Footer />
     </>
   )
 }
 
 export default Page
-
-// https://widget.senja.io/widget/3fae6f42-6a34-4da8-81f2-d3389606a704/platform.js

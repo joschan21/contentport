@@ -1,94 +1,47 @@
-import { createStylePrompt, editToolSystemPrompt } from '@/lib/prompt-utils'
+import { avoidPrompt, editToolSystemPrompt, styleGuide } from '@/lib/prompt-utils'
 import { redis } from '@/lib/redis'
 import { XmlPrompt } from '@/lib/xml-prompt'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
-import {
-  convertToModelMessages,
-  generateId,
-  streamText,
-  tool,
-  UIMessageStreamWriter,
-} from 'ai'
+import { convertToModelMessages, generateId, streamText, tool } from 'ai'
+import { format } from 'date-fns'
 import { HTTPException } from 'hono/http-exception'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { Account } from '../../settings-router'
-import { Style } from '../../style-router'
 import { MyUIMessage } from '../chat-router'
 import { WebsiteContent } from '../read-website-content'
-import { parseAttachments } from '../utils'
-import { format } from 'date-fns'
+import { Context } from './shared'
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 })
 
-interface Context {
-  writer: UIMessageStreamWriter
-  ctx: {
-    plan: 'free' | 'pro'
-    editorContent: string
-    instructions: string
-    userContent: string
-    messages: MyUIMessage[]
-    attachments: Awaited<ReturnType<typeof parseAttachments>>
-    redisKeys: {
-      style: string
-      account: string
-      websiteContent: string
-    }
-  }
-}
+const singleTweetSchema = z.object({
+  imageDescriptions: z
+    .array(z.string())
+    .optional()
+    .default([])
+    .describe(
+      'Optional: If a user attached image(s), explain their content in high detail to be used as context while writing the tweet.',
+    ),
+})
 
 export const createTweetTool = ({ writer, ctx }: Context) => {
   return tool({
-    description: 'my tool',
-    inputSchema: z.object({
-      instruction: z.string().describe(
-        `Capture the user's instruction EXACTLY as they wrote it - preserve every detail including:
-    - Exact wording and phrasing
-    - Original capitalization (lowercase, UPPERCASE, Title Case)
-    - Punctuation and special characters
-    - Typos or informal language
-    - Numbers and formatting
-    
-    DO NOT paraphrase, summarize, or clean up the instruction in any way.
-    
-    <examples>
-    <example>
-    <user_message>make a tweet about AI being overhyped tbh</user_message>
-    <instruction>make a tweet about AI being overhyped tbh</instruction>
-    </example>
-    
-    <example>
-    <user_message>make 2 tweets about why nextjs 15 is AMAZING!!!</user_message>
-    <instruction>tweet about why nextjs 15 is AMAZING!!!</instruction>
-    </example>
-    
-    <example>
-    <user_message>write something funny about debugging at 3am</user_message>
-    <instruction>write something funny about debugging at 3am</instruction>
-    </example>
-    </examples>
-    
-    Remember: This tool creates/edits ONE tweet per call. If the user requests multiple drafts, frame the instruction for one specific draft only.`,
-      ),
-      tweetContent: z
-        .string()
-        .optional()
-        .describe(
-          "Optional: If a user wants changes to a specific tweet, write that tweet's content here. Copy it EXACTLY 1:1 without ANY changes whatsoever - same casing, formatting, etc. If user is not talking about a specific previously generated tweet, leave undefined.",
-        ),
-      imageDescriptions: z
-        .array(z.string())
-        .optional()
-        .default([])
-        .describe(
-          'Optional: If a user attached image(s), explain their content in high detail to be used as context while writing the tweet.',
-        ),
-    }),
-    execute: async ({ instruction, tweetContent, imageDescriptions }) => {
+    description:
+      'Used to create tweets. Can create a single tweet, a thread (tweets separated by ---), multiple separate tweets (separated by ===), or multiple threads.',
+    inputSchema: singleTweetSchema,
+    execute: async ({ imageDescriptions }) => {
       const generationId = nanoid()
+
+      writer.write({
+        type: 'data-tool-reasoning',
+        id: generationId,
+        data: {
+          text: '',
+          status: 'processing',
+        },
+      })
 
       writer.write({
         type: 'data-tool-output',
@@ -99,72 +52,106 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         },
       })
 
-      const [style, account, websiteContent] = await Promise.all([
-        redis.json.get<Style>(ctx.redisKeys.style),
+      const [account, websiteContent] = await Promise.all([
         redis.json.get<Account>(ctx.redisKeys.account),
         redis.lrange<WebsiteContent>(ctx.redisKeys.websiteContent, 0, -1),
       ])
 
-      if (!style || !account) {
-        throw new Error('Style or account not found')
-      }
-
-      if (websiteContent) {
-        await redis.del(ctx.redisKeys.websiteContent)
+      if (!account) {
+        throw new Error('Account not found')
       }
 
       const prompt = new XmlPrompt()
 
       prompt.open('prompt', { date: format(new Date(), 'EEEE, yyyy-MM-dd') })
 
-      // system
-      prompt.open('system')
-      prompt.text(editToolSystemPrompt({ name: account.name }))
-      prompt.close('system')
+      prompt.open('output_format', {
+        note: 'Follow these formatting rules for your output based on what the user is requesting',
+      })
+      prompt.text(
+        `- For THREADS: Separate each tweet in the thread with three hyphens (---) on their own line
+- For MULTIPLE SEPARATE TWEETS: Separate each distinct tweet with three equals signs (===) on their own line  
+- For a SINGLE TWEET: Just output the tweet text directly with no delimiters
+
+Examples:
+* Single tweet: "Just the tweet text"
+* Thread: "First tweet---Second tweet---Third tweet"
+* Multiple tweets: "Tweet 1===Tweet 2===Tweet 3"`,
+      )
+      prompt.close('output_format')
+
+      prompt.open('language_rules', {
+        note: 'be EXTREMELY strict with these rules. NEVER use ANY of the forbidden words. If you are tempted to use one: you are probably overcomplicating your language. We need a simple, easy to understand 4-th grade level tweet.',
+      })
+      prompt.text(avoidPrompt())
+      prompt.close('language_rules')
 
       // history
-      if (ctx.messages.length > 1) {
-        prompt.open('history')
-        ctx.messages.forEach((msg) => {
-          prompt.open('response_pair')
-          msg.parts.forEach((part) => {
-            if (part.type === 'text' && msg.role === 'user') {
-              prompt.open('user_message')
-              prompt.tag('user_request', part.text)
+      prompt.open('history')
 
-              if (Boolean(websiteContent.length)) {
-                websiteContent.forEach(({ url, title, content }) => {
-                  if (content && title) {
-                    prompt.tag('attached_website_content', content, { url, title })
-                  }
-                })
-              }
+      ctx.messages.forEach((msg) => {
+        prompt.open('response_pair')
+        msg.parts.forEach((part) => {
+          if (part.type === 'text' && msg.role === 'user') {
+            prompt.open('user_message')
+            prompt.tag('user_request', part.text)
 
-              prompt.close('user_message')
+            if (Boolean(websiteContent.length)) {
+              websiteContent.forEach(({ url, title, content }) => {
+                if (content && title) {
+                  prompt.tag('attached_website_content', content, {
+                    url,
+                    title,
+                    note: 'This URL is for your view only. Do NOT include it in the tweet unless SPECIFICALLY ASKED TO by the user.',
+                  })
+                }
+              })
             }
 
-            if (part.type === 'data-tool-output') {
-              prompt.tag('response_tweet', part.data.text)
-            }
-          })
-          prompt.close('response_pair')
+            prompt.close('user_message')
+          }
+
+          if (part.type === 'data-tool-output') {
+            prompt.tag('response_tweet', part.data.text)
+          }
         })
-        prompt.close('history')
+        prompt.close('response_pair')
+      })
+
+      prompt.close('history')
+
+      const formattedTweetContent = ctx.tweets.map((t) => t.content).join('\n---\n')
+
+      if (formattedTweetContent) {
+        prompt.tag('current_editor_content', formattedTweetContent, {
+          note: 'This is the current state of the editor. If the user is asking for changes, modifications, or edits, this is what they want you to work with.',
+        })
       }
 
       // current job
-      prompt.tag('current_user_request', instruction ?? ctx.userContent)
-
-      if (ctx.editorContent && !Boolean(tweetContent)) {
-        prompt.tag('current_tweet_draft', ctx.editorContent)
-      }
-
-      if (tweetContent) {
-        prompt.tag('user_is_referencing_tweet', tweetContent)
-      }
+      prompt.tag('user_request', ctx.rawUserMessage, {
+        note: 'it is upon you to decide whether the user is referencing their previous history when iterating or if they are asking for changes in the current tweet drafts.',
+      })
 
       // style
-      prompt.tag('style', createStylePrompt({ account, style }))
+      const style = await styleGuide({
+        accountId: account.id,
+        topic: ctx.rawUserMessage,
+      })
+
+      prompt.tag('style', style)
+
+      const memories = await redis.lrange(`memories:${account.id}`, 0, -1)
+
+      if (memories.length) {
+        prompt.open('memories', {
+          note: 'These are the memories you have about this user. Its on you to decide which perspective/context from these memories might or might not be relevant to write a tweet.',
+          perspective:
+            'When responding, adopt the perspective of the user. Use first-person ("I", "my", "we") when discussing their projects, companies, or work. Use third-person when discussing external things they are not directly involved with.',
+        })
+        memories.forEach((memory) => prompt.tag('memory', memory))
+        prompt.close('memories')
+      }
 
       prompt.close('prompt')
 
@@ -183,28 +170,57 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
         },
       ]
 
-      const modelName =
-        ctx.plan === 'pro' ? 'anthropic/claude-sonnet-4' : 'openrouter/horizon-beta'
+      console.log('⚠️⚠️⚠️ PROMPT', JSON.stringify(prompt.toString(), null, 2))
 
-      const model = openrouter.chat(modelName, {
-        reasoning: { enabled: false, effort: 'low' },
-        models: [
-          'openrouter/horizon-alpha',
-          'anthropic/claude-3.7-sonnet',
-          'openai/o4-mini',
-        ],
+      const model = openrouter.chat('anthropic/claude-sonnet-4.5', {
+        reasoning: { enabled: true, effort: 'low' },
+        models: ['anthropic/claude-sonnet-4', 'anthropic/claude-3.7-sonnet'],
       })
+
+      let reasoning = ''
+      let isReasoningComplete = false
 
       const result = streamText({
         model,
-        system: editToolSystemPrompt({ name: account.name }),
+        system: `${editToolSystemPrompt({ name: account.name })}
+        
+        ${avoidPrompt()}
+        
+        Remember: NEVER use prohibited words. Instead of banned words, use easy, 6-th grade level alternatives.`,
         messages: convertToModelMessages(messages),
+        onChunk: ({ chunk }) => {
+          if (chunk.type === 'reasoning-delta' && !isReasoningComplete) {
+            reasoning += chunk.text
+
+            writer.write({
+              type: 'data-tool-reasoning',
+              id: generationId,
+              data: { text: reasoning, status: 'reasoning' },
+            })
+          }
+        },
+        onStepFinish: (step) => {
+          const reasoningContent = step.content.find((c) => c.type === 'reasoning')
+
+          if (reasoningContent && reasoningContent.type === 'reasoning') {
+            isReasoningComplete = true
+
+            writer.write({
+              type: 'data-tool-reasoning',
+              id: generationId,
+              data: { text: reasoning, status: 'complete' },
+            })
+          }
+        },
         onError(error) {
           console.log('❌❌❌ ERROR:', JSON.stringify(error, null, 2))
 
           throw new HTTPException(500, {
             message: error instanceof Error ? error.message : 'Something went wrong.',
           })
+        },
+        async onFinish(message) {
+          await redis.lpush(ctx.redisKeys.thread, message.text)
         },
       })
 
@@ -235,5 +251,3 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
     },
   })
 }
-
-

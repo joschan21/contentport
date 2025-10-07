@@ -1,122 +1,139 @@
 'use client'
 
-import * as React from 'react'
 import { Icons } from '@/components/icons'
-import { baseStyles, sizeStyles, variantStyles } from '@/components/ui/duolingo-button'
-import GitHubStarButton from '@/components/ui/github-star-button'
+import DuolingoButton from '@/components/ui/duolingo-button'
+import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 import { Menu, X } from 'lucide-react'
 import Link from 'next/link'
-import { GITHUB_REPO } from '@/constants/misc'
-
-const Logo = ({ className }: { className?: string }) => (
-  <Link href="/" className={cn('-m-1.5 p-1.5 flex items-center gap-1.5', className)}>
-    <Icons.logo className="size-5" />
-    <span className="font-medium">contentport</span>
-  </Link>
-)
-
-const ActionButtons = ({
-  className,
-  onLinkClick,
-  title,
-}: {
-  className?: string
-  onLinkClick?: () => void
-  title: string
-}) => (
-  <div className={cn('flex gap-2 items-center', className)}>
-    <GitHubStarButton
-      className={cn(
-        'whitespace-nowrap',
-        className?.includes('w-full') && 'w-full justify-center',
-      )}
-      repo={GITHUB_REPO}
-    />
-    <Link
-      className={cn(
-        baseStyles,
-        variantStyles.primary,
-        sizeStyles.sm,
-        className?.includes('w-full') && 'w-full justify-center',
-      )}
-      href={title === 'Studio' ? '/studio' : '/login'}
-      onClick={onLinkClick}
-    >
-      {title}
-    </Link>
-  </div>
-)
+import * as React from 'react'
 
 const Navbar = ({ title }: { title: string }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
+  const { data: session } = authClient.useSession()
+  const isAuthenticated = Boolean(session?.session)
 
   React.useEffect(() => {
     const originalOverflow = document.body.style.overflow
+    const originalPointerEvents = document.body.style.pointerEvents
 
     if (mobileMenuOpen) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = originalOverflow
+      document.body.style.pointerEvents = originalPointerEvents || ''
     }
 
     return () => {
       document.body.style.overflow = originalOverflow
+      document.body.style.pointerEvents = originalPointerEvents || ''
     }
   }, [mobileMenuOpen])
 
   return (
-    <header className="absolute inset-x-0 top-0 z-50">
-      <nav aria-label="Global" className="flex items-center justify-between p-6 lg:px-8">
-        <div className="flex lg:flex-1">
-          <Logo />
-        </div>
-        <div className="flex lg:hidden">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(true)}
-            className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
-          >
-            <span className="sr-only">Open main menu</span>
-            <Menu aria-hidden="true" className="size-6" />
-          </button>
-        </div>
-        <div className="hidden lg:flex gap-4 lg:flex-1 lg:justify-end">
-          <ActionButtons title={title} />
-        </div>
-      </nav>
-
-      <div className={cn('lg:hidden', mobileMenuOpen ? 'fixed inset-0 z-50' : 'hidden')}>
-        <div
-          className="fixed inset-0 bg-black bg-opacity-25"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-        <div className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-white px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
-          <div className="flex items-center justify-between">
-            <Logo />
+    <>
+      {mobileMenuOpen && <div className="fixed inset-0 z-[50] bg-black bg-opacity-50" />}
+      <header className="fixed inset-x-0 top-0 z-50 bg-white/80 backdrop-blur-md border-b border-black border-opacity-[0.1] h-16">
+        <nav className="max-w-7xl mx-auto h-full flex items-center px-6 lg:px-8">
+          <div className="flex sm:flex-1">
+            <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-1.5">
+              <Icons.logo className="size-5" />
+              <span className="font-medium">Contentport</span>
+            </Link>
+          </div>
+          <div className="flex ml-auto sm:hidden">
             <button
               type="button"
-              onClick={() => setMobileMenuOpen(false)}
-              className="-m-2.5 rounded-md p-2.5 text-gray-700"
+              onClick={() => setMobileMenuOpen(true)}
+              className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
             >
-              <span className="sr-only">Close menu</span>
-              <X aria-hidden="true" className="size-6" />
+              <span className="sr-only">Open main menu</span>
+              <Menu aria-hidden="true" className="size-6" />
             </button>
           </div>
-          <div className="mt-6 flow-root">
-            <div className="-my-6 divide-y divide-gray-500/10">
-              <div className="py-6 space-y-4">
-                <ActionButtons
-                  title={title}
-                  className="flex-col space-y-4 w-full"
-                  onLinkClick={() => setMobileMenuOpen(false)}
-                />
+          <div className="hidden sm:flex items-center gap-2">
+            {!isAuthenticated ? (
+              <Link href="/sign-in">
+                <DuolingoButton
+                  className="whitespace-nowrap"
+                  size="sm"
+                  variant="secondary"
+                >
+                  Sign in
+                </DuolingoButton>
+              </Link>
+            ) : null}
+            {isAuthenticated ? (
+              <Link href="/studio">
+                <DuolingoButton size="sm" className="whitespace-nowrap">
+                  Dashboard
+                </DuolingoButton>
+              </Link>
+            ) : (
+              <Link href="/sign-up">
+                <DuolingoButton size="sm" className="whitespace-nowrap">
+                  Get Started
+                </DuolingoButton>
+              </Link>
+            )}
+          </div>
+
+          <div
+            className={cn(
+              'sm:hidden',
+              mobileMenuOpen ? 'fixed inset-0 z-[100]' : 'hidden',
+            )}
+          >
+            <div className="absolute top-0 inset-x-0 bg-white right-0 z-[100] w-full overflow-y-auto px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
+              <div className="flex items-center justify-between">
+                <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-1.5">
+                  <Icons.logo className="size-5" />
+                  <span className="font-medium">Contentport</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="-m-2.5 rounded-md p-2.5 text-gray-700"
+                >
+                  <span className="sr-only">Close menu</span>
+                  <X aria-hidden="true" className="size-6" />
+                </button>
+              </div>
+              <div className="mt-6 flow-root">
+                <div className="-my-6 divide-y divide-gray-500/10">
+                  <div className="py-6 flex flex-col gap-4">
+                    {!isAuthenticated ? (
+                      <Link href="/sign-in">
+                        <DuolingoButton
+                          className="whitespace-nowrap"
+                          size="sm"
+                          variant="secondary"
+                        >
+                          Sign in
+                        </DuolingoButton>
+                      </Link>
+                    ) : null}
+                    {isAuthenticated ? (
+                      <Link href="/studio">
+                        <DuolingoButton size="sm" className="whitespace-nowrap">
+                          Dashboard
+                        </DuolingoButton>
+                      </Link>
+                    ) : (
+                      <Link href="/sign-up">
+                        <DuolingoButton size="sm" className="whitespace-nowrap">
+                          Get Started
+                        </DuolingoButton>
+                      </Link>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </header>
+        </nav>
+      </header>
+    </>
   )
 }
 

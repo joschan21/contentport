@@ -54,7 +54,7 @@ export const UpgradeDrawer = () => {
         return
       }
 
-      setSubscription(data.subscription)
+      setSubscription(data.subscription as Subscription)
     }
   }, [data])
 

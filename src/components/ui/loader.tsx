@@ -17,7 +17,7 @@ export interface LoaderProps {
     | 'text-blink'
     | 'text-shimmer'
     | 'loading-dots'
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   text?: string
   className?: string
 }
@@ -53,15 +53,17 @@ export function ClassicLoader({
   size = 'md',
 }: {
   className?: string
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
 }) {
   const sizeClasses = {
+    xs: 'size-3',
     sm: 'size-4',
     md: 'size-5',
     lg: 'size-6',
   }
 
   const barSizes = {
+    xs: { height: '5px', width: '1.5px' },
     sm: { height: '6px', width: '1.5px' },
     md: { height: '7px', width: '2px' },
     lg: { height: '10px', width: '2.5px' },
@@ -78,8 +80,8 @@ export function ClassicLoader({
               backgroundColor: 'currentColor',
               top: '0',
               left: '50%',
-              marginLeft: size === 'sm' ? '-0.75px' : size === 'lg' ? '-1.25px' : '-1px',
-              transformOrigin: `${size === 'sm' ? '0.75px' : size === 'lg' ? '1.25px' : '1px'} ${size === 'sm' ? '10px' : size === 'lg' ? '14px' : '12px'}`,
+              marginLeft: size === 'xs' ? '-0.75px' : size === 'sm' ? '-0.75px' : size === 'lg' ? '-1.25px' : '-1px',
+              transformOrigin: `${size === 'xs' ? '0.75px' : size === 'sm' ? '0.75px' : size === 'lg' ? '1.25px' : '1px'} ${size === 'xs' ? '8px' : size === 'sm' ? '10px' : size === 'lg' ? '14px' : '12px'}`,
               transform: `rotate(${i * 30}deg)`,
               opacity: 0,
               animationDelay: `${i * 0.1}s`,
@@ -327,10 +329,10 @@ export function TerminalLoader({
 
   return (
     <div className={cn('flex items-center space-x-1', containerSizes[size], className)}>
-      <span className={cn('text-primary font-mono', textSizes[size])}>{'>'}</span>
+      <span className={cn('text-gray-500 font-mono', textSizes[size])}>{'>'}</span>
       <div
         className={cn(
-          'bg-primary animate-[blink_1s_step-end_infinite]',
+          'bg-gray-500 animate-[blink_1s_step-end_infinite]',
           cursorSizes[size],
         )}
       />
@@ -425,33 +427,35 @@ export function TextDotsLoader({
 }
 
 function Loader({ variant = 'circular', size = 'md', text, className }: LoaderProps) {
+  const fallbackSize = size === 'xs' ? 'sm' : size
+
   switch (variant) {
     case 'circular':
-      return <CircularLoader size={size} className={className} />
+      return <CircularLoader size={fallbackSize} className={className} />
     case 'classic':
       return <ClassicLoader size={size} className={className} />
     case 'pulse':
-      return <PulseLoader size={size} className={className} />
+      return <PulseLoader size={fallbackSize} className={className} />
     case 'pulse-dot':
-      return <PulseDotLoader size={size} className={className} />
+      return <PulseDotLoader size={fallbackSize} className={className} />
     case 'dots':
-      return <DotsLoader size={size} className={className} />
+      return <DotsLoader size={fallbackSize} className={className} />
     case 'typing':
-      return <TypingLoader size={size} className={className} />
+      return <TypingLoader size={fallbackSize} className={className} />
     case 'wave':
-      return <WaveLoader size={size} className={className} />
+      return <WaveLoader size={fallbackSize} className={className} />
     case 'bars':
-      return <BarsLoader size={size} className={className} />
+      return <BarsLoader size={fallbackSize} className={className} />
     case 'terminal':
-      return <TerminalLoader size={size} className={className} />
+      return <TerminalLoader size={fallbackSize} className={className} />
     case 'text-blink':
-      return <TextBlinkLoader text={text} size={size} className={className} />
+      return <TextBlinkLoader text={text} size={fallbackSize} className={className} />
     case 'text-shimmer':
-      return <TextShimmerLoader text={text} size={size} className={className} />
+      return <TextShimmerLoader text={text} size={fallbackSize} className={className} />
     case 'loading-dots':
-      return <TextDotsLoader text={text} size={size} className={className} />
+      return <TextDotsLoader text={text} size={fallbackSize} className={className} />
     default:
-      return <CircularLoader size={size} className={className} />
+      return <CircularLoader size={fallbackSize} className={className} />
   }
 }
 

@@ -1,15 +1,3 @@
-/**
- * stripeRouter handles Stripe subscription and billing portal flows.
- *
- * - checkout_session: create/retrieve a Stripe Customer for the current user,
- *   persist the customer.id on the user record in the database, and
- *   return a Checkout Session URL for subscription purchase.
- *
- * - billing_portal: create/retrieve a Stripe Customer for the current user,
- *   persist the customer.id on the user record if needed, and
- *   return a Billing Portal session URL for managing existing subscriptions.
- */
-
 import { STRIPE_SUBSCRIPTION_DATA } from '@/constants/stripe-subscription'
 import { db } from '@/db'
 import { user } from '@/db/schema'
@@ -21,11 +9,6 @@ import { j, privateProcedure } from '../jstack'
 import { getBaseUrl } from '@/constants/base-url'
 
 export const stripeRouter = j.router({
-  /**
-   * Initiate a Stripe Checkout Session for subscription purchase.
-   * Ensures a Customer exists (creates one and updates user.stripeId in DB if missing).
-   * @returns JSON with { url: string | null } for redirecting to Stripe Checkout.
-   */
   checkout_session: privateProcedure
     .input(
       z.object({
@@ -83,18 +66,6 @@ export const stripeRouter = j.router({
             },
           },
           payment_method_collection: 'if_required',
-          // only include trial settings if the user requests a trial and hasn't had one before
-          // ...(trial &&
-          //   !hadTrial && {
-          //     subscription_data: {
-          //       trial_period_days: 7,
-          //       trial_settings: {
-          //         end_behavior: {
-          //           missing_payment_method: 'pause',
-          //         },
-          //       },
-          //     },
-          //   }),
         })
         return c.json({ url: checkout.url ?? null })
       },
@@ -180,13 +151,22 @@ export const stripeRouter = j.router({
     },
   ),
 
-  subscription: privateProcedure.query(async ({ c, ctx }) => {
+  get_active_subscription: privateProcedure.query(async ({ c, ctx }) => {
     const { user } = ctx
 
-    if (user.plan === 'pro') {
-      return c.json({ status: 'active' })
+    if (!user.stripeId) {
+      return c.json({ hasActiveSubscription: false })
     }
 
-    return c.json({ status: 'inactive' })
+    const subscriptions = await stripe.subscriptions.list({
+      customer: user.stripeId,
+      status: 'active',
+    })
+
+    const activeNonCancelledSubscriptions = subscriptions.data.filter(
+      (sub) => !sub.cancel_at_period_end,
+    )
+
+    return c.json({ hasActiveSubscription: activeNonCancelledSubscriptions.length > 0 })
   }),
 })

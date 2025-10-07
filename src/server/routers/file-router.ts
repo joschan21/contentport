@@ -1,14 +1,18 @@
-import { j, privateProcedure } from '../jstack'
-import { HTTPException } from 'hono/http-exception'
-import { nanoid } from 'nanoid'
-import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
-import { z } from 'zod'
+import { db } from '@/db'
+import { account as accountSchema, knowledgeDocument } from '@/db/schema'
+import { redis } from '@/lib/redis'
 import { FILE_TYPE_MAP, s3Client } from '@/lib/s3'
 import { HeadObjectCommand, HeadObjectCommandOutput } from '@aws-sdk/client-s3'
-import { db } from '@/db'
-import { knowledgeDocument } from '@/db/schema'
-import pdfParse from 'pdf-parse'
+import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
+import { and, eq } from 'drizzle-orm'
+import { HTTPException } from 'hono/http-exception'
 import mammoth from 'mammoth'
+import { nanoid } from 'nanoid'
+import pdfParse from 'pdf-parse'
+import { z } from 'zod'
+import { j, privateProcedure } from '../jstack'
+import { getAccount } from './utils/get-account'
+import { uploadMediaToTwitter } from './utils/upload-media-to-twitter'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const BUCKET_NAME = process.env.NEXT_PUBLIC_S3_BUCKET_NAME as string
@@ -143,6 +147,57 @@ export const fileRouter = j.router({
         fileKey,
         mediaType,
         sizeLimit,
+      })
+    }),
+
+  uploadMediaToTwitter: privateProcedure
+    .input(
+      z.object({
+        s3Key: z.string(),
+        mediaType: z.enum(['image', 'gif', 'video']),
+      }),
+    )
+    .post(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { s3Key, mediaType } = input
+
+      const activeAccount = await getAccount({ email: user.email })
+
+      if (!activeAccount) {
+        throw new HTTPException(400, {
+          message: 'No active account found',
+        })
+      }
+
+      const account = await db.query.account.findFirst({
+        where: and(
+          eq(accountSchema.userId, user.id),
+          eq(accountSchema.id, activeAccount.id),
+        ),
+      })
+
+      if (!account) {
+        throw new HTTPException(400, {
+          message: 'Twitter account not connected or access token missing',
+        })
+      }
+
+      const { mediaId } = await uploadMediaToTwitter({
+        account,
+        s3Key,
+        mediaType,
+        additionalOwners: activeAccount.twitterId ? [activeAccount.twitterId] : undefined,
+      })
+
+      const nowUnix = Date.now()
+
+      await redis.set(`tweet-media-upload:${mediaId}`, nowUnix, {
+        ex: 60 * 60 * 24, // twitter media files expire after 1 day (twitter-side)
+      })
+
+      return c.json({
+        media_id: mediaId,
+        media_key: `3_${mediaId}`,
       })
     }),
 

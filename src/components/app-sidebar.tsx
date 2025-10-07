@@ -1,7 +1,7 @@
 'use client'
 
-import { ArrowUp, Paperclip, Plus, Square, X } from 'lucide-react'
-import { useCallback, useContext, useEffect } from 'react'
+import { ArrowUp, History, Paperclip, Plus, Square, X } from 'lucide-react'
+import { useCallback, useContext, useEffect, useState } from 'react'
 
 import {
   Sidebar,
@@ -14,31 +14,43 @@ import {
 } from '@/components/ui/sidebar'
 import { useAttachments } from '@/hooks/use-attachments'
 import { useChatContext } from '@/hooks/use-chat'
-import { useTweets } from '@/hooks/use-tweets'
+import { PayloadTweet, useTweetsV2 } from '@/hooks/use-tweets-v2'
+import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
 import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
+import type { RealtimeEvents } from '@/lib/realtime'
+import { cn } from '@/lib/utils'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { useQuery } from '@tanstack/react-query'
+import { useRealtime } from '@upstash/realtime/client'
+import { formatDistanceToNow } from 'date-fns'
 import { motion } from 'framer-motion'
 import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $getSelection,
+  $isRangeSelection,
   COMMAND_PRIORITY_HIGH,
   KEY_ENTER_COMMAND,
+  PASTE_COMMAND,
 } from 'lexical'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AttachmentItem } from './attachment-item'
 import { Messages } from './chat/messages'
-import { KnowledgeSelector, SelectedKnowledgeDocument } from './knowledge-selector'
+import { Modal } from './ui/modal'
 import DuolingoButton from './ui/duolingo-button'
 import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-upload'
 import { PromptSuggestion } from './ui/prompt-suggestion'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
+import { Loader } from './ui/loader'
+import Link from 'next/link'
+import { mapToConnectedAccount } from '@/hooks/account-ctx'
 
 const ChatInput = ({
   onSubmit,
@@ -46,25 +58,53 @@ const ChatInput = ({
   disabled,
   handleFilesAdded,
 }: {
-  onSubmit: (text: string, editorContent: string) => void
+  onSubmit: (text: string) => void
   onStop: () => void
   disabled: boolean
   handleFilesAdded: (files: File[]) => void
 }) => {
   const [editor] = useLexicalComposerContext()
   const { isDragging } = useContext(FileUploadContext)
+  const { open } = useSidebar()
+  const { data: session } = authClient.useSession()
 
-  const { attachments, removeAttachment, addKnowledgeAttachment, hasUploading } =
-    useAttachments()
+  const { data: accounts, refetch: refetchAccounts } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: async () => {
+      const res = await client.settings.list_accounts.$get()
+      const { accounts } = await res.json()
 
-  const { shadowEditor } = useTweets()
+      return accounts
+    },
+  })
+
+  const { status } = useRealtime<RealtimeEvents>({
+    channel: session?.user.id,
+    enabled:
+      Boolean(Boolean(session?.user.id)) &&
+      Boolean(open) &&
+      Boolean(
+        accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+      ),
+    events: {
+      index_memories: { status: () => refetchAccounts() },
+      index_tweets: { status: () => refetchAccounts() },
+    },
+  })
+
+  const isIndexing = status === 'connecting' || status === 'connected'
+
+  useEffect(() => {
+    if (isIndexing) editor.setEditable(false)
+    else editor.setEditable(true)
+  }, [isIndexing, editor])
+
+  const { attachments, removeAttachment, hasUploading } = useAttachments()
 
   const handleSubmit = () => {
-    const editorContent = shadowEditor.read(() => $getRoot().getTextContent().trim())
-
     const text = editor.read(() => $getRoot().getTextContent().trim())
 
-    onSubmit(text, editorContent)
+    onSubmit(text)
 
     editor.update(() => {
       const root = $getRoot()
@@ -80,16 +120,12 @@ const ChatInput = ({
         if (event && !event.shiftKey) {
           event.preventDefault()
 
-          const editorContent = shadowEditor.read(() =>
-            $getRoot().getTextContent().trim(),
-          )
-
           editor.update(() => {
             const root = $getRoot()
             const text = root.getTextContent().trim()
             if (!text) return
 
-            onSubmit(text, editorContent)
+            onSubmit(text)
 
             root.clear()
             const paragraph = $createParagraphNode()
@@ -102,17 +138,35 @@ const ChatInput = ({
       COMMAND_PRIORITY_HIGH,
     )
 
+    const removePasteCommand = editor.registerCommand<ClipboardEvent>(
+      PASTE_COMMAND,
+      (event) => {
+        const pastedText = event.clipboardData?.getData('Text')
+
+        if (pastedText) {
+          const trimmedText = pastedText.trim()
+
+          if (trimmedText !== pastedText) {
+            editor.update(() => {
+              const selection = $getSelection()
+              if ($isRangeSelection(selection)) {
+                selection.insertText(trimmedText)
+              }
+            })
+            return true
+          }
+        }
+
+        return false
+      },
+      COMMAND_PRIORITY_HIGH,
+    )
+
     return () => {
       removeCommand?.()
+      removePasteCommand?.()
     }
   }, [editor, onSubmit])
-
-  const handleAddKnowledgeDoc = useCallback(
-    (doc: SelectedKnowledgeDocument) => {
-      addKnowledgeAttachment(doc)
-    },
-    [addKnowledgeAttachment],
-  )
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
@@ -132,32 +186,47 @@ const ChatInput = ({
       if (files.length > 0) {
         e.preventDefault()
         handleFilesAdded(files)
+        return
       }
     },
-    [handleFilesAdded],
+    [handleFilesAdded, editor],
   )
 
   return (
     <div>
       <div className="mb-2 flex gap-2 items-center">
-        {attachments.map((attachment, i) => {
-          const onRemove = () => removeAttachment({ id: attachment.id })
-          return (
-            <motion.div
-              key={attachment.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.2, delay: i * 0.1 }}
+        {isIndexing ? (
+          <div className="flex items-center gap-2">
+            <Loader variant="classic" size="xs" />
+            <p className="text-sm text-gray-500 mt-1">Indexing your tweets</p>
+            <p className="text-gray-500 mt-1 text-sm">•</p>
+            <Link
+              href="/studio/accounts"
+              className="hover:underline text-sm text-gray-500 mt-1"
             >
-              <AttachmentItem
-                onRemove={onRemove}
+              See status
+            </Link>
+          </div>
+        ) : (
+          attachments.map((attachment, i) => {
+            const onRemove = () => removeAttachment({ id: attachment.id })
+            return (
+              <motion.div
                 key={attachment.id}
-                attachment={attachment}
-              />
-            </motion.div>
-          )
-        })}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ duration: 0.2, delay: i * 0.1 }}
+              >
+                <AttachmentItem
+                  onRemove={onRemove}
+                  key={attachment.id}
+                  attachment={attachment}
+                />
+              </motion.div>
+            )
+          })
+        )}
       </div>
 
       <div className="space-y-3">
@@ -189,7 +258,8 @@ const ChatInput = ({
                 contentEditable={
                   <ContentEditable
                     autoFocus
-                    className="w-full px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
+                    disabled={isIndexing}
+                    className="w-full diabled:opacity-50 px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
                     style={{ minHeight: '4.5rem' }}
                     onPaste={handlePaste}
                   />
@@ -203,12 +273,15 @@ const ChatInput = ({
               <div className="flex items-center justify-between px-3 pb-3">
                 <div className="flex gap-1.5 items-center">
                   <FileUploadTrigger asChild>
-                    <DuolingoButton type="button" variant="secondary" size="icon">
+                    <DuolingoButton
+                      disabled={isIndexing}
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                    >
                       <Paperclip className="text-stone-600 size-5" />
                     </DuolingoButton>
                   </FileUploadTrigger>
-
-                  <KnowledgeSelector onSelectDocument={handleAddKnowledgeDoc} />
                 </div>
 
                 {disabled ? (
@@ -222,7 +295,7 @@ const ChatInput = ({
                   </DuolingoButton>
                 ) : (
                   <DuolingoButton
-                    disabled={hasUploading}
+                    disabled={hasUploading || isIndexing}
                     onClick={handleSubmit}
                     variant="icon"
                     size="icon"
@@ -241,37 +314,51 @@ const ChatInput = ({
 }
 
 export function AppSidebar({ children }: { children: React.ReactNode }) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, open } = useSidebar()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [editor] = useLexicalComposerContext()
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+
+  const { data: chatHistoryData, isPending: isHistoryPending } = useQuery({
+    queryKey: ['chat-history', isHistoryOpen],
+    queryFn: async () => {
+      const res = await client.chat.history.$get()
+      return await res.json()
+    },
+    enabled: isHistoryOpen,
+  })
+  const { tweets, toPayloadTweet } = useTweetsV2()
 
   const { messages, status, sendMessage, startNewChat, id, stop } = useChatContext()
-  const { attachments, removeAttachment, addChatAttachment, addKnowledgeAttachment } =
-    useAttachments()
+  const { attachments, removeAttachment, addChatAttachment } = useAttachments()
 
   const updateURL = useCallback(
     (key: string, value: string) => {
-      const params = new URLSearchParams(searchParams)
+      const params = new URLSearchParams(window.location.search)
       params.set(key, value)
       router.replace(`${window.location.pathname}?${params.toString()}`, {
         scroll: false,
       })
     },
-    [searchParams, router],
+    [router],
   )
 
   const handleSubmit = useCallback(
-    async (text: string, editorContent: string) => {
+    async (text: string) => {
       if (!text.trim()) return
 
       if (!Boolean(searchParams.get('chatId'))) {
         updateURL('chatId', id)
       }
 
-      sendMessage({ text, metadata: { attachments, editorContent, userMessage: text } })
+      const payloadTweets: PayloadTweet[] = tweets.map(toPayloadTweet)
 
-      // Batch attachment removals to prevent multiple rapid state updates
+      sendMessage({
+        text,
+        metadata: { attachments, tweets: payloadTweets, userMessage: text },
+      })
+
       if (attachments.length > 0) {
         requestAnimationFrame(() => {
           attachments.forEach((a) => {
@@ -280,7 +367,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
         })
       }
     },
-    [searchParams, updateURL, id, sendMessage, attachments, removeAttachment],
+    [searchParams, updateURL, id, sendMessage, attachments, removeAttachment, tweets],
   )
 
   const handleNewChat = useCallback(() => {
@@ -294,6 +381,13 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     [addChatAttachment],
   )
 
+  const { setId } = useChatContext()
+
+  const handleChatSelect = async (chatId: string) => {
+    setIsHistoryOpen(false)
+    setId(chatId)
+  }
+
   const { data: knowledgeData } = useQuery({
     queryKey: ['knowledge-documents'],
     queryFn: async () => {
@@ -304,8 +398,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
     gcTime: 10 * 60 * 1000,
   })
 
-  const exampleDocuments = knowledgeData?.documents?.filter((doc) => doc.isExample) || []
-
   return (
     <>
       {children}
@@ -315,25 +407,56 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
           <div className="w-full flex items-center justify-between">
             <p className="text-sm/6 font-medium">Assistant</p>
             <div className="flex gap-2">
-              <DuolingoButton
-                onClick={handleNewChat}
-                size="sm"
-                variant="secondary"
-                title="New Chat"
-                className="inline-flex items-center gap-1.5"
-              >
-                <Plus className="size-4" />
-                <p className="text-sm">New Chat</p>
-              </DuolingoButton>
-              <DuolingoButton
-                onClick={toggleSidebar}
-                variant="secondary"
-                className="aspect-square"
-                size="icon"
-                title="Close Sidebar"
-              >
-                <X className="size-4" />
-              </DuolingoButton>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DuolingoButton
+                      onClick={handleNewChat}
+                      size="sm"
+                      variant="secondary"
+                      className="inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="size-4" />
+                      <p className="text-sm">New Chat</p>
+                    </DuolingoButton>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Start a new conversation</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DuolingoButton
+                      onClick={() => setIsHistoryOpen(true)}
+                      size="icon"
+                      variant="secondary"
+                      className="aspect-square"
+                    >
+                      <History className="size-4" />
+                    </DuolingoButton>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Open chat history</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DuolingoButton
+                      onClick={toggleSidebar}
+                      variant="secondary"
+                      className="aspect-square"
+                      size="icon"
+                    >
+                      <X className="size-4" />
+                    </DuolingoButton>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Close sidebar</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </SidebarHeader>
@@ -347,10 +470,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                     attachments.forEach((attachment) => {
                       removeAttachment({ id: attachment.id })
                     })
-
-                    const blogDoc = exampleDocuments.find(
-                      (doc) => doc.title?.includes('Zod') || doc.type === 'url',
-                    )
 
                     editor.update(() => {
                       const root = $getRoot()
@@ -404,7 +523,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                       const root = $getRoot()
                       const paragraph = $createParagraphNode()
                       const text = $createTextNode(
-                        'Draft a tweet about 3 productivity tips for remote devs',
+                        'Create a thread about 3 productivity tips for remote devs',
                       )
                       root.clear()
                       paragraph.append(text)
@@ -415,7 +534,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
                     editor.focus()
                   }}
                 >
-                  Draft a tweet about 3 productivity tips for remote devs
+                  Create a thread about 3 productivity tips for remote devs
                 </PromptSuggestion>
 
                 <PromptSuggestion
@@ -453,8 +572,6 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
         </SidebarContent>
 
         <SidebarFooter className="relative p-3 border-t border-t-gray-300 bg-gray-100">
-          {/* <Improvements /> */}
-
           <FileUpload onFilesAdded={handleFilesAdded}>
             <ChatInput
               onStop={stop}
@@ -466,6 +583,61 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
+
+      <Modal
+        showModal={isHistoryOpen}
+        setShowModal={setIsHistoryOpen}
+        className="max-w-2xl max-h-[80vh]"
+      >
+        <div className="p-6 space-y-4">
+          <div className="size-12 bg-gray-100 rounded-full flex items-center justify-center">
+            <History className="size-6" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold">Chat History</h2>
+            <p className="text-sm text-gray-500">
+              {isHistoryPending
+                ? 'Loading...'
+                : chatHistoryData?.chatHistory?.length
+                  ? `Showing ${chatHistoryData?.chatHistory?.length} most recent chats`
+                  : 'No chat history yet'}
+            </p>
+          </div>
+
+          <div className="overflow-y-auto max-h-[60vh] -mx-2 px-2">
+            <div className="space-y-2">
+              {chatHistoryData?.chatHistory?.length ? (
+                chatHistoryData.chatHistory.map((chat) => (
+                  <button
+                    key={chat.id}
+                    onClick={() => handleChatSelect(chat.id)}
+                    className="w-full text-left p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm text-gray-900 truncate">
+                          {chat.title}
+                        </h3>
+                      </div>
+                      <span className="text-xs text-gray-400 whitespace-nowrap">
+                        {formatDistanceToNow(new Date(chat.lastUpdated), {
+                          addSuffix: true,
+                        })}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p className="text-sm">No chat history yet</p>
+                  <p className="text-xs mt-1">Start a conversation to see it here</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }

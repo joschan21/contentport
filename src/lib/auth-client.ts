@@ -1,17 +1,14 @@
 import { createAuthClient } from 'better-auth/react'
-import { inferAdditionalFields } from 'better-auth/client/plugins'
+import { inferAdditionalFields, magicLinkClient } from 'better-auth/client/plugins'
 
 export const authClient = createAuthClient({
-  baseURL:
-    process.env.NODE_ENV === 'production'
-      ? 'https://www.contentport.io'
-      : 'http://localhost:3000',
   plugins: [
+    magicLinkClient(),
     inferAdditionalFields({
       user: {
         plan: { type: 'string', defaultValue: 'free' },
+        isAdmin: { type: 'boolean', defaultValue: false },
       },
     }),
   ],
-  
 })

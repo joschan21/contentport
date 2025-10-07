@@ -1,13 +1,15 @@
 'use client'
 
+import { Icons } from '@/components/icons'
 import { buttonVariants } from '@/components/ui/button'
 import { useChatContext } from '@/hooks/use-chat'
 import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
-import { ArrowLeftFromLine, ArrowRightFromLine, PanelLeft, Settings } from 'lucide-react'
+import { ArrowLeftFromLine, ArrowRightFromLine, PanelLeft } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createSerializer, parseAsString } from 'nuqs'
+import { useEffect, useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import {
   Sidebar,
@@ -19,7 +21,7 @@ import {
   SidebarHeader,
   useSidebar,
 } from './ui/sidebar'
-import { Icons } from './icons'
+import { SidebarSimpleIcon } from '@phosphor-icons/react'
 
 const searchParams = {
   tweetId: parseAsString,
@@ -29,59 +31,64 @@ const searchParams = {
 const serialize = createSerializer(searchParams)
 
 export const LeftSidebar = () => {
-  const { state } = useSidebar()
-  const { data } = authClient.useSession()
-
   const pathname = usePathname()
 
   const { id } = useChatContext()
+  const { state, toggleSidebar } = useSidebar()
+  const { data } = authClient.useSession()
 
   const isCollapsed = state === 'collapsed'
+  const [isMounted, setIsMounted] = useState(false)
 
-  const { toggleSidebar } = useSidebar()
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   return (
-    <Sidebar collapsible="icon" side="left" className="border-r border-border/40">
-      <SidebarHeader className="border-b border-border/40 p-4">
-        <div className="flex items-center justify-start gap-2">
-          <button
-            onClick={toggleSidebar}
-            className="h-8 w-8 rounded-md hover:bg-accent/50 transition-colors flex items-center justify-center group/toggle-button flex-shrink-0"
-          >
-            <PanelLeft className="h-4 w-4 transition-all duration-200 group-hover/toggle-button:opacity-0 group-hover/toggle-button:scale-75" />
-            <div className="absolute transition-all duration-200 opacity-0 scale-75 group-hover/toggle-button:opacity-100 group-hover/toggle-button:scale-100">
+    <Sidebar collapsible="icon" side="left" className="z-30 border-r border-border/40">
+      <SidebarHeader className="relative p-0">
+        {isCollapsed && (
+          <div
+            aria-hidden="true"
+            className="absolute pointer-events-none bottom-0 left-4 right-4 border-b border-stone-200"
+          />
+        )}
+
+        <button
+          onClick={toggleSidebar}
+          className={cn(
+            buttonVariants({
+              variant: 'ghost',
+              className:
+                'w-full cursor-pointer h-14 group/toggle justify-start gap-2 p-2 hover:bg-transparent',
+            }),
+          )}
+        >
+          <div className="relative w-fit h-10 flex group-hover/toggle:bg-stone-200 transition-colors rounded-md items-center justify-start flex-shrink-0">
+            <PanelLeft className="size-[18px] w-12 transition-all duration-200 group-hover/toggle:opacity-0 group-hover/toggle:scale-75" />
+            <div className="absolute transition-all duration-200 opacity-0 scale-75 group-hover/toggle:opacity-100 group-hover/toggle:scale-100">
               {isCollapsed ? (
-                <ArrowRightFromLine className="h-4 w-4" />
+                <ArrowRightFromLine className="size-[18px] w-12" />
               ) : (
-                <ArrowLeftFromLine className="h-4 w-4" />
+                <ArrowLeftFromLine className="size-[18px] w-12" />
               )}
             </div>
-          </button>
-          <div
-            className={cn(
-              'flex items-center gap-1 transition-all duration-200 ease-out',
-              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
-            )}
-          >
-            {/* <Icons.logo className="size-4" /> */}
-            <p className={cn('text-sm/6 text-stone-800 ')}>Contentport</p>
           </div>
-        </div>
+        </button>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="overflow-x-hidden gap-0">
         {/* Create Group */}
-        <SidebarGroup>
-          <SidebarGroupLabel
-            className={cn(
-              'transition-all duration-200 ease-out px-3',
-              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
-            )}
-          >
-            Create
-          </SidebarGroupLabel>
+        <SidebarGroup className="relative p-0">
+          {isCollapsed && (
+            <div
+              aria-hidden="true"
+              className="absolute pointer-events-none bottom-0 left-4 right-4 border-b border-stone-200"
+            />
+          )}
           <SidebarGroupContent>
             <Link
+              suppressHydrationWarning
               href={{
                 pathname: '/studio',
                 search: serialize({ chatId: id }),
@@ -89,135 +96,200 @@ export const LeftSidebar = () => {
               className={cn(
                 buttonVariants({
                   variant: 'ghost',
-                  className: 'w-full justify-start gap-2 px-3 py-2',
+                  className:
+                    'w-full cursor-pointer h-14 group/create justify-start gap-2 p-2 hover:bg-transparent',
                 }),
-                pathname === '/studio' &&
-                  'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
               )}
             >
-              <div className="size-6 flex items-center justify-center flex-shrink-0">
-                ✏️
-              </div>
-              <span
+              <div
                 className={cn(
-                  'transition-all opacity-0 duration-200 ease-out delay-200',
-                  isCollapsed ? 'opacity-0 w-0 overflow-hidden hidden' : 'opacity-100',
+                  'w-full h-10 flex  group-hover/create:bg-stone-200 transition-colors rounded-md items-center justify-start flex-shrink-0',
+                  { 'bg-stone-200': pathname === '/studio' },
                 )}
               >
-                Studio
-              </span>
+                <Icons.pencil className="size-[18px] w-12" />
+                <span
+                  data-state={isCollapsed ? 'collapsed' : 'expanded'}
+                  className={cn(
+                    'data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200',
+                    {
+                      'opacity-0': !isMounted,
+                    },
+                  )}
+                >
+                  Create
+                </span>
+              </div>
+            </Link>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Engage Group */}
+        <SidebarGroup className="relative p-0">
+          {isCollapsed && (
+            <div
+              aria-hidden="true"
+              className="absolute pointer-events-none bottom-0 left-4 right-4 border-b border-stone-200"
+            />
+          )}
+
+          <SidebarGroupLabel
+            data-state={isCollapsed ? 'collapsed' : 'expanded'}
+            className={cn(
+              'data-[state=collapsed]:pointer-events-none data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200 px-3',
+              {
+                'opacity-0': !isMounted,
+              },
+            )}
+          >
+            Engage
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <Link
+              suppressHydrationWarning
+              href={{
+                pathname: '/studio/topic-monitor',
+                search: serialize({ chatId: id }),
+              }}
+              className={cn(
+                buttonVariants({
+                  variant: 'ghost',
+                  className:
+                    'w-full cursor-pointer h-14 group/engage justify-start gap-2 p-2 hover:bg-transparent',
+                }),
+              )}
+            >
+              <div
+                className={cn(
+                  'w-full h-10 flex group-hover/engage:bg-stone-200 transition-colors rounded-md items-center justify-start flex-shrink-0',
+                  { 'bg-stone-200': pathname === '/studio/topic-monitor' },
+                )}
+              >
+                <Icons.magnifier className="size-[18px] w-12" />
+                <span
+                  data-state={isCollapsed ? 'collapsed' : 'expanded'}
+                  className={cn(
+                    'data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200',
+                    {
+                      'opacity-0': !isMounted,
+                    },
+                  )}
+                >
+                  Keyword Monitor
+                </span>
+              </div>
             </Link>
           </SidebarGroupContent>
         </SidebarGroup>
 
         {/* Content Group */}
-        <SidebarGroup>
+        <SidebarGroup className="relative p-0">
+          {isCollapsed && (
+            <div
+              aria-hidden="true"
+              className="absolute pointer-events-none bottom-0 left-4 right-4 border-b border-stone-200"
+            />
+          )}
           <SidebarGroupLabel
+            data-state={isCollapsed ? 'collapsed' : 'expanded'}
             className={cn(
-              'transition-all duration-200 ease-out px-3',
-              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+              'data-[state=collapsed]:pointer-events-none data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200 px-3',
+              {
+                'opacity-0': !isMounted,
+              },
             )}
           >
             Manage
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <div className="flex flex-col gap-1">
-              <Link
-                href={{
-                  pathname: '/studio/knowledge',
-                  search: serialize({ chatId: id }),
-                }}
+            <Link
+              suppressHydrationWarning
+              href={{
+                pathname: '/studio/knowledge',
+                search: serialize({ chatId: id }),
+              }}
+              className={cn(
+                buttonVariants({
+                  variant: 'ghost',
+                  className:
+                    'w-full cursor-pointer h-14 pt-2 group/knowledge justify-start gap-2 p-2 hover:bg-transparent',
+                }),
+              )}
+            >
+              <div
                 className={cn(
-                  buttonVariants({
-                    variant: 'ghost',
-                    className: 'justify-start gap-2 px-3 py-2',
-                  }),
-                  pathname.includes('/studio/knowledge') &&
-                    'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
+                  'w-full h-10 flex group-hover/knowledge:bg-stone-200 transition-colors rounded-md items-center justify-start flex-shrink-0',
+                  { 'bg-stone-200': pathname.includes('/studio/knowledge') },
                 )}
               >
-                <div className="size-6 flex items-center justify-center flex-shrink-0">
-                  🧠
-                </div>
+                <Icons.brain className="size-[20px] w-12" />
                 <span
+                  data-state={isCollapsed ? 'collapsed' : 'expanded'}
                   className={cn(
-                    'transition-all duration-200 ease-out',
-                    isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+                    'data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200',
+                    {
+                      'opacity-0': !isMounted,
+                    },
                   )}
                 >
                   Knowledge Base
                 </span>
-              </Link>
+              </div>
+            </Link>
 
-              <Link
-                href={{
-                  pathname: '/studio/scheduled',
-                  search: serialize({ chatId: id }),
-                }}
+            <Link
+              suppressHydrationWarning
+              href={{
+                pathname: '/studio/scheduled',
+                search: serialize({ chatId: id }),
+              }}
+              className={cn(
+                buttonVariants({
+                  variant: 'ghost',
+                  className:
+                    'w-full cursor-pointer h-14 pb-2 group/scheduled justify-start gap-2 p-2 hover:bg-transparent',
+                }),
+              )}
+            >
+              <div
                 className={cn(
-                  buttonVariants({
-                    variant: 'ghost',
-                    className: 'justify-start gap-2 px-3 py-2',
-                  }),
-                  pathname === '/studio/scheduled' &&
-                    'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
+                  'w-full h-10 flex group-hover/scheduled:bg-stone-200 transition-colors rounded-md items-center justify-start flex-shrink-0',
+                  { 'bg-stone-200': pathname === '/studio/scheduled' },
                 )}
               >
-                <div className="size-6 flex items-center justify-center flex-shrink-0">
-                  📅
-                </div>
+                <Icons.calendar className="size-[18px] w-12" />
                 <span
+                  data-state={isCollapsed ? 'collapsed' : 'expanded'}
                   className={cn(
-                    'transition-all duration-200 ease-out',
-                    isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+                    'data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200',
+                    {
+                      'opacity-0': !isMounted,
+                    },
                   )}
                 >
                   Schedule
                 </span>
-              </Link>
-
-              <Link
-                href={{
-                  pathname: '/studio/posted',
-                  search: serialize({ chatId: id }),
-                }}
-                className={cn(
-                  buttonVariants({
-                    variant: 'ghost',
-                    className: 'justify-start gap-2 px-3 py-2',
-                  }),
-                  pathname === '/studio/posted' &&
-                    'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
-                )}
-              >
-                <div className="size-6 flex items-center justify-center flex-shrink-0">
-                  📤
-                </div>
-                <span
-                  className={cn(
-                    'transition-all duration-200 ease-out',
-                    isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
-                  )}
-                >
-                  Posted
-                </span>
-              </Link>
-            </div>
+              </div>
+            </Link>
           </SidebarGroupContent>
         </SidebarGroup>
 
         {/* Account Group */}
-        <SidebarGroup>
+        <SidebarGroup className="relative p-0">
           <SidebarGroupLabel
+            data-state={isCollapsed ? 'collapsed' : 'expanded'}
             className={cn(
-              'transition-all duration-200 ease-out px-3',
-              isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+              'data-[state=collapsed]:pointer-events-none data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200 px-3',
+              {
+                'opacity-0': !isMounted,
+              },
             )}
           >
             Account
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <Link
+              suppressHydrationWarning
               href={{
                 pathname: '/studio/accounts',
                 search: serialize({ chatId: id }),
@@ -225,94 +297,84 @@ export const LeftSidebar = () => {
               className={cn(
                 buttonVariants({
                   variant: 'ghost',
-                  className: 'w-full justify-start gap-2 px-3 py-2',
+                  className:
+                    'w-full cursor-pointer h-14 group/accounts justify-start gap-2 p-2 hover:bg-transparent',
                 }),
-                pathname.includes('/studio/accounts') &&
-                  'bg-stone-200 hover:bg-stone-200 text-accent-foreground',
               )}
             >
-              <div className="size-6 flex items-center justify-center flex-shrink-0">
-                👤
-              </div>
-              <span
+              <div
                 className={cn(
-                  'transition-all duration-200 ease-out',
-                  isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+                  'w-full h-10 flex group-hover/accounts:bg-stone-200 transition-colors rounded-md items-center justify-start flex-shrink-0',
+                  { 'bg-stone-200': pathname.includes('/studio/accounts') },
                 )}
               >
-                Accounts
-              </span>
+                <Icons.imageIcon className="size-[18px] w-12 -mt-[3px]" />
+                <span
+                  data-state={isCollapsed ? 'collapsed' : 'expanded'}
+                  className={cn(
+                    'data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200',
+                    {
+                      'opacity-0': !isMounted,
+                    },
+                  )}
+                >
+                  Accounts
+                </span>
+              </div>
             </Link>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border/40 p-4">
-        <div
+      <SidebarFooter className="relative p-0">
+        {isCollapsed && (
+          <div className="absolute w-10 mx-auto top-0 left-0 right-0 border-t border-stone-200" />
+        )}
+        <Link
+          suppressHydrationWarning
+          href={{
+            pathname: `/studio/settings`,
+            search: id ? `?chatId=${id}` : undefined,
+          }}
           className={cn(
-            'transition-all duration-200 ease-out overflow-hidden',
-            isCollapsed ? 'opacity-0 max-h-0' : 'opacity-100 max-h-[1000px]',
+            buttonVariants({
+              variant: 'ghost',
+              className:
+                'w-full cursor-pointer h-14 group/settings justify-start gap-2 p-2 hover:bg-transparent',
+            }),
           )}
         >
-          <div className="flex flex-col gap-2">
-            {data?.user ? (
-              <Link
-                href={{
-                  pathname: `/studio/settings`,
-                  search: id ? `?chatId=${id}` : undefined,
-                }}
-                className={cn(
-                  buttonVariants({
-                    variant: 'outline',
-                    className: 'flex items-center gap-2 justify-start px-3 py-2',
-                  }),
-                  'h-16',
-                )}
-              >
-                <Avatar className="size-9 border-2 border-white shadow-md">
-                  <AvatarImage
-                    src={data.user.image || undefined}
-                    alt={data.user.name ?? 'Profile'}
-                  />
-                  <AvatarFallback>{data.user.name?.charAt(0) ?? null}</AvatarFallback>
+          <div
+            className={cn(
+              'relative w-full h-10 flex group-hover/settings:bg-stone-200 transition-colors rounded-md items-center flex-shrink-0',
+              { 'bg-stone-200': pathname.includes('/studio/settings') },
+            )}
+          >
+            <div className="!w-12">
+              {data?.user.image ? (
+                <Avatar className="mx-auto size-7 border border-stone-300">
+                  <AvatarImage src={data.user.image} alt={data.user.name ?? 'Profile'} />
+                  <AvatarFallback className="text-xs">
+                    {data.user.name?.charAt(0) ?? null}
+                  </AvatarFallback>
                 </Avatar>
-                <div className="flex flex-col items-start min-w-0">
-                  <span className="truncate text-sm font-medium text-stone-800">
-                    {data.user.name ?? 'Account'}
-                  </span>
-
-                  {data.user.plan && (
-                    <span className="truncate text-xs text-muted-foreground">
-                      {data.user.plan === 'free' ? 'Free' : '🐐 Pro'}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            ) : null}
-          </div>
-        </div>
-
-        <div
-          className={cn(
-            'transition-all duration-0 ease-out overflow-hidden',
-            isCollapsed ? 'opacity-100 max-h-[1000px]' : 'opacity-0 max-h-0',
-          )}
-        >
-          <div className="flex flex-col gap-2">
-            <Link
-              href={{
-                pathname: `/studio/settings`,
-                search: id ? `?chatId=${id}` : undefined,
-              }}
-              className={buttonVariants({
-                variant: 'ghost',
-                className: 'text-muted-foreground hover:text-foreground',
-              })}
+              ) : (
+                <Icons.gear className="size-[20px] w-12" />
+              )}
+            </div>
+            <span
+              data-state={isCollapsed ? 'collapsed' : 'expanded'}
+              className={cn(
+                'data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200 absolute left-12',
+                {
+                  'opacity-0': !isMounted,
+                },
+              )}
             >
-              <Settings className="size-5" />
-            </Link>
+              Settings
+            </span>
           </div>
-        </div>
+        </Link>
       </SidebarFooter>
     </Sidebar>
   )

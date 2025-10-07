@@ -1,9 +1,9 @@
-"use client"
+'use client'
 
-import React, { forwardRef, useImperativeHandle, useRef, useEffect } from "react"
-import { createPortal } from "react-dom"
-import { cn } from "@/lib/utils"
-import confetti from "canvas-confetti"
+import React, { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { cn } from '@/lib/utils'
+import confetti from 'canvas-confetti'
 
 export interface ConfettiRef {
   fire: (options?: confetti.Options) => void
@@ -17,47 +17,65 @@ type ConfettiProps = {
 const Confetti = forwardRef<ConfettiRef, ConfettiProps>(
   ({ className, ...props }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null)
+    const confettiInstanceRef = useRef<confetti.CreateTypes | null>(null)
+    const [isInitialized, setIsInitialized] = useState(false)
 
     useEffect(() => {
       const canvas = canvasRef.current
-      if (!canvas) return
-      
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
-    }, [])
+      if (!canvas || isInitialized) return
+
+      const updateCanvasSize = () => {
+        canvas.width = window.innerWidth
+        canvas.height = window.innerHeight
+      }
+
+      updateCanvasSize()
+
+      confettiInstanceRef.current = confetti.create(canvas, {
+        resize: true,
+        useWorker: false,
+      })
+
+      setIsInitialized(true)
+
+      const handleResize = () => {
+        updateCanvasSize()
+      }
+
+      window.addEventListener('resize', handleResize)
+      return () => window.removeEventListener('resize', handleResize)
+    }, [isInitialized])
 
     useImperativeHandle(ref, () => ({
       fire: (options) => {
-        const canvas = canvasRef.current
-        if (!canvas) return
+        if (!confettiInstanceRef.current) return
 
-        const myConfetti = confetti.create(canvas, {
-          resize: true,
-          useWorker: true,
-        })
-
-        myConfetti({
+        confettiInstanceRef.current({
           particleCount: 100,
           spread: 70,
           origin: { y: 0.6 },
           ...options,
         })
       },
-    }))
+    }), [])
 
-    if (typeof window === "undefined") return null
+    if (typeof window === 'undefined') return null
 
     return createPortal(
       <canvas
         ref={canvasRef}
-        className={cn("fixed inset-0 z-[1000] pointer-events-none w-full h-full", className)}
+        aria-hidden="true"
+        className={cn(
+          'fixed inset-0 z-[1000] pointer-events-none w-full h-full',
+          className,
+        )}
         {...props}
       />,
-      document.body
+      document.body,
     )
-  }
+  },
 )
 
-Confetti.displayName = "Confetti"
+Confetti.displayName = 'Confetti'
 
-export default Confetti 
+export default Confetti

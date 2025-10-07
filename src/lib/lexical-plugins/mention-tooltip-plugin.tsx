@@ -10,25 +10,6 @@ export function MentionTooltipPlugin() {
   const triggerRef = useRef<HTMLDivElement>(null)
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  //   const { data: handle, isPending, isError } = useQuery({
-  //     queryKey: ['mention-tooltip', mentionText],
-  //     queryFn: async () => {
-  //       if (!mentionText) return null
-
-  //       try {
-  //         const res = await client.tweet.getHandles.$get({
-  //           query: mentionText.replaceAll('@', ''),
-  //         })
-
-  //         const { data } = await res.json()
-  //         return data || null
-  //       } catch (error) {
-  //         return null
-  //       }
-  //     },
-  //     enabled: !!mentionText,
-  //   })
-
   useEffect(() => {
     const clickHandler = (e: MouseEvent) => {
       const target = e.target as HTMLElement
@@ -89,30 +70,6 @@ export function MentionTooltipPlugin() {
   }
 
   const renderContent = () => {
-    // if (isPending) {
-    //   return (
-    //     <div className="flex items-center gap-2 py-2">
-    //       <Skeleton className="h-10 w-10 rounded-full bg-muted/60" />
-    //       <div className="space-y-1.5">
-    //         <Skeleton className="h-4 w-24 bg-muted/60" />
-    //         <Skeleton className="h-3 w-16 bg-muted/60" />
-    //       </div>
-    //     </div>
-    //   )
-    // }
-
-    // if (!handle || isError) {
-    //   return (
-    //     <div className="flex items-center gap-2 py-2 px-2 text-muted-foreground">
-    //       <AlertCircleIcon className="size-8 text-yellow-400" />
-    //       <div className="space-y-0.5 text-start">
-    //         <p className="font-medium text-yellow-400 leading-none">User not found</p>
-    //         <p className="text-xs opacity-60 text-white leading-none">@{mentionText.replace('@', '')}</p>
-    //       </div>
-    //     </div>
-    //   )
-    // }
-
     return (
       <a
         href={`https://x.com/${mentionText.replace('@', '')}`}
@@ -121,10 +78,6 @@ export function MentionTooltipPlugin() {
         className="w-full py-2 px-2 flex items-center justify-between gap-2 transition-colors hover:bg-gray-700 rounded-sm"
       >
         <div className="flex justify-start items-center gap-2">
-          {/* <Avatar>
-            <AvatarImage src={handle.profile_image_url} />
-            <AvatarFallback>{handle.name?.charAt(0)}</AvatarFallback>
-          </Avatar> */}
           <div className="text-start">
             {/* <p className="text-sm font-medium leading-none">{handle.name}</p> */}
             <p className="text-xs leading-none">
