@@ -17,12 +17,6 @@ const openrouter = createOpenRouter({
 })
 
 const singleTweetSchema = z.object({
-  tweetContent: z
-    .string()
-    .optional()
-    .describe(
-      "Optional: If a user wants changes to a specific tweet, write that tweet's content here. Copy it EXACTLY 1:1 without ANY changes whatsoever - same casing, formatting, etc. If user is not talking about a specific previously generated tweet, leave undefined.",
-    ),
   imageDescriptions: z
     .array(z.string())
     .optional()
@@ -37,7 +31,7 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
     description:
       'Used to create tweets. Can create a single tweet, a thread (tweets separated by ---), multiple separate tweets (separated by ===), or multiple threads.',
     inputSchema: singleTweetSchema,
-    execute: async ({ tweetContent, imageDescriptions }) => {
+    execute: async ({ imageDescriptions }) => {
       const generationId = nanoid()
 
       writer.write({
@@ -126,24 +120,18 @@ Examples:
 
       prompt.close('history')
 
-      if (ctx.tweets.length > 1) {
-        prompt.open('thread_draft')
-        ctx.tweets.forEach((tweet) => {
-          prompt.tag('tweet_draft', tweet.content)
+      const formattedTweetContent = ctx.tweets.map((t) => t.content).join('\n---\n')
+
+      if (formattedTweetContent) {
+        prompt.tag('current_editor_content', formattedTweetContent, {
+          note: 'This is the current state of the editor. If the user is asking for changes, modifications, or edits, this is what they want you to work with.',
         })
-        prompt.close('thread_draft')
-      } else {
-        prompt.tag('tweet_draft', ctx.tweets[0]?.content ?? '')
       }
 
       // current job
       prompt.tag('user_request', ctx.rawUserMessage, {
         note: 'it is upon you to decide whether the user is referencing their previous history when iterating or if they are asking for changes in the current tweet drafts.',
       })
-
-      if (tweetContent) {
-        prompt.tag('user_is_referencing_tweet', tweetContent)
-      }
 
       // style
       const style = await styleGuide({
