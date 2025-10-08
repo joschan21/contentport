@@ -22,7 +22,7 @@ export const ProSubscriptionEmail = ({
 }: ProSubscriptionEmailProps) => (
   <Html>
     <Head />
-    <Preview>Welcome to Contentport Pro! Thanks for supporting us 💙</Preview>
+    <Preview>You upgraded to Contentport Pro! Thanks for supporting us</Preview>
     <Body style={main}>
       <Container style={container}>
         <Section style={header}>

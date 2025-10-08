@@ -19,7 +19,7 @@ interface WelcomeEmailProps {
 export const WelcomeEmail = ({ name = 'there' }: WelcomeEmailProps) => (
   <Html>
     <Head />
-    <Preview>Welcome to Contentport! Let's create some amazing content together ✨</Preview>
+    <Preview>We're already analyzing your most successful posts...</Preview>
     <Body style={main}>
       <Container style={container}>
         <Section style={header}>
