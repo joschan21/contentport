@@ -224,11 +224,8 @@ export const settingsRouter = j.router({
 
       for (const tweet of scheduledTweets) {
         if (tweet.qstashId) {
-          try {
-            await qstash.messages.delete(tweet.qstashId)
-          } catch (err) {
-            console.error(`Failed to cancel QStash job ${tweet.qstashId}:`, err)
-          }
+          // tweet is deleted later too
+          await qstash.messages.delete(tweet.qstashId).catch(() => {})
         }
       }
 

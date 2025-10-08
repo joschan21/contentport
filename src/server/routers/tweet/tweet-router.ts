@@ -1423,7 +1423,6 @@ export const tweetRouter = j.router({
 
         return c.json(result)
       } catch (error) {
-        console.error('Error fetching OG data:', error)
         return c.json({ image: null, title: null, description: null, siteName: null })
       }
     }),
