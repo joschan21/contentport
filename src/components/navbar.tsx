@@ -41,6 +41,16 @@ const Navbar = ({ title }: { title: string }) => {
               <span className="font-medium">Contentport</span>
             </Link>
           </div>
+          <div className="hidden sm:flex items-center gap-6 h-full">
+            <Link
+              href="/pricing"
+              className="text-sm px-4 group/pricing flex items-center font-medium h-full text-gray-700 hover:text-gray-900 transition-colors"
+            >
+              <p className="group-hover/pricing:text-gray-900 group-hover/pricing:underline">
+                Pricing
+              </p>
+            </Link>
+          </div>
           <div className="flex ml-auto sm:hidden">
             <button
               type="button"
@@ -51,26 +61,25 @@ const Navbar = ({ title }: { title: string }) => {
               <Menu aria-hidden="true" className="size-6" />
             </button>
           </div>
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="hidden sm:flex items-center h-full">
             {!isAuthenticated ? (
-              <Link href="/sign-in">
-                <DuolingoButton
-                  className="whitespace-nowrap"
-                  size="sm"
-                  variant="secondary"
-                >
-                  Sign in
-                </DuolingoButton>
+              <Link
+                href="/sign-in"
+                className="text-sm px-4 group/sign-in flex items-center font-medium h-full text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                <p className="group-hover/sign-in:text-gray-900 group-hover/sign-in:underline">
+                  Sign In
+                </p>
               </Link>
             ) : null}
             {isAuthenticated ? (
-              <Link href="/studio">
+              <Link href="/studio" className="h-full flex items-center px-2">
                 <DuolingoButton size="sm" className="whitespace-nowrap">
                   Dashboard
                 </DuolingoButton>
               </Link>
             ) : (
-              <Link href="/sign-up">
+              <Link href="/sign-up" className="h-full flex items-center px-2">
                 <DuolingoButton size="sm" className="whitespace-nowrap">
                   Get Started
                 </DuolingoButton>
@@ -99,35 +108,37 @@ const Navbar = ({ title }: { title: string }) => {
                   <X aria-hidden="true" className="size-6" />
                 </button>
               </div>
-              <div className="mt-6 flow-root">
-                <div className="-my-6 divide-y divide-gray-500/10">
-                  <div className="py-6 flex flex-col gap-4">
-                    {!isAuthenticated ? (
-                      <Link href="/sign-in">
-                        <DuolingoButton
-                          className="whitespace-nowrap"
-                          size="sm"
-                          variant="secondary"
-                        >
-                          Sign in
-                        </DuolingoButton>
-                      </Link>
-                    ) : null}
-                    {isAuthenticated ? (
-                      <Link href="/studio">
-                        <DuolingoButton size="sm" className="whitespace-nowrap">
-                          Dashboard
-                        </DuolingoButton>
-                      </Link>
-                    ) : (
-                      <Link href="/sign-up">
-                        <DuolingoButton size="sm" className="whitespace-nowrap">
-                          Get Started
-                        </DuolingoButton>
-                      </Link>
-                    )}
-                  </div>
-                </div>
+              <div className="py-6">
+                <Link
+                  href="/pricing"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="-mx-3 block rounded-lg px-3 py-4 text-base font-medium text-gray-900"
+                >
+                  Pricing
+                </Link>
+                {!isAuthenticated ? (
+                  <Link
+                    href="/sign-in"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="-mx-3 block rounded-lg px-3 py-4 text-base font-medium text-gray-900"
+                  >
+                    Sign In
+                  </Link>
+                ) : null}
+
+                {isAuthenticated ? (
+                  <Link href="/studio" className="block pt-4">
+                    <DuolingoButton size="sm" className="whitespace-nowrap">
+                      Dashboard
+                    </DuolingoButton>
+                  </Link>
+                ) : (
+                  <Link href="/sign-up" className="block pt-4">
+                    <DuolingoButton size="sm" className="whitespace-nowrap">
+                      Get Started
+                    </DuolingoButton>
+                  </Link>
+                )}
               </div>
             </div>
           </div>
