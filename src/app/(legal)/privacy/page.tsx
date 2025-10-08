@@ -8,7 +8,7 @@ import { notFound } from 'next/navigation'
 import { Prose } from '@/components/prose'
 import type { Metadata } from 'next'
 
-export const revalidate = 60 * 60 // 1 hour
+export const revalidate = 3600
 
 export async function generateMetadata(): Promise<Metadata> {
   const data = await getSinglePost('privacy-policy')
