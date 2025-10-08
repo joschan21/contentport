@@ -81,7 +81,7 @@ export const ProSubscriptionEmail = ({
             <Text style={contactItem}>
               💬{' '}
               <strong>
-                X DMs:{' '}
+                Twitter DMs:{' '}
                 <Link href="https://x.com/joshtriedcoding" style={link}>
                   @joshtriedcoding
                 </Link>{' '}
