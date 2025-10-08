@@ -81,7 +81,7 @@ export const ProSubscriptionEmail = ({
             <Text style={contactItem}>
               💬{' '}
               <strong>
-                Twitter DMs:{' '}
+                X DMs:{' '}
                 <Link href="https://x.com/joshtriedcoding" style={link}>
                   @joshtriedcoding
                 </Link>{' '}
@@ -106,6 +106,12 @@ export const ProSubscriptionEmail = ({
             We're usually super responsive (we promise we're not bots 💀) and love hearing
             from our users. Whether it's a question, feature request, or just to say hi -
             we're here!
+          </Text>
+
+          <Text style={signature}>
+            Jo & Josh
+            <br />
+            Founders, Contentport
           </Text>
 
           {invoicePdfUrl && (
