@@ -330,6 +330,43 @@ export const LeftSidebar = () => {
         {isCollapsed && (
           <div className="absolute w-10 mx-auto top-0 left-0 right-0 border-t border-stone-200" />
         )}
+        {/* Support */}
+        <Link
+          suppressHydrationWarning
+          href={{
+            pathname: '/studio/support',
+            search: id ? `?chatId=${id}` : undefined,
+          }}
+          className={cn(
+            buttonVariants({
+              variant: 'ghost',
+              className:
+                'w-full cursor-pointer h-14 group/contact justify-start gap-2 p-2 hover:bg-transparent',
+            }),
+          )}
+        >
+          <div
+            className={cn(
+              'relative w-full h-10 flex group-hover/contact:bg-stone-200 transition-colors rounded-md items-center flex-shrink-0',
+              { 'bg-stone-200': pathname === '/studio/support' },
+            )}
+          >
+            <div className="!w-12">
+              <Icons.outboxTray className="size-[18px] w-12" />
+            </div>
+            <span
+              data-state={isCollapsed ? 'collapsed' : 'expanded'}
+              className={cn(
+                'data-[state=expanded]:animate-in data-[state=expanded]:fade-in data-[state=collapsed]:animate-out data-[state=collapsed]:fade-out fill-mode-forwards duration-200 absolute left-12',
+                { 'opacity-0': !isMounted },
+              )}
+            >
+              Support
+            </span>
+          </div>
+        </Link>
+
+        {/* Settings */}
         <Link
           suppressHydrationWarning
           href={{
