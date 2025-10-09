@@ -12,7 +12,6 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { useAccount } from '@/hooks/account-ctx'
 import { useAttachments } from '@/hooks/use-attachments'
 import { useChatContext } from '@/hooks/use-chat'
 import { PayloadTweet, useTweetsV2 } from '@/hooks/use-tweets-v2'
@@ -21,18 +20,15 @@ import { client } from '@/lib/client'
 import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
 import type { RealtimeEvents } from '@/lib/realtime'
-import { cn } from '@/lib/utils'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
-import { CheckIcon } from '@phosphor-icons/react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useRealtime } from '@upstash/realtime/client'
 import { formatDistanceToNow } from 'date-fns'
 import { motion } from 'framer-motion'
-import { HTTPException } from 'hono/http-exception'
 import {
   $createParagraphNode,
   $createTextNode,
@@ -43,146 +39,18 @@ import {
   KEY_ENTER_COMMAND,
   PASTE_COMMAND,
 } from 'lexical'
-import { ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import toast from 'react-hot-toast'
 import { Loader } from './ai-elements/loader'
 import { AttachmentItem } from './attachment-item'
 import { Messages } from './chat/messages'
-import { Icons } from './icons'
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import DuolingoButton from './ui/duolingo-button'
 import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-upload'
 import { Modal } from './ui/modal'
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { PromptSuggestion } from './ui/prompt-suggestion'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 
-const AccountSwitcher = () => {
-  const { account: activeAccount } = useAccount()
-  const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
 
-  const { data: accounts } = useQuery({
-    queryKey: ['accounts'],
-    queryFn: async () => {
-      const res = await client.settings.list_accounts.$get()
-      const { accounts } = await res.json()
-      return accounts
-    },
-  })
-
-  const {
-    mutate: switchAccount,
-    isPending: isSwitching,
-    variables: switchAccountVariables,
-  } = useMutation({
-    mutationFn: async ({ accountId }: { accountId: string }) => {
-      const res = await client.settings.switch_account.$post({ accountId })
-      return await res.json()
-    },
-    onSuccess: ({ account }) => {
-      toast.success(`Switched to ${account.name}`)
-      setOpen(false)
-    },
-    onError: (error: HTTPException) => {
-      toast.error(error.message)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['get-active-account'] })
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
-    },
-  })
-
-  if (!activeAccount || !accounts?.length) return null
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="group flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-stone-200 transition-colors">
-          <Avatar className="size-7 ring-2 ring-white">
-            <AvatarImage
-              src={activeAccount.profile_image_url?.replace('_normal', '_200x200')}
-              alt={activeAccount.username}
-            />
-            <AvatarFallback className="bg-primary/10 text-primary text-xs">
-              {(
-                activeAccount.name?.[0] ||
-                activeAccount.username?.[0] ||
-                '?'
-              ).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="hidden sm:flex items-center gap-1">
-            <span className="text-sm font-medium text-stone-700 max-w-24 truncate">
-              {activeAccount.name}
-            </span>
-            <ChevronDown className="size-3.5 text-stone-500 group-hover:text-stone-700 transition-colors" />
-          </div>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-72 p-2" align="start" side="bottom">
-        <div className="space-y-1">
-          <div className="px-2 py-1.5">
-            <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">
-              Switch Account
-            </p>
-          </div>
-          {accounts.map((acc) => {
-            const isActive = acc.id === activeAccount.id
-            const isSwitchingThis =
-              isSwitching && switchAccountVariables?.accountId === acc.id
-
-            return (
-              <button
-                key={acc.id}
-                onClick={() => !isActive && switchAccount({ accountId: acc.id })}
-                disabled={isActive || isSwitchingThis}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group',
-                  isActive
-                    ? 'bg-gray-100 cursor-default'
-                    : 'hover:bg-stone-100 cursor-pointer',
-                )}
-              >
-                <Avatar className="size-9 ring-2 ring-white shrink-0">
-                  <AvatarImage
-                    src={acc.profile_image_url?.replace('_normal', '_200x200')}
-                    alt={acc.username}
-                  />
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                    {(acc.name?.[0] || acc.username?.[0] || '?').toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-medium text-stone-900 truncate">
-                      {acc.name}
-                    </p>
-                    {acc.verified && (
-                      <Icons.verificationBadge className="size-3.5 shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-xs text-stone-500 truncate">@{acc.username}</p>
-                </div>
-                <div className="shrink-0">
-                  {isSwitchingThis ? (
-                    <Loader />
-                  ) : isActive ? (
-                    <div className="size-5 rounded-full bg-stone-800 flex items-center justify-center">
-                      <CheckIcon weight="bold" className="size-3 text-white" />
-                    </div>
-                  ) : null}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
 
 const ChatInput = ({
   onSubmit,
@@ -535,10 +403,10 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
       {children}
 
       <Sidebar side="right" collapsible="offcanvas">
-        <SidebarHeader className="flex flex-col border-b border-stone-200 bg-stone-100 items-center justify-end gap-2 px-2">
+        <SidebarHeader className="flex flex-col border-b border-stone-200 bg-stone-100 items-center justify-end gap-2 px-4">
           <div className="w-full flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <AccountSwitcher />
+              <p className='text-sm font-medium'>Assistant</p>
             </div>
             <div className="flex gap-2">
               <TooltipProvider>

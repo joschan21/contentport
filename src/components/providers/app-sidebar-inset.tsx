@@ -35,6 +35,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { HTTPException } from 'hono/http-exception'
 import { Tweet } from '@/db/schema'
 import { pollTweetStatus } from '@/lib/poll-tweet-status'
+import { AccountSwitcher } from '../account-switcher'
 
 export function AppSidebarInset({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient()
@@ -656,6 +657,10 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                 </div>
               )}
             </div>
+
+           
+                  <AccountSwitcher />
+               
 
             <TooltipProvider delayDuration={0}>
               <Tooltip>

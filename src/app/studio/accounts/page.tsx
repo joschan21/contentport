@@ -133,7 +133,11 @@ export default function AccountsPage() {
       return await res.json()
     },
     onSuccess: ({ account }) => {
-      toast.success(`Switched to ${account.name}`)
+      toast.success(
+        <span>
+          Switched to <span className="font-medium text-gray-800">{account.name}</span>.
+        </span>,
+      )
     },
     onError: (error: HTTPException) => {
       toast.error(error.message)
@@ -351,7 +355,7 @@ export default function AccountsPage() {
                         </div>
 
                         <div className="flex items-center gap-2.5">
-                          {acc.postIndexingStatus === "started" ? (
+                          {acc.postIndexingStatus === 'started' ? (
                             <DuolingoBadge variant="gray" className="text-xs px-2">
                               <Loader className="size-3.5" />
                               <span className="ml-1.5">Indexing...</span>
