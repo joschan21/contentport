@@ -1,7 +1,6 @@
+import { AlertCircle, X } from 'lucide-react'
 import { useState } from 'react'
-import DuolingoButton from '@/components/ui/duolingo-button'
-import { AlertCircle, CheckCircle, Loader2, X } from 'lucide-react'
-import { Loader } from './ui/loader'
+import { Loader } from './ai-elements/loader'
 import {
   Dialog,
   DialogClose,
@@ -36,7 +35,7 @@ export default function MediaDisplay({
         <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center">
           {mediaFile.uploading && (
             <div className="flex flex-col gap-2 items-center text-white text-center">
-              <Loader2 className="animate-spin text-white" />
+              <Loader />
               <p className="text-sm">Uploading</p>
             </div>
           )}
@@ -52,7 +51,10 @@ export default function MediaDisplay({
   )
 
   const renderImage = (mediaFile: MediaFile, className: string) => (
-    <Dialog open={openImageUrl === mediaFile.url} onOpenChange={(open) => setOpenImageUrl(open ? mediaFile.url : null)}>
+    <Dialog
+      open={openImageUrl === mediaFile.url}
+      onOpenChange={(open) => setOpenImageUrl(open ? mediaFile.url : null)}
+    >
       <DialogTrigger asChild>
         <img
           src={mediaFile.url}
@@ -97,7 +99,7 @@ export default function MediaDisplay({
                 controls
               />
             ) : (
-              renderImage(mediaFiles[0], "w-full max-h-[510px] object-cover")
+              renderImage(mediaFiles[0], 'w-full max-h-[510px] object-cover')
             )}
             {renderMediaOverlays(mediaFiles[0])}
           </div>
@@ -110,13 +112,13 @@ export default function MediaDisplay({
             <div key={mediaFile.url} className="relative group">
               <div className="relative overflow-hidden h-[254px]">
                 {mediaFile.type === 'video' ? (
-                  <video 
-                    src={mediaFile.url} 
+                  <video
+                    src={mediaFile.url}
                     className="w-full h-full object-cover"
                     controls
                   />
                 ) : (
-                  renderImage(mediaFile, "w-full h-full object-cover")
+                  renderImage(mediaFile, 'w-full h-full object-cover')
                 )}
                 {renderMediaOverlays(mediaFile)}
               </div>
@@ -130,13 +132,13 @@ export default function MediaDisplay({
           <div className="relative group">
             <div className="relative overflow-hidden h-full">
               {mediaFiles[0].type === 'video' ? (
-                <video 
-                  src={mediaFiles[0].url} 
+                <video
+                  src={mediaFiles[0].url}
                   className="w-full h-full object-cover"
                   controls
                 />
               ) : (
-                renderImage(mediaFiles[0], "w-full h-full object-cover")
+                renderImage(mediaFiles[0], 'w-full h-full object-cover')
               )}
               {renderMediaOverlays(mediaFiles[0])}
             </div>
@@ -152,7 +154,7 @@ export default function MediaDisplay({
                       controls
                     />
                   ) : (
-                    renderImage(mediaFile, "w-full h-full object-cover")
+                    renderImage(mediaFile, 'w-full h-full object-cover')
                   )}
                   {renderMediaOverlays(mediaFile)}
                 </div>
@@ -168,13 +170,13 @@ export default function MediaDisplay({
             <div key={mediaFile.url} className="relative group">
               <div className="relative overflow-hidden h-full">
                 {mediaFile.type === 'video' ? (
-                  <video 
-                    src={mediaFile.url} 
+                  <video
+                    src={mediaFile.url}
                     className="w-full h-full object-cover"
                     controls
                   />
                 ) : (
-                  renderImage(mediaFile, "w-full h-full object-cover")
+                  renderImage(mediaFile, 'w-full h-full object-cover')
                 )}
                 {renderMediaOverlays(mediaFile)}
               </div>

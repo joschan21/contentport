@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Container } from '@/components/container'
 import DuolingoButton from '@/components/ui/duolingo-button'
-import { Loader } from '@/components/ui/loader'
 import {
   Tooltip,
   TooltipContent,
@@ -21,6 +20,7 @@ import toast from 'react-hot-toast'
 import { EmptyState } from './empty-state'
 import { FeedSettingsModal } from './feed-settings-modal'
 import { Feed } from './topic-monitor'
+import { Loader } from '@/components/ai-elements/loader'
 
 const Page = () => {
   const queryClient = useQueryClient()
@@ -209,8 +209,8 @@ const Page = () => {
 
         {isPending ? (
           <div className="flex items-center gap-2.5">
-            <Loader variant="classic" size="sm" />
-            <p className="text-gray-800">Getting relevant tweets...</p>
+            <Loader />
+            <p className="text-gray-500">Getting relevant tweets...</p>
           </div>
         ) : isFetched && data?.length === 0 ? (
           <EmptyState

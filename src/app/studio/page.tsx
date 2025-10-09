@@ -1,12 +1,11 @@
 'use client'
 
 import TweetEditor from '@/components/tweet-editor/tweet-editor'
-import { OnboardingModal } from '@/frontend/studio/components/onboarding-modal'
 import { useAccount } from '@/hooks/account-ctx'
+import { client } from '@/lib/client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { redirect, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { client } from '@/lib/client'
+import { useEffect } from 'react'
 
 const Page = () => {
   const router = useRouter()

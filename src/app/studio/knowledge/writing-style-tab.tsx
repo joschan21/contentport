@@ -1,4 +1,3 @@
-import { Loader } from '@/components/ui/loader'
 import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
 import { useRealtime } from '@upstash/realtime/client'
@@ -9,6 +8,7 @@ import { Feed } from '../topic-monitor/topic-monitor'
 import { mapToConnectedAccount } from '@/hooks/account-ctx'
 import Link from 'next/link'
 import { XIcon } from '@phosphor-icons/react'
+import { Loader } from '@/components/ai-elements/loader'
 
 export const WritingStyleTab = () => {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -73,7 +73,7 @@ export const WritingStyleTab = () => {
   if (status === 'connecting' || status === 'connected') {
     return (
       <div className="flex items-center gap-2.5">
-        <Loader variant="classic" size="sm" />
+        <Loader />
         <p className="text-gray-500">Indexing your tweets, please wait...</p>
       </div>
     )
@@ -98,7 +98,7 @@ export const WritingStyleTab = () => {
     <div>
       {isPending ? (
         <div className="flex items-center gap-2.5">
-          <Loader variant="classic" size="sm" />
+          <Loader />
           <p className="text-sm text-gray-800">Loading tweets...</p>
         </div>
       ) : (

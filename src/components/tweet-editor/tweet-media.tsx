@@ -1,9 +1,9 @@
 import { MediaFile, useTweetsV2 } from '@/hooks/use-tweets-v2'
-import { Loader } from '../ui/loader'
 import { AlertCircle, Download, MessageSquarePlus, X } from 'lucide-react'
 import DuolingoButton from '../ui/duolingo-button'
 import toast from 'react-hot-toast'
 import { useAttachments } from '@/hooks/use-attachments'
+import { Loader } from '../ai-elements/loader'
 
 const RenderMediaOverlay = ({
   tweetId,
@@ -41,7 +41,7 @@ const RenderMediaOverlay = ({
         <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
           {mediaFile.uploading && (
             <div className="text-white flex flex-col items-center gap-1.5 text-center">
-              <Loader variant="classic" />
+              <Loader />
               <p className="text-sm/6 font-medium">Uploading</p>
             </div>
           )}
