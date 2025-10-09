@@ -7,6 +7,8 @@ import { ChevronsLeft, Check } from 'lucide-react'
 import { PropsWithChildren, memo, useState, useEffect } from 'react'
 import DuolingoButton from '../ui/duolingo-button'
 import { cn } from '@/lib/utils'
+import { usePathname, useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 
 export const TweetMockup = memo(
   ({
@@ -27,6 +29,8 @@ export const TweetMockup = memo(
   }>) => {
     const { tweets, addTweet, updateTweet } = useTweetsV2()
     const [isApplied, setIsApplied] = useState(false)
+    const pathname = usePathname()
+    const router = useRouter()
 
     useEffect(() => {
       if (isApplied) {
@@ -85,6 +89,20 @@ export const TweetMockup = memo(
       }
       
       setIsApplied(true)
+      
+      if (pathname !== "/studio") {
+        toast.success(
+          <div className="flex items-center gap-2">
+            <span>Tweet applied!</span>
+            <button
+              onClick={() => router.push('/studio')}
+              className="font-medium text-gray-800 hover:text-gray-800 underline"
+            >
+              Go to Studio
+            </button>
+          </div>
+        )
+      }
     }
 
     return (
