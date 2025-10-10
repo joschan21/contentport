@@ -183,7 +183,10 @@ export const QueueSettingsModal = ({
         ) : (
           <div className="space-y-6">
             <div className="border rounded-lg overflow-hidden">
-              <div className="grid grid-cols-8 bg-muted">
+              <div
+                className="grid bg-muted"
+                style={{ gridTemplateColumns: 'minmax(140px, auto) repeat(7, 1fr)' }}
+              >
                 <div className="p-3 text-sm font-medium border-r">Time</div>
                 {DAYS.map((day) => (
                   <div
@@ -197,26 +200,30 @@ export const QueueSettingsModal = ({
 
               <div className="divide-y max-h-[400px] overflow-y-auto">
                 {availableTimes.map((time) => (
-                  <div key={time} className="grid grid-cols-8 hover:bg-muted/50">
-                    <div className="p-3 text-sm border-r flex items-center justify-between">
-                      <span>{formatTime(time)}</span>
+                  <div
+                    key={time}
+                    className="grid hover:bg-muted/50"
+                    style={{ gridTemplateColumns: 'minmax(140px, auto) repeat(7, 1fr)' }}
+                  >
+                    <div className="px-4 py-3.5 text-sm border-r flex items-center justify-between gap-4">
+                      <span className="whitespace-nowrap">{formatTime(time)}</span>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
                         onClick={() => removeTimeSlot(time)}
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                     {DAYS.map((day) => (
                       <div
                         key={`${day.value}-${time}`}
-                        className="p-3 border-r last:border-r-0 flex items-center justify-center"
+                        className="p-3 border-r last:border-r-0 flex items-center justify-center cursor-pointer hover:bg-muted/70"
+                        onClick={() => toggleSlot(day.value, time)}
                       >
                         <Checkbox
                           checked={settings[day.value]?.includes(time) ?? false}
-                          onCheckedChange={() => toggleSlot(day.value, time)}
                         />
                       </div>
                     ))}
