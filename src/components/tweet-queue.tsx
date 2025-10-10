@@ -290,7 +290,7 @@ export default function TweetQueue() {
                                   {baseTweet ? 'Queued' : 'Empty'}
                                 </DuolingoBadge>
                               ) : baseTweet ? (
-                                <DuolingoBadge variant="amber" className="text-xs">
+                                <DuolingoBadge variant="achievement" className="text-xs">
                                   Manual
                                 </DuolingoBadge>
                               ) : null}
