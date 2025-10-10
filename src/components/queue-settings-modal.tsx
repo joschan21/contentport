@@ -39,9 +39,11 @@ const generateTimeOptions = () => {
   const options = []
   for (let i = 0; i < 24 * 4; i++) {
     const totalMinutes = i * 15
-    const hours = Math.floor(totalMinutes / 60)
+    const hours24 = Math.floor(totalMinutes / 60)
     const minutes = totalMinutes % 60
-    const label = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+    const period = hours24 >= 12 ? 'PM' : 'AM'
+    const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24
+    const label = `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
     options.push({ value: totalMinutes, label })
   }
   return options
@@ -50,9 +52,11 @@ const generateTimeOptions = () => {
 const TIME_OPTIONS = generateTimeOptions()
 
 const formatTime = (minutesFromMidnight: number) => {
-  const hours = Math.floor(minutesFromMidnight / 60)
+  const hours24 = Math.floor(minutesFromMidnight / 60)
   const minutes = minutesFromMidnight % 60
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+  const period = hours24 >= 12 ? 'PM' : 'AM'
+  const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
 }
 
 export const QueueSettingsModal = ({
