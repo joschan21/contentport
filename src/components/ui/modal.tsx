@@ -33,6 +33,11 @@ export function Modal({
   useEffect(() => {
     const cleanup = () => {
       document.body.style.pointerEvents = ''
+      document.body.style.overflow = ''
+    }
+
+    if (showModal) {
+      document.body.style.overflow = 'hidden'
     }
 
     if (!showModal) {
