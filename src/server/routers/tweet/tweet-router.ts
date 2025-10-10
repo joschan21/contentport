@@ -18,14 +18,12 @@ import { getAccount } from '../utils/get-account'
 import { ensureValidMedia } from '../utils/upload-media-to-twitter'
 import { fetchMediaFromS3 } from './fetch-media-from-s3'
 
-import { getNextAvailableQueueSlot, applyNaturalPostingTime } from './queue-utils'
+import { getNextAvailableQueueSlot, applyNaturalPostingTime, getQueueSlotsForAccount } from './queue-utils'
 import { vector } from '@/lib/vector'
 import { getScheduledTweetCount } from '../utils/get-scheduled-tweet-count'
 
 const consumerKey = process.env.TWITTER_CONSUMER_KEY as string
 const consumerSecret = process.env.TWITTER_CONSUMER_SECRET as string
-
-const SLOTS = [10, 12, 14]
 
 const payloadTweetSchema = z.object({
   id: z.string(),
@@ -1173,15 +1171,32 @@ export const tweetRouter = j.router({
         return null
       }
 
+      const queueSettings = await getQueueSlotsForAccount(account.id)
+
+      const furthestScheduledTweet = scheduledTweets.reduce((max, tweet) => {
+        if (!tweet.scheduledUnix) return max
+        return tweet.scheduledUnix > max ? tweet.scheduledUnix : max
+      }, 0)
+
+      const daysToShow = furthestScheduledTweet > 0
+        ? Math.min(90, Math.max(8, Math.ceil((furthestScheduledTweet - today.getTime()) / (1000 * 60 * 60 * 24)) + 14))
+        : 8
+
       const all: Array<Record<number, Array<number>>> = []
 
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < daysToShow; i++) {
         const currentDay = addDays(today, i)
+        const dayOfWeek = currentDay.getDay()
+        const slotsForDay = queueSettings[dayOfWeek.toString()] || []
 
-        const unixTimestamps = SLOTS.map((hour) => {
-          const localDate = startOfHour(setHours(currentDay, hour))
-          const utcDate = fromZonedTime(localDate, timezone)
-          return utcDate.getTime()
+        const unixTimestamps = slotsForDay.map((minutesFromMidnight) => {
+          const hours = Math.floor(minutesFromMidnight / 60)
+          const minutes = minutesFromMidnight % 60
+          const localDate = fromZonedTime(
+            new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate(), hours, minutes),
+            timezone
+          )
+          return localDate.getTime()
         })
 
         all.push({ [currentDay.getTime()]: unixTimestamps })
@@ -1291,6 +1306,82 @@ export const tweetRouter = j.router({
         scheduledUnix: nextSlot.getTime(),
         scheduledDate: nextSlot.toISOString(),
       })
+    }),
+
+  get_queue_settings: privateProcedure.get(async ({ c, ctx }) => {
+    const { user } = ctx
+
+    const account = await getAccount({
+      email: user.email,
+    })
+
+    if (!account?.id) {
+      throw new HTTPException(400, {
+        message: 'Please connect your Twitter account',
+      })
+    }
+
+    const queueSettings = await getQueueSlotsForAccount(account.id)
+
+    return c.json({ queueSettings })
+  }),
+
+  update_queue_settings: privateProcedure
+    .input(
+      z.object({
+        queueSettings: z.record(z.string(), z.array(z.number())),
+      }),
+    )
+    .post(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { queueSettings } = input
+
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
+      }
+
+      const hasAtLeastOneSlot = Object.values(queueSettings).some((slots) => slots.length > 0)
+
+      if (!hasAtLeastOneSlot) {
+        throw new HTTPException(400, {
+          message: 'At least one time slot must be enabled',
+        })
+      }
+
+      const allSlots = new Set<number>()
+      for (const [day, slots] of Object.entries(queueSettings)) {
+        slots.forEach((slot) => allSlots.add(slot))
+      }
+
+      if (allSlots.size > 10) {
+        throw new HTTPException(400, {
+          message: 'Maximum 10 unique time slots allowed',
+        })
+      }
+
+      for (const [day, slots] of Object.entries(queueSettings)) {
+
+        for (const slot of slots) {
+          if (slot < 0 || slot >= 1440 || slot % 15 !== 0) {
+            throw new HTTPException(400, {
+              message: 'Invalid time slot. Must be in 15-minute intervals between 00:00 and 23:45',
+            })
+          }
+        }
+      }
+
+      await db
+        .update(accountSchema)
+        .set({ queueSettings, updatedAt: new Date() })
+        .where(eq(accountSchema.id, account.id))
+
+      return c.json({ success: true, queueSettings })
     }),
 
   getOpenGraph: privateProcedure

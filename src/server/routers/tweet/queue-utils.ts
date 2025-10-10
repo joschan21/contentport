@@ -1,10 +1,20 @@
 import { db } from '@/db'
-import { tweets } from '@/db/schema'
-import { addDays, isAfter, setHours, startOfDay, startOfHour } from 'date-fns'
+import { account as accountSchema, tweets } from '@/db/schema'
+import { addDays, getDay, isAfter, setHours, setMinutes, startOfDay, startOfHour } from 'date-fns'
 import { fromZonedTime } from 'date-fns-tz'
 import { and, eq } from 'drizzle-orm'
 
-const SLOTS = [10, 12, 14]
+const DEFAULT_SLOTS = [600, 720, 840]
+
+const getDefaultQueueSettings = (): Record<string, number[]> => {
+  return {
+    '1': DEFAULT_SLOTS,
+    '2': DEFAULT_SLOTS,
+    '3': DEFAULT_SLOTS,
+    '4': DEFAULT_SLOTS,
+    '5': DEFAULT_SLOTS,
+  }
+}
 
 export function applyNaturalPostingTime(scheduledUnix: number): number {
   const fourMinutesInMs = 4 * 60 * 1000
@@ -28,9 +38,15 @@ export async function getNextAvailableQueueSlot({
   isAdmin?: boolean
 }): Promise<Date | null> {
   if (process.env.VERCEL_ENV === 'preview' || isAdmin) {
-    // allow testing queue slots
     return new Date(userNow.getTime() + 60000)
   }
+
+  const dbAccount = await db.query.account.findFirst({
+    where: eq(accountSchema.id, accountId),
+    columns: { queueSettings: true },
+  })
+
+  const queueSettings = dbAccount?.queueSettings || getDefaultQueueSettings()
 
   const scheduledTweets = await db.query.tweets.findMany({
     where: and(
@@ -53,8 +69,14 @@ export async function getNextAvailableQueueSlot({
     if (dayOffset === 0) checkDay = startOfDay(userNow)
     else checkDay = startOfDay(addDays(userNow, dayOffset))
 
-    for (const hour of SLOTS) {
-      const localSlotTime = startOfHour(setHours(checkDay, hour))
+    const dayOfWeek = getDay(checkDay)
+    const slotsForDay = queueSettings[dayOfWeek.toString()] || []
+
+    for (const minutesFromMidnight of slotsForDay) {
+      const hours = Math.floor(minutesFromMidnight / 60)
+      const minutes = minutesFromMidnight % 60
+
+      const localSlotTime = setMinutes(setHours(checkDay, hours), minutes)
       const slotTime = fromZonedTime(localSlotTime, timezone)
 
       if (isAfter(slotTime, userNow) && isSpotEmpty(slotTime)) {
@@ -64,4 +86,13 @@ export async function getNextAvailableQueueSlot({
   }
 
   return null
+}
+
+export async function getQueueSlotsForAccount(accountId: string): Promise<Record<string, number[]>> {
+  const dbAccount = await db.query.account.findFirst({
+    where: eq(accountSchema.id, accountId),
+    columns: { queueSettings: true },
+  })
+
+  return dbAccount?.queueSettings || getDefaultQueueSettings()
 }

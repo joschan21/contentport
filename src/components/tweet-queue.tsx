@@ -3,7 +3,15 @@
 import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { format, isThisWeek, isToday, isTomorrow } from 'date-fns'
+import {
+  format,
+  isThisWeek,
+  isToday,
+  isTomorrow,
+  differenceInDays,
+  isWeekend,
+  startOfDay,
+} from 'date-fns'
 import { ArrowRight, Clock, Edit, MoreHorizontal, Send, Trash2 } from 'lucide-react'
 
 import { useConfetti } from '@/hooks/use-confetti'
@@ -157,20 +165,64 @@ export default function TweetQueue() {
 
   if (isPending) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col items-center justify-center text-center py-12">
-          <Loader />
-          <p className="text-sm text-stone-500 mt-4">Loading queue...</p>
-        </div>
+      <div className="flex items-center justify-center text-center py-12 gap-2">
+        <Loader />
+        <p className="text-stone-500">Loading your queue...</p>
       </div>
     )
   }
 
   const renderDay = (unix: number) => {
-    if (isToday(unix)) return `Today | ${format(unix, 'MMM d')}`
-    if (isTomorrow(unix)) return `Tomorrow | ${format(unix, 'MMM d')}`
-    if (isThisWeek(unix)) return `${format(unix, 'EEEE')} | ${format(unix, 'MMM d')}`
-    return format(unix, 'MMM d')
+    const date = new Date(unix)
+    const weekday = format(date, 'EEEE')
+    const monthDay = format(date, 'MMM d')
+    const daysAway = differenceInDays(startOfDay(date), startOfDay(userNow))
+
+    if (isToday(unix)) {
+      return (
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-gray-900">Today</span>
+          <span className="text-gray-400">·</span>
+          <span className="text-gray-500">
+            {weekday}, {monthDay}
+          </span>
+        </div>
+      )
+    }
+
+    if (isTomorrow(unix)) {
+      return (
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-gray-900">Tomorrow</span>
+          <span className="text-gray-400">·</span>
+          <span className="text-gray-500">
+            {weekday}, {monthDay}
+          </span>
+        </div>
+      )
+    }
+
+    if (daysAway <= 6) {
+      return (
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-gray-900">{weekday}</span>
+          <span className="text-gray-400">·</span>
+          <span className="text-gray-500">{monthDay}</span>
+          <span className="text-gray-400">·</span>
+          <span className="text-gray-500">
+            in {daysAway} day{daysAway === 1 ? '' : 's'}
+          </span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="font-semibold text-gray-900">{weekday}</span>
+        <span className="text-gray-400">·</span>
+        <span className="text-gray-500">{monthDay}</span>
+      </div>
+    )
   }
 
   return (
@@ -179,13 +231,35 @@ export default function TweetQueue() {
         {data?.results.map((result) => {
           const [day, threads] = Object.entries(result)[0]!
 
-          if (threads.length === 0) return null
+          const dayUnix = Number(day)
+
+          if (threads.length === 0) {
+            const emptyDayMessage = isToday(dayUnix)
+              ? `No more open slots`
+              : 'No slots set'
+
+            return (
+              <Card key={day} className={cn('overflow-hidden opacity-50')}>
+                <CardHeader className="pb-0 block">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    {renderDay(dayUnix)}{' '}
+                    <p className="text-gray-500">- {emptyDayMessage}</p>
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+            )
+          }
 
           return (
             <Card key={day} className={cn('overflow-hidden')}>
               <CardHeader className="">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  {renderDay(Number(day))}
+                  {renderDay(dayUnix)}
+                  {/* {isWeekendDay && (
+                    <DuolingoBadge variant="gray" className="text-xs">
+                      Weekend
+                    </DuolingoBadge>
+                  )} */}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
