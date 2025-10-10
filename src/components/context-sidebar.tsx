@@ -22,7 +22,6 @@ import {
   SidebarHeader,
   useSidebar,
 } from './ui/sidebar'
-import { SidebarSimpleIcon } from '@phosphor-icons/react'
 
 const searchParams = {
   tweetId: parseAsString,

@@ -1,6 +1,7 @@
 'use client'
 
 import { AccountConnection } from '@/components/account-connection'
+import { Loader } from '@/components/ai-elements/loader'
 import { Container } from '@/components/container'
 import { Icons } from '@/components/icons'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -13,7 +14,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import DuolingoBadge from '@/components/ui/duolingo-badge'
 import DuolingoButton from '@/components/ui/duolingo-button'
-import { Loader } from '@/components/ui/loader'
 import { Modal } from '@/components/ui/modal'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
@@ -30,7 +30,6 @@ import {
   Check,
   Copy,
   Link as LinkIcon,
-  Loader2,
   MoreHorizontal,
   Plus,
   RefreshCw,
@@ -134,7 +133,11 @@ export default function AccountsPage() {
       return await res.json()
     },
     onSuccess: ({ account }) => {
-      toast.success(`Switched to ${account.name}`)
+      toast.success(
+        <span>
+          Switched to <span className="font-medium text-gray-800">{account.name}</span>.
+        </span>,
+      )
     },
     onError: (error: HTTPException) => {
       toast.error(error.message)
@@ -354,8 +357,8 @@ export default function AccountsPage() {
                         <div className="flex items-center gap-2.5">
                           {acc.postIndexingStatus === 'started' ? (
                             <DuolingoBadge variant="gray" className="text-xs px-2">
-                              <Loader variant="classic" size="xs" className="-mt-[2px]" />
-                              <span className="ml-2">Indexing...</span>
+                              <Loader className="size-3.5" />
+                              <span className="ml-1.5">Indexing...</span>
                             </DuolingoBadge>
                           ) : acc.postIndexingStatus === 'error' ? (
                             <DuolingoBadge variant="error" className="text-xs px-2">
@@ -407,7 +410,7 @@ export default function AccountsPage() {
                                 >
                                   {isSwitching &&
                                   switchAccountVariables?.accountId === acc.id ? (
-                                    <Loader2 className="size-4 animate-spin" />
+                                    <Loader />
                                   ) : (
                                     <UserSwitchIcon className="size-4 shrink-0" />
                                   )}
@@ -433,7 +436,7 @@ export default function AccountsPage() {
                                 >
                                   {isRefreshingProfile &&
                                   refreshProfileVariables?.accountId === acc.id ? (
-                                    <Loader2 className="size-4 animate-spin" />
+                                    <Loader />
                                   ) : (
                                     <RefreshCw className="size-4" />
                                   )}
@@ -458,7 +461,7 @@ export default function AccountsPage() {
                                   {isCreatingOAuthLink &&
                                   isCreatingOAuthLinkVariables?.action ===
                                     're-authenticate' ? (
-                                    <Loader2 className="size-4 animate-spin" />
+                                    <Loader />
                                   ) : (
                                     <XLogoIcon className="size-[18px]" />
                                   )}
@@ -483,7 +486,7 @@ export default function AccountsPage() {
                                 >
                                   {isDeletingAccount &&
                                   deleteAccountVariables?.accountId === acc.id ? (
-                                    <Loader2 className="size-4 animate-spin" />
+                                    <Loader />
                                   ) : (
                                     <Trash2 className="size-4" />
                                   )}
@@ -575,7 +578,7 @@ export default function AccountsPage() {
 
             {isCreatingInviteLink ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="size-6 animate-spin text-stone-500" />
+                <Loader />
               </div>
             ) : (
               <>

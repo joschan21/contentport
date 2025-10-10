@@ -203,6 +203,8 @@ export const settingsRouter = j.router({
             redis.del(`memories:${account.id}`),
             redis.del(`posts:${account.id}`),
             redis.del(`status:posts:${account.id}`),
+            redis.hdel(`received-welcome-email`, user.id),
+            redis.hdel(`attempted_indexing_users`, user.id),
           ])
         } catch (err) {
           console.error(`Failed to delete Redis keys for account ${account.id}:`, err)
@@ -222,11 +224,8 @@ export const settingsRouter = j.router({
 
       for (const tweet of scheduledTweets) {
         if (tweet.qstashId) {
-          try {
-            await qstash.messages.delete(tweet.qstashId)
-          } catch (err) {
-            console.error(`Failed to cancel QStash job ${tweet.qstashId}:`, err)
-          }
+          // tweet is deleted later too
+          await qstash.messages.delete(tweet.qstashId).catch(() => {})
         }
       }
 

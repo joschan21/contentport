@@ -20,7 +20,6 @@ import { client } from '@/lib/client'
 import { MultipleEditorStorePlugin } from '@/lib/lexical-plugins/multiple-editor-plugin'
 import PlaceholderPlugin from '@/lib/placeholder-plugin'
 import type { RealtimeEvents } from '@/lib/realtime'
-import { cn } from '@/lib/utils'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
@@ -40,17 +39,18 @@ import {
   KEY_ENTER_COMMAND,
   PASTE_COMMAND,
 } from 'lexical'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Loader } from './ai-elements/loader'
 import { AttachmentItem } from './attachment-item'
 import { Messages } from './chat/messages'
-import { Modal } from './ui/modal'
 import DuolingoButton from './ui/duolingo-button'
 import { FileUpload, FileUploadContext, FileUploadTrigger } from './ui/file-upload'
+import { Modal } from './ui/modal'
 import { PromptSuggestion } from './ui/prompt-suggestion'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
-import { Loader } from './ui/loader'
-import Link from 'next/link'
-import { mapToConnectedAccount } from '@/hooks/account-ctx'
+
+
 
 const ChatInput = ({
   onSubmit,
@@ -197,7 +197,7 @@ const ChatInput = ({
       <div className="mb-2 flex gap-2 items-center">
         {isIndexing ? (
           <div className="flex items-center gap-2">
-            <Loader variant="classic" size="xs" />
+            <Loader />
             <p className="text-sm text-gray-500 mt-1">Indexing your tweets</p>
             <p className="text-gray-500 mt-1 text-sm">•</p>
             <Link
@@ -405,7 +405,9 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
       <Sidebar side="right" collapsible="offcanvas">
         <SidebarHeader className="flex flex-col border-b border-stone-200 bg-stone-100 items-center justify-end gap-2 px-4">
           <div className="w-full flex items-center justify-between">
-            <p className="text-sm/6 font-medium">Assistant</p>
+            <div className="flex items-center gap-2">
+              <p className='text-sm font-medium'>Assistant</p>
+            </div>
             <div className="flex gap-2">
               <TooltipProvider>
                 <Tooltip>

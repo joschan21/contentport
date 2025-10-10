@@ -13,13 +13,14 @@ import {
 } from '@/components/ui/drawer'
 import { client } from '@/lib/client'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowRight, Dot, Gem, Loader } from 'lucide-react'
+import { Gem } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import type Stripe from 'stripe'
+import { Loader } from './ai-elements/loader'
 import DuolingoButton from './ui/duolingo-button'
-import dynamic from 'next/dynamic'
 
 const SenjaWidgetDynamic = dynamic(
   () => import('@/components/senja-widget').then((mod) => ({ default: mod.SenjaWidget })),
@@ -81,7 +82,7 @@ export const UpgradeDrawer = () => {
     <>
       {isLoading ? (
         <Button disabled>
-          <Loader className="animate-spin size-4" /> Loading
+          <Loader /> Loading
         </Button>
       ) : subscription ? (
         <Drawer>

@@ -35,8 +35,8 @@ import {
 } from './ui/dropdown-menu'
 import DuolingoBadge from './ui/duolingo-badge'
 import DuolingoButton from './ui/duolingo-button'
-import { Loader } from './ui/loader'
 import { Separator } from './ui/separator'
+import { Loader } from './ai-elements/loader'
 
 export default function TweetQueue() {
   const queryClient = useQueryClient()
@@ -159,8 +159,8 @@ export default function TweetQueue() {
     return (
       <div className="space-y-6">
         <div className="flex flex-col items-center justify-center text-center py-12">
-          <Loader variant="classic" />
-          <p className="text-sm text-stone-600 mt-4">Loading queue...</p>
+          <Loader />
+          <p className="text-sm text-stone-500 mt-4">Loading queue...</p>
         </div>
       </div>
     )

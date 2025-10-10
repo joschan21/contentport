@@ -370,6 +370,9 @@ export const knowledgeRouter = j.router({
         })
       }
 
+      const data = await res.json()
+      console.error('[ERROR] Indexing tweets:', JSON.stringify(data, null, 2))
+
       await redis.set(`status:posts:${accountId}`, 'success')
     } catch (err) {
       await redis.set(`status:posts:${accountId}`, 'error')

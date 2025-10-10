@@ -1,12 +1,12 @@
+import { getBaseUrl } from '@/constants/base-url'
 import { db } from '@/db'
+import { getAccount } from '@/server/routers/utils/get-account'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { createAuthMiddleware, magicLink } from 'better-auth/plugins'
 import { PostHog } from 'posthog-node'
 import { Resend } from 'resend'
 import { redis } from './redis'
-import { getAccount } from '@/server/routers/utils/get-account'
-import { getBaseUrl } from '@/constants/base-url'
 
 const client = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   host: 'https://eu.i.posthog.com',
@@ -58,8 +58,6 @@ export const auth = betterAuth({
             subject: 'Sign into Contentport',
             text: `Click this link to sign into Contentport: ${emailUrl}`,
           })
-
-          console.log(res)
 
           if (res.error) {
             console.error('[Error sending email]:', res.error)

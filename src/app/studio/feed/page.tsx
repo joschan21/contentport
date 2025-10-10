@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Feed } from './feed'
-import { Loader } from '@/components/ui/loader'
 import { authClient } from '@/lib/auth-client'
 import { useRouter } from 'next/navigation'
 import {
@@ -23,6 +22,7 @@ import {
 import { InfoModal } from '../topic-monitor/info-modal'
 import { FeedSettingsModal } from '../topic-monitor/feed-settings-modal'
 import { EmptyState } from '../topic-monitor/empty-state'
+import { Loader } from '@/components/ai-elements/loader'
 
 const Page = () => {
   const queryClient = useQueryClient()
@@ -224,7 +224,7 @@ const Page = () => {
 
         {isPending ? (
           <div className="flex items-center gap-2.5">
-            <Loader variant="classic" size="sm" />
+            <Loader />
             <p className="text-sm text-gray-800">Curating feed...</p>
           </div>
         ) : isFetched && data?.length === 0 ? (

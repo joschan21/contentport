@@ -51,3 +51,14 @@ bigger
 - proactively create posts for users
   - code screenshot editor?
 - viral tweet library
+
+dominik feedback:
+// allow editing of images in image editor
+// add scrollbar-gutter back
+// sidebar lags when feed is open
+// when clicking transcript, it takes you to nextjs 404
+// allow users to add tweet image to chat
+// allow transcripts for large video
+// allow editing memories inline
+// media management inside of contentport
+// make entire tweet in thread clickable

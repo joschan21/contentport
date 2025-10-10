@@ -5,6 +5,7 @@ import { redis } from '@/lib/redis'
 import type Stripe from 'stripe'
 import { and, eq } from 'drizzle-orm'
 import { STRIPE_SUBSCRIPTION_DATA } from '@/constants/stripe-subscription'
+import { sendProSubscriptionEmail } from '@/lib/email'
 
 /**
  * Validates a Stripe webhook request by verifying its signature and constructing the Stripe event.
@@ -167,6 +168,34 @@ export const POST = async (req: Request) => {
           .update(user)
           .set({ plan: 'pro' })
           .where(eq(user.stripeId, String(customer)))
+
+        const userRecord = await db.query.user.findFirst({
+          where: eq(user.stripeId, String(customer)),
+        })
+
+        if (userRecord && userRecord.email && userRecord.name) {
+          let invoicePdfUrl: string | undefined
+
+          if (subscription.latest_invoice) {
+            const invoiceId =
+              typeof subscription.latest_invoice === 'string'
+                ? subscription.latest_invoice
+                : subscription.latest_invoice.id
+
+            if (invoiceId) {
+              const invoice = await stripe.invoices.retrieve(invoiceId)
+              invoicePdfUrl = invoice.invoice_pdf || undefined
+            }
+          }
+
+          await sendProSubscriptionEmail({
+            email: userRecord.email,
+            name: userRecord.name.split(' ')[0] || userRecord.name,
+            invoicePdfUrl,
+          }).catch((err) => {
+            console.error('Error sending pro subscription email:', err)
+          })
+        }
 
         return new Response('User upgraded to pro plan', { status: 200 })
       } catch (err) {

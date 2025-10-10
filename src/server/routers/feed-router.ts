@@ -95,16 +95,12 @@ export const feedRouter = j.router({
         })
       }
 
-      console.log('keywords', keywords)
-
       let ids: string[] = []
       if (user.plan === 'free') {
         ids = await redis.smembers(`feed:contentport`)
       } else {
         ids = await redis.smembers(`feed:${user.id}`)
       }
-
-      console.log('ids', ids)
 
       const tweetMap: Map<string, EnrichedTweet> = new Map()
       const replyMap: Record<string, string[]> = {}
@@ -129,26 +125,6 @@ export const feedRouter = j.router({
 
             return tweet
           }
-
-          // const tweet = await getTweet(id)
-
-          // if (tweet) {
-          //   const enriched = enrichTweet(tweet)
-          //   tweetMap.set(enriched.id_str, enriched)
-
-          //   if (enriched.in_reply_to_status_id_str) {
-          //     if (!replyMap[enriched.in_reply_to_status_id_str]) {
-          //       replyMap[enriched.in_reply_to_status_id_str] = []
-          //     }
-
-          //     replyMap[enriched.in_reply_to_status_id_str]?.push(enriched.id_str)
-          //   } else {
-          //     mains.add(enriched)
-          //   }
-
-          //   await redis_raw.set(`enriched-tweet:${id}`, superjson.stringify(enriched))
-          //   return enriched
-          // }
         }),
       )
 
@@ -156,8 +132,6 @@ export const feedRouter = j.router({
         main: EnrichedTweet
         replyChains: Array<Array<EnrichedTweet>>
       }> = []
-
-      console.log('ids length', ids.length)
 
       const buildReplyChain = async (
         startTweet: EnrichedTweet,
@@ -226,8 +200,6 @@ export const feedRouter = j.router({
           )
         })
 
-        console.log('has included keyword?', hasIncludedKeyword)
-
         return Boolean(hasIncludedKeyword && !hasExcludedKeyword)
       }
 
@@ -285,39 +257,12 @@ export const feedRouter = j.router({
             )
           })
 
-          console.log('has included keyword?', hasIncludedKeyword)
-
           return Boolean(hasIncludedKeyword && !hasExcludedKeyword)
         }
 
         const filteredChains = replyChains.filter((chain) => {
           return chain.some((tweet) => {
             return shouldIncludeTweet(tweet)
-            // return keywords?.some((keyword) => {
-            //   const text = tweet.entities.reduce((acc, curr) => {
-            //     if (curr.type === 'text') {
-            //       return acc + curr.text
-            //     } else return acc
-            //   }, '')
-
-            //   const relevantEntities = tweet.entities.filter(
-            //     (e) => {
-            //       if (e.type === 'mention' || e.type === 'hashtag' || e.type === 'url') {
-            //         return fuzzyIncludes(e.text.toLowerCase(), keyword.text.toLowerCase())
-            //       }
-            //     },
-            //     // e.type === 'mention' ||
-            //     // e.type === 'hashtag' ||
-            //     // (e.type === 'url' &&
-            //     //   fuzzyIncludes(e.text.toLowerCase(), keyword.text.toLowerCase())),
-            //   )
-
-            //   const isRelevant =
-            //     Boolean(fuzzyIncludes(text.toLowerCase(), keyword.text.toLowerCase())) ||
-            //     Boolean(relevantEntities.length)
-
-            //   return isRelevant
-            // })
           })
         })
 
@@ -329,7 +274,6 @@ export const feedRouter = j.router({
 
       const filteredData = data.filter((item) => {
         const shouldIncludeMain = shouldIncludeTweet(item.main)
-        console.log('should include??', shouldIncludeMain)
         if (shouldIncludeMain) return true
 
         const hasIncludedReplies = item.replyChains.some((chain) =>

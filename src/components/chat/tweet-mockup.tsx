@@ -3,10 +3,12 @@ import { useTweetsV2 } from '@/hooks/use-tweets-v2'
 import { motion } from 'framer-motion'
 import type { Variants } from 'framer-motion'
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
-import { ChevronsLeft } from 'lucide-react'
-import { PropsWithChildren, memo } from 'react'
+import { ChevronsLeft, Check } from 'lucide-react'
+import { PropsWithChildren, memo, useState, useEffect } from 'react'
 import DuolingoButton from '../ui/duolingo-button'
 import { cn } from '@/lib/utils'
+import { usePathname, useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 
 export const TweetMockup = memo(
   ({
@@ -26,6 +28,19 @@ export const TweetMockup = memo(
     index: number
   }>) => {
     const { tweets, addTweet, updateTweet } = useTweetsV2()
+    const [isApplied, setIsApplied] = useState(false)
+    const pathname = usePathname()
+    const router = useRouter()
+
+    useEffect(() => {
+      if (isApplied) {
+        const timeout = setTimeout(() => {
+          setIsApplied(false)
+        }, 2000)
+        
+        return () => clearTimeout(timeout)
+      }
+    }, [isApplied])
 
     const containerVariants: Variants = {
       hidden: { opacity: 0, y: 20, scale: 0.95 },
@@ -70,6 +85,22 @@ export const TweetMockup = memo(
             root.append(paragraph)
           },
           { tag: 'force-sync' },
+        )
+      }
+      
+      setIsApplied(true)
+      
+      if (pathname !== "/studio") {
+        toast.success(
+          <div className="flex items-center gap-2">
+            <span>Tweet applied!</span>
+            <button
+              onClick={() => router.push('/studio')}
+              className="font-medium text-gray-800 hover:text-gray-800 underline"
+            >
+              Go to Studio
+            </button>
+          </div>
         )
       }
     }
@@ -119,7 +150,15 @@ export const TweetMockup = memo(
                   size="sm"
                   className="text-sm w-fit h-8 px-2"
                 >
-                  <ChevronsLeft className="size-4 mr-1" /> Apply
+                  {isApplied ? (
+                    <>
+                      <Check className="size-4 mr-1" /> Applied
+                    </>
+                  ) : (
+                    <>
+                      <ChevronsLeft className="size-4 mr-1" /> Apply
+                    </>
+                  )}
                 </DuolingoButton>
               </motion.div>
             )}

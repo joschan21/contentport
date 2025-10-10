@@ -8,16 +8,28 @@ const redis_raw = Redis.fromEnv({
 })
 
 export const getTweet = async (id: string): Promise<EnrichedTweet | null> => {
-  const cached = await redis_raw.get<string>(`enriched-tweet:${id}`)
+  const [isInvalid, cached] = await Promise.all([
+    redis_raw.sismember(`invalid-tweet-ids`, id),
+    redis_raw.get<string>(`enriched-tweet:${id}`)
+  ])
+
+  if (isInvalid) {
+    return null
+  }
 
   if (cached) {
     const tweet = SuperJSON.parse(cached) as EnrichedTweet
     return tweet
   }
 
+  // Suppress errors from getTweetFromTwitter
+  const originalConsoleError = console.error
+  console.error = () => {}
   const tweet = await getTweetFromTwitter(id)
+  console.error = originalConsoleError
 
   if (!tweet) {
+    await redis_raw.sadd(`invalid-tweet-ids`, id)
     return null
   }
 

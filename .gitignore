@@ -46,6 +46,9 @@ next-env.d.ts
 # wrangler
 .wrangler
 
+# react-email
+.react-email
+
 certificates
 
 package-lock.json

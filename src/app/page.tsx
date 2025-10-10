@@ -1,29 +1,14 @@
 import TestimonialCard from '@/frontend/studio/components/TestimonialCard'
 import { LogoCloud } from '@/components/logo-cloud'
 import Navbar from '@/components/navbar'
+import Footer from '@/components/footer'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { auth } from '@/lib/auth'
 import MuxPlayer from '@mux/mux-player-react'
 import { headers } from 'next/headers'
 import Link from 'next/link'
-import Script from 'next/script'
 import Pricing from '@/frontend/studio/components/Pricing'
 import { Icons } from '@/components/icons'
-
-const Footer = () => {
-  return (
-    <footer className="bg-white border-t border-gray-200">
-      <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12">
-        <div className="text-center space-y-4">
-          <p className="text-gray-600 text-base">
-            Your content engine for growing on Twitter.
-          </p>
-          <p className="text-gray-500 text-sm">© 2025 Contentport.</p>
-        </div>
-      </div>
-    </footer>
-  )
-}
 
 const Page = async () => {
   const session = await auth.api.getSession({
@@ -64,13 +49,13 @@ const Page = async () => {
                       {session?.user ? (
                         <Link href="/studio">
                           <DuolingoButton className="w-full h-12 sm:px-8">
-                            Start Growing on <Icons.twitter className="size-4 ml-1.5" /> 
+                            Start Growing on <Icons.twitter className="size-4 ml-1.5" />
                           </DuolingoButton>
                         </Link>
                       ) : (
                         <Link href="/sign-in">
                           <DuolingoButton className="w-full h-12 sm:px-8">
-                            Start Growing on <Icons.twitter className="size-4 ml-1.5" /> 
+                            Start Growing on <Icons.twitter className="size-4 ml-1.5" />
                           </DuolingoButton>
                         </Link>
                       )}
@@ -117,8 +102,8 @@ const Page = async () => {
                           ))}
                         </div>
                         <p className="text-base text-left text-gray-600">
-                          Trusted by{' '}
-                          <span className="font-medium text-gray-900">1.817</span> founders
+                          Loved by{' '}
+                          <span className="font-medium text-gray-900">1.817</span> users
                         </p>
                       </div>
                     </div>
@@ -126,7 +111,7 @@ const Page = async () => {
                 </div>
               </div>
 
-              <div className="relative flex items-center h-fit -m-2 rounded-xl bg-gray-900/5 p-2 ring-1 ring-gray-900/10 ring-inset lg:-m-4 lg:rounded-2xl lg:p-4 shadow-2xl">
+              <div className="relative flex items-center h-fit -m-2 rounded-xl bg-white/75 p-2 ring-1 ring-gray-900/10 ring-inset lg:-m-4 lg:rounded-2xl lg:p-4 shadow-2xl">
                 <MuxPlayer
                   accentColor="#4f46e5"
                   style={{ aspectRatio: 16 / 9 }}
@@ -178,9 +163,21 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">
-                          Can't manage multiple accounts / pay per account
-                        </p>
+                        <p className="text-gray-600">Don't help you get content ideas</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-6 h-6 text-red-500 mt-0.5 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <p className="text-gray-600">Generate obvious AI slop at best</p>
                       </div>
                       <div className="flex items-start gap-3">
                         <svg
@@ -195,9 +192,10 @@ const Page = async () => {
                           />
                         </svg>
                         <p className="text-gray-600">
-                          Tweets look boring & perform poorly
+                          Don't allow you to manage multiple accounts
                         </p>
                       </div>
+
                       <div className="flex items-start gap-3">
                         <svg
                           className="w-6 h-6 text-red-500 mt-0.5 flex-shrink-0"
@@ -210,7 +208,7 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">Outdated AI models from 2024</p>
+                        <p className="text-gray-600">Use outdated AI models from 2024</p>
                       </div>
                       <div className="flex items-start gap-3">
                         <svg
@@ -224,7 +222,9 @@ const Page = async () => {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <p className="text-gray-600">Closed source, zero transparency</p>
+                        <p className="text-gray-600">
+                          Are closed source with questionable data safety
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -259,7 +259,7 @@ const Page = async () => {
                           />
                         </svg>
                         <p className="text-gray-600">
-                          All personal & company accounts in one place
+                          Finds high-potential content ideas for you
                         </p>
                       </div>
                       <div className="flex items-start gap-3">
@@ -275,7 +275,7 @@ const Page = async () => {
                           />
                         </svg>
                         <p className="text-gray-600">
-                          Create beautiful tweet visuals without design skills
+                          Trains AI on your recent & most successful tweets
                         </p>
                       </div>
                       <div className="flex items-start gap-3">
@@ -291,7 +291,7 @@ const Page = async () => {
                           />
                         </svg>
                         <p className="text-gray-600">
-                          The most modern AI models available
+                          Creates content that sounds exactly like you
                         </p>
                       </div>
                       <div className="flex items-start gap-3">
@@ -307,10 +307,25 @@ const Page = async () => {
                           />
                         </svg>
                         <p className="text-gray-600">
-                          100% open-source, transparent & auditable
+                          Always uses the most modern AI models available
                         </p>
                       </div>
-                      
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-6 h-6 text-green-400 mt-0.5 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <p className="text-gray-600">
+                          Is 100% open-source, transparent & auditable
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -325,18 +340,16 @@ const Page = async () => {
                   <span className="absolute z-0 bg-indigo-500/10 w-[105%] h-[105%] -left-[2.5%] -top-[2.5%] -rotate-1" />
                   Within 60 seconds:
                 </span>
-                <span className="block mt-4 text-gray-800 text-3xl sm:text-4xl space-y-2">
-                  <span className="block opacity-80">draft a tweet</span>
-                  <span className="block opacity-90">add a beautiful visual</span>
-                  <span className="block opacity-100">
-                    queue for peak activity times
-                  </span>
+                <span className="block mt-8 text-gray-800 text-3xl sm:text-4xl space-y-2">
+                  <span className="block opacity-60">draft a tweet.</span>
+                  <span className="block opacity-80">add a beautiful visual.</span>
+                  <span className="block opacity-100">queue for peak activity times.</span>
                 </span>
               </h2>{' '}
               <div className="max-w-xs w-full mx-auto">
                 <Link href="/sign-in">
                   <DuolingoButton className="w-full h-14 sm:px-8">
-                    Get Started Now →
+                    Try For Free →
                   </DuolingoButton>
                 </Link>
               </div>
@@ -351,7 +364,7 @@ const Page = async () => {
                 </h2>
               </div>
               <div className="mx-auto max-w-7xl px-6 lg:px-8 space-y-12">
-                <TestimonialCard></TestimonialCard>
+                <TestimonialCard />
                 <div
                   className="senja-embed block w-full"
                   data-id="72519276-9e16-4bc4-9911-49ffb12b73b4"
@@ -564,13 +577,6 @@ const Page = async () => {
                   </div>
                 </div>
               </div>
-            </div>
-          </section>
-
-          {/* Pricing */}
-          <section className=" bg-white ">
-            <div className="mx-auto max-w-7xl px-6 lg:px-8">
-              <Pricing targetUrl="/login" />
             </div>
           </section>
         </div>
