@@ -181,7 +181,7 @@ export const QueueSettingsModal = ({
             <p className="text-gray-500">Loading queue...</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-5">
             <div className="border rounded-lg overflow-hidden">
               <div
                 className="grid bg-muted"
