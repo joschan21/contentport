@@ -117,7 +117,7 @@ function OnboardingCompleteModal({
   }, [open, fire])
 
   return (
-    <Modal className="p-6" showModal={open} setShowModal={onOpenChange}>
+    <Modal className="p-6 min-h-[400px]" showModal={open} setShowModal={onOpenChange}>
       <AccountConnection
         title="You're all set! 🎉"
         description="Welcome to Contentport! We're analyzing your tweets and learning your writing style in the background."
