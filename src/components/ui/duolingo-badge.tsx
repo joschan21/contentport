@@ -30,7 +30,7 @@ export default function DuolingoBadge({
     error:
       "bg-gradient-to-b from-red-400 to-red-500 text-white border-2 border-red-300 shadow-[0_2px_0_#DC2626,0_4px_6px_-1px_rgba(239,68,68,0.3)]",
     gray:
-      "bg-gradient-to-b from-gray-400 to-gray-500 text-white border-2 border-gray-300 shadow-[0_2px_0_#6b7280,0_4px_6px_-1px_rgba(107,114,128,0.3)]",
+      "bg-gradient-to-b from-gray-300 to-gray-400 text-white border-2 border-gray-200 shadow-[0_2px_0_#6b7280,0_4px_6px_-1px_rgba(107,114,128,0.3)]",
     green:
       "bg-gradient-to-b from-emerald-500 to-emerald-600 text-white border-2 border-emerald-400 shadow-[0_2px_0_#16A34A,0_4px_6px_-1px_rgba(22,163,74,0.3)]",
     amber:

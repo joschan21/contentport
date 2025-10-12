@@ -2,6 +2,7 @@
 
 import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
+import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   format,
@@ -12,12 +13,27 @@ import {
   isWeekend,
   startOfDay,
 } from 'date-fns'
-import { ArrowRight, Clock, Edit, MoreHorizontal, Send, Trash2 } from 'lucide-react'
+import {
+  ArrowRight,
+  ChevronDown,
+  Clock,
+  Edit,
+  Image,
+  MoreHorizontal,
+  Send,
+  Trash2,
+  Video,
+} from 'lucide-react'
 
 import { useConfetti } from '@/hooks/use-confetti'
 
 import { Tweet } from '@/db/schema'
-import { AccountHandle, AccountName } from '@/hooks/account-ctx'
+import {
+  AccountHandle,
+  AccountName,
+  AccountAvatar,
+  mapToConnectedAccount,
+} from '@/hooks/account-ctx'
 import { useTweetsV2 } from '@/hooks/use-tweets-v2'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -25,31 +41,26 @@ import { Fragment, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Icons } from './icons'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
+import { Modal } from './ui/modal'
 import DuolingoBadge from './ui/duolingo-badge'
 import DuolingoButton from './ui/duolingo-button'
 import { Separator } from './ui/separator'
 import { Loader } from './ai-elements/loader'
+import { CaretRightIcon, ImageIcon } from '@phosphor-icons/react'
+import MediaDisplay from './media-display'
 
 export default function TweetQueue() {
   const queryClient = useQueryClient()
   const { fire } = useConfetti()
   const [pendingPostId, setPendingPostId] = useState<string | null>(null)
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const { loadThread } = useTweetsV2()
 
   const router = useRouter()
@@ -57,8 +68,19 @@ export default function TweetQueue() {
   const userNow = new Date()
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
+  const { data: activeAccount } = useQuery({
+    queryKey: ['get-active-account'],
+    queryFn: async () => {
+      const res = await client.settings.active_account.$get()
+      const { account } = await res.json()
+      return account ? mapToConnectedAccount(account) : null
+    },
+  })
+
+  const useNaturalTimeByDefault = activeAccount?.useNaturalTimeByDefault ?? false
+
   const { data, isPending } = useQuery({
-    queryKey: ['queue-slots'],
+    queryKey: ['queue-slots', activeAccount?.id],
     queryFn: async () => {
       const res = await client.tweet.get_queue.$get({ timezone, userNow })
       return await res.json()
@@ -180,36 +202,31 @@ export default function TweetQueue() {
 
     if (isToday(unix)) {
       return (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-900">Today</span>
-          <span className="text-gray-400">·</span>
-          <span className="text-gray-500">
-            {weekday}, {monthDay}
-          </span>
+          <span className="text-gray-400">{weekday}</span>
         </div>
       )
     }
 
     if (isTomorrow(unix)) {
       return (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-900">Tomorrow</span>
-          <span className="text-gray-400">·</span>
-          <span className="text-gray-500">
-            {weekday}, {monthDay}
-          </span>
+          {/* <span className="text-gray-400">·</span> */}
+          <span className="text-gray-400">{weekday}</span>
         </div>
       )
     }
 
     if (daysAway <= 6) {
       return (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-900">{weekday}</span>
-          <span className="text-gray-400">·</span>
-          <span className="text-gray-500">{monthDay}</span>
-          <span className="text-gray-400">·</span>
-          <span className="text-gray-500">
+          {/* <span className="text-gray-400">·</span>
+          <span className="text-gray-500">{monthDay}</span> */}
+          {/* <span className="text-gray-400">·</span> */}
+          <span className="text-gray-400">
             in {daysAway} day{daysAway === 1 ? '' : 's'}
           </span>
         </div>
@@ -217,269 +234,434 @@ export default function TweetQueue() {
     }
 
     return (
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         <span className="font-semibold text-gray-900">{weekday}</span>
-        <span className="text-gray-400">·</span>
-        <span className="text-gray-500">{monthDay}</span>
+        <span className="text-gray-400">{monthDay}</span>
       </div>
     )
   }
 
+  const allThreads = data?.results.flatMap((result) => {
+    const [day, threads] = Object.entries(result)[0]!
+    const dayUnix = Number(day)
+    return threads.map((slot) => ({ dayUnix, ...slot }))
+  })
+
   return (
     <>
-      <div className="space-y-2">
-        {data?.results.map((result) => {
-          const [day, threads] = Object.entries(result)[0]!
+      <Card className="overflow-hidden p-0">
+        <div className="flow-root">
+          <div className="">
+            <table className="min-w-full">
+              <thead className="bg-gray-100 hidden">
+                <tr>
+                  <th
+                    scope="col"
+                    className="py-3.5 min-w-[150px] pr-3 pl-4 text-left text-base font-semibold text-gray-500 sm:pl-3"
+                  >
+                    Time
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 min-w-[150px] py-3.5 text-left text-base font-semibold text-gray-500"
+                  >
+                    Status
+                  </th>
 
-          const dayUnix = Number(day)
+                  <th
+                    scope="col"
+                    className="px-3 py-3.5 w-full text-left text-base font-semibold text-gray-500"
+                  >
+                    Content
+                  </th>
+                  <th scope="col" className="py-3.5 pr-4 pl-3 sm:pr-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white">
+                {data?.results.map((result) => {
+                  const [day, threads] = Object.entries(result)[0]!
+                  const dayUnix = Number(day)
 
-          if (threads.length === 0) {
-            const emptyDayMessage = isToday(dayUnix)
-              ? `No more open slots`
-              : 'No slots set'
-
-            return (
-              <Card key={day} className={cn('overflow-hidden opacity-50')}>
-                <CardHeader className="pb-0 block">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    {renderDay(dayUnix)}{' '}
-                    <p className="text-gray-500">- {emptyDayMessage}</p>
-                  </CardTitle>
-                </CardHeader>
-              </Card>
-            )
-          }
-
-          return (
-            <Card key={day} className={cn('overflow-hidden')}>
-              <CardHeader className="">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  {renderDay(dayUnix)}
-                  {/* {isWeekendDay && (
-                    <DuolingoBadge variant="gray" className="text-xs">
-                      Weekend
-                    </DuolingoBadge>
-                  )} */}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div
-                  className="grid gap-3"
-                  style={{ gridTemplateColumns: 'auto 1fr auto' }}
-                >
-                  {threads.map(({ unix, thread, isQueued }, i) => {
-                    const baseTweet = thread?.[0]
-                    const threadLength = thread?.length || 0
-
-                    return (
-                      <Fragment key={i}>
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2 mt-2">
-                            <div className="flex items-center gap-2 w-[100px]">
-                              <Clock className="size-4 text-stone-500" />
-                              <span className="font-medium text-sm text-stone-700">
-                                {format(unix, "hh:mmaaaaa'm'")}
-                              </span>
-                            </div>
-                            <div className="flex w-[65px] items-start justify-center gap-2">
-                              {isQueued ? (
-                                <DuolingoBadge
-                                  variant={baseTweet ? 'achievement' : 'gray'}
-                                  className="text-xs"
-                                >
-                                  {baseTweet ? 'Queued' : 'Empty'}
-                                </DuolingoBadge>
-                              ) : baseTweet ? (
-                                <DuolingoBadge variant="achievement" className="text-xs">
-                                  Manual
-                                </DuolingoBadge>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div
-                          className={cn(
-                            'px-4 py-3 rounded-lg border',
-                            baseTweet
-                              ? 'bg-white border-stone-200 shadow-sm'
-                              : 'bg-stone-50 border-dashed border-stone-300',
-                          )}
+                  return (
+                    <Fragment key={day}>
+                      <tr className="w-full border-t border-gray-200">
+                        <th
+                          scope="colgroup"
+                          colSpan={5}
+                          className="bg-gray-100 px-4 py-2.5 w-full text-left text-base font-semibold text-gray-900"
                         >
-                          {baseTweet ? (
-                            <div className="space-y-3">
-                              {thread.map((tweet, index) => (
-                                <div
-                                  key={index}
-                                  className={cn(
-                                    'space-y-2',
-                                    index > 0 && 'border-l-2 border-stone-200 pl-3',
-                                  )}
-                                >
-                                  {index > 0 && (
-                                    <div className="text-xs text-stone-500 font-medium">
-                                      Tweet {index + 1}
-                                    </div>
-                                  )}
-                                  <p className="text-stone-900 whitespace-pre-line text-sm leading-relaxed">
-                                    {tweet.content || 'No content'}
-                                  </p>
-                                  {tweet.media && tweet.media.length > 0 && (
-                                    <div className="text-xs text-stone-500">
-                                      📎 {tweet.media.length} media file
-                                      {tweet.media.length > 1 ? 's' : ''}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-stone-500">
-                              <span className="text-sm">Empty slot</span>
-                            </div>
-                          )}
-                        </div>
+                          {renderDay(dayUnix)}
+                        </th>
+                      </tr>
+                      {threads.length === 0 ? (
+                        <tr className="border-t border-gray-300 bg-gray-50 opacity-50 bg-[image:repeating-linear-gradient(315deg,rgba(209,213,219,0.2)_0,rgba(209,213,219,0.2)_1px,_transparent_0,_transparent_50%)] bg-[size:10px_10px]">
+                          <td
+                            colSpan={5}
+                            className="py-2.5 pr-3 pl-4 text-sm font-medium text-gray-500 sm:pl-3"
+                          >
+                            {isToday(dayUnix) ? 'No more open slots' : 'No slots set'}
+                          </td>
+                        </tr>
+                      ) : (
+                        threads.map(({ unix, thread, isQueued }, slotIdx) => {
+                          const baseTweet = thread?.[0]
+                          const threadLength = thread?.length || 0
 
-                        <div className="flex items-center">
-                          {baseTweet && (
-                            <Dialog
-                              open={pendingPostId === baseTweet.id}
-                              onOpenChange={(open) => {
-                                setPendingPostId(open ? baseTweet.id : null)
-                              }}
+                          return (
+                            <tr
+                              key={slotIdx}
+                              className={cn(
+                                'relative group transition-opacity',
+                                slotIdx === 0 ? 'border-gray-300' : 'border-gray-200',
+                                'border-t',
+                                !baseTweet && [
+                                  'bg-[image:repeating-linear-gradient(315deg,rgba(209,213,219,0.2)_0,rgba(209,213,219,0.2)_1px,_transparent_0,_transparent_50%)] bg-[size:10px_10px]',
+                                  'bg-gray-50 opacity-50',
+                                ],
+                              )}
                             >
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <DuolingoButton
-                                    variant="secondary"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                  >
-                                    <MoreHorizontal className="size-4" />
-                                    <span className="sr-only">Tweet options</span>
-                                  </DuolingoButton>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    className="mb-1 w-full"
-                                    onClick={() => {
-                                      if (baseTweet) {
-                                        router.push(`/studio?edit=${baseTweet.id}`)
-
-                                        loadThread(thread)
-
-                                        queryClient.setQueryData<{
-                                          thread: Partial<Tweet>[]
-                                        }>(['edit-tweet', baseTweet.id], {
-                                          thread,
-                                        })
-                                      }
-                                    }}
-                                  >
-                                    <Edit className="size-4 mr-1" />
-                                    <div className="flex flex-col">
-                                      <p>Edit</p>
-                                      <p className="text-xs text-stone-500">
-                                        Open this {threadLength > 1 ? 'thread' : 'tweet'}{' '}
-                                        in the editor.
-                                      </p>
-                                    </div>
-                                  </DropdownMenuItem>
-
-                                  <Separator />
-
-                                  <DropdownMenuItem asChild className="my-1 w-full">
-                                    <DialogTrigger>
-                                      <Send className="size-4 mr-1" />
-                                      <div className="flex items-start flex-col">
-                                        <p>Post Now</p>
-                                        <p className="text-xs text-stone-500">
-                                          A confirmation model will open.
-                                        </p>
-                                      </div>
-                                    </DialogTrigger>
-                                  </DropdownMenuItem>
-
-                                  <Separator />
-
-                                  <DropdownMenuItem
-                                    variant="destructive"
-                                    className="mt-1 w-full"
-                                    onClick={() => deleteTweet(baseTweet!.id)}
-                                  >
-                                    <Trash2 className="size-4 mr-1 text-red-600" />
-                                    <div className="flex text-red-600  flex-col">
-                                      <p>Delete</p>
-                                      <p className="text-xs text-red-600">
-                                        Delete this{' '}
-                                        {threadLength > 1 ? 'thread' : 'tweet'} from the
-                                        queue.
-                                      </p>
-                                    </div>
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-
-                              <DialogContent className="bg-white rounded-2xl p-6">
-                                <div className="size-12 bg-gray-100 rounded-full flex items-center justify-center">
-                                  <Icons.twitter className="size-6" />
+                              <td
+                                className={cn(
+                                  'min-w-[150px] pr-3 pl-4 text-sm font-medium whitespace-nowrap text-gray-900 align-top',
+                                  baseTweet ? 'py-4' : 'py-2.5',
+                                )}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span>
+                                    {format(unix, 'hh:mm')}
+                                    <span className="ml-1 uppercase">
+                                      {format(unix, "aaaaa'm'")}
+                                    </span>
+                                  </span>
                                 </div>
-                                <DialogHeader className="py-2">
-                                  <DialogTitle className="text-lg font-semibold">
-                                    Post to Twitter
-                                  </DialogTitle>
-                                  <DialogDescription>
-                                    This {threadLength > 1 ? 'thread' : 'tweet'} will be
-                                    posted and removed from your queue immediately. Would
-                                    you like to continue?
-                                  </DialogDescription>
-                                  <DialogDescription>
-                                    <span className="font-medium text-gray-900">
-                                      Posting as:
-                                    </span>{' '}
-                                    <AccountName className="font-normal text-gray-600" />{' '}
-                                    (
-                                    <AccountHandle className="text-gray-600" />)
-                                  </DialogDescription>
-                                </DialogHeader>
+                              </td>
+                              <td
+                                className={cn(
+                                  'min-w-[150px] px-3 text-sm whitespace-nowrap align-top',
+                                  baseTweet ? 'py-4' : 'py-2.5',
+                                )}
+                              >
+                                {baseTweet?.isError ? (
+                                  <span className="text-sm font-medium text-red-600">
+                                    Error
+                                  </span>
+                                ) : baseTweet?.isProcessing ? (
+                                  <span className="text-sm font-medium text-gray-500">
+                                    Processing
+                                  </span>
+                                ) : baseTweet?.isPublished ? (
+                                  <span className="text-sm font-medium text-emerald-500">
+                                    Posted
+                                  </span>
+                                ) : baseTweet?.isQueued ? (
+                                  <span className="text-sm font-medium text-indigo-500">
+                                    Queued
+                                  </span>
+                                ) : baseTweet ? (
+                                  <span className="text-sm font-medium text-indigo-500">
+                                    Scheduled
+                                  </span>
+                                ) : (
+                                  <span className="text-sm font-medium text-gray-500">
+                                    Empty
+                                  </span>
+                                )}
+                              </td>
 
-                                <DialogFooter>
-                                  <DialogClose asChild>
-                                    <DuolingoButton
-                                      variant="secondary"
-                                      size="sm"
-                                      className="h-11"
+                              <td
+                                className={cn(
+                                  'px-3 w-full text-sm text-gray-900 align-top',
+                                  baseTweet ? 'py-4' : 'py-2.5',
+                                )}
+                              >
+                                {baseTweet ? (
+                                  <div className="space-y-3">
+                                    {thread.map((tweet, index) => {
+                                      const hasMedia =
+                                        tweet.media && tweet.media.length > 0
+                                      const mediaTypes = hasMedia
+                                        ? tweet.media.reduce(
+                                            (acc, m) => {
+                                              if (m.type === 'video') acc.videos++
+                                              else acc.images++
+                                              return acc
+                                            },
+                                            { images: 0, videos: 0 },
+                                          )
+                                        : null
+
+                                      return (
+                                        <div
+                                          key={index}
+                                          className={cn('relative', index > 0 && 'pt-3')}
+                                        >
+                                          {index === 0 &&
+                                            tweet.properties?.includes('natural') && (
+                                              <span className="inline-flex mb-3 items-center gap-x-1.5 rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
+                                                <svg
+                                                  viewBox="0 0 6 6"
+                                                  aria-hidden="true"
+                                                  className="size-1.5 fill-emerald-500"
+                                                >
+                                                  <circle r={3} cx={3} cy={3} />
+                                                </svg>
+                                                Natural time
+                                              </span>
+                                            )}
+                                          <div className="flex gap-3">
+                                            <div
+                                              className={cn(
+                                                'relative z-10 flex-none bg-white h-fit',
+                                                {
+                                                  'pb-2': index < thread.length - 1,
+                                                  'pt-2':
+                                                    index > 0 &&
+                                                    index <= thread.length - 1,
+                                                },
+                                              )}
+                                            >
+                                              <AccountAvatar className="size-8 shrink-0" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-1.5 mb-0.5">
+                                                <AccountName className="text-sm font-medium text-gray-800" />
+                                                <AccountHandle className="text-sm text-stone-400 truncate" />
+                                              </div>
+                                              <p className="text-gray-900 whitespace-pre-line text-sm leading-relaxed">
+                                                {tweet.content || 'No content'}
+                                              </p>
+                                              {hasMedia && mediaTypes && (
+                                                <Collapsible>
+                                                  <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors py-1 group mt-2">
+                                                    <CaretRightIcon
+                                                      weight="bold"
+                                                      className="size-3 transition-transform group-data-[state=open]:rotate-90"
+                                                    />
+
+                                                    <div className="flex items-center gap-1.5 text-gray-500 font-medium">
+                                                      {mediaTypes.images > 0 && (
+                                                        <div className="flex items-center gap-1">
+                                                          <p>
+                                                            Show image
+                                                            {mediaTypes.images > 1
+                                                              ? 's'
+                                                              : ''}
+                                                          </p>
+                                                          <span>
+                                                            ({mediaTypes.images})
+                                                          </span>
+                                                        </div>
+                                                      )}
+                                                      {mediaTypes.videos > 0 && (
+                                                        <div className="flex items-center gap-1">
+                                                          <p>
+                                                            Show video
+                                                            {mediaTypes.videos > 1
+                                                              ? 's'
+                                                              : ''}
+                                                          </p>
+                                                          <span>{mediaTypes.videos}</span>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  </CollapsibleTrigger>
+                                                  <CollapsibleContent className="mt-2">
+                                                    <MediaDisplay
+                                                      mediaFiles={tweet.media}
+                                                    />
+                                                  </CollapsibleContent>
+                                                </Collapsible>
+                                              )}
+                                            </div>
+                                          </div>
+                                          {thread.length > 1 &&
+                                            index < thread.length - 1 && (
+                                              <motion.div
+                                                initial={{ height: 0 }}
+                                                animate={{ height: '100%' }}
+                                                transition={{ duration: 0.3 }}
+                                                className={cn("absolute z-0 left-4 top-8 w-0.5 bg-gray-200/75 h-full", {
+                                                  // offset badges
+                                                  "top-11": tweet.properties?.includes('natural')
+                                                })}
+                                              />
+                                            )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                ) : null}
+                              </td>
+                              <td
+                                className={cn(
+                                  'pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-3 align-top',
+                                  baseTweet ? 'py-4' : 'py-2.5',
+                                )}
+                              >
+                                {baseTweet && (
+                                  <>
+                                    <DropdownMenu
+                                      open={openDropdownId === baseTweet.id}
+                                      onOpenChange={(open) =>
+                                        setOpenDropdownId(open ? baseTweet.id : null)
+                                      }
                                     >
-                                      Cancel
-                                    </DuolingoButton>
-                                  </DialogClose>
-                                  <DuolingoButton
-                                    loading={isPosting}
-                                    size="sm"
-                                    className="h-11"
-                                    onClick={(e) => {
-                                      e.preventDefault()
+                                      <DropdownMenuTrigger
+                                        disabled={
+                                          baseTweet.isProcessing || baseTweet.isPublished
+                                        }
+                                        className={cn(
+                                          baseTweet.isProcessing || baseTweet.isPublished
+                                            ? 'opacity-50 cursor-not-allowed'
+                                            : '',
+                                        )}
+                                        asChild
+                                      >
+                                        <DuolingoButton
+                                          variant="secondary"
+                                          size="icon"
+                                          className="h-8 w-8"
+                                        >
+                                          <MoreHorizontal className="size-4" />
+                                          <span className="sr-only">Tweet options</span>
+                                        </DuolingoButton>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem
+                                          className="mb-1 w-full"
+                                          onClick={() => {
+                                            if (baseTweet) {
+                                              router.push(`/studio?edit=${baseTweet.id}`)
 
-                                      postImmediateFromQueue({ tweetId: baseTweet.id })
-                                    }}
-                                  >
-                                    <Icons.twitter className="size-4 mr-2" />
-                                    {isPosting ? 'Posting...' : 'Post Now'}
-                                  </DuolingoButton>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
-                          )}
-                        </div>
-                      </Fragment>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                                              loadThread(thread)
+
+                                              queryClient.setQueryData<{
+                                                thread: Partial<Tweet>[]
+                                              }>(['edit-tweet', baseTweet.id], {
+                                                thread,
+                                              })
+                                            }
+                                          }}
+                                        >
+                                          <Edit className="size-4 mr-1" />
+                                          <div className="flex flex-col">
+                                            <p>Edit</p>
+                                            <p className="text-xs text-gray-500">
+                                              Open this{' '}
+                                              {threadLength > 1 ? 'thread' : 'tweet'} in
+                                              the editor.
+                                            </p>
+                                          </div>
+                                        </DropdownMenuItem>
+
+                                        <Separator />
+
+                                        <DropdownMenuItem
+                                          className="my-1 w-full"
+                                          onClick={() => setPendingPostId(baseTweet.id)}
+                                        >
+                                          <Send className="size-4 mr-1" />
+                                          <div className="flex items-start flex-col">
+                                            <p>Post Now</p>
+                                            <p className="text-xs text-gray-500">
+                                              A confirmation model will open.
+                                            </p>
+                                          </div>
+                                        </DropdownMenuItem>
+
+                                        <Separator />
+
+                                        <DropdownMenuItem
+                                          variant="destructive"
+                                          className="mt-1 w-full"
+                                          onClick={() => deleteTweet(baseTweet!.id)}
+                                        >
+                                          <Trash2 className="size-4 mr-1 text-red-600" />
+                                          <div className="flex text-red-600 flex-col">
+                                            <p>Delete</p>
+                                            <p className="text-xs text-red-600">
+                                              Delete this{' '}
+                                              {threadLength > 1 ? 'thread' : 'tweet'} from
+                                              the queue.
+                                            </p>
+                                          </div>
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+
+                                    <Modal
+                                      showModal={pendingPostId === baseTweet.id}
+                                      setShowModal={(open) => {
+                                        setPendingPostId(open ? baseTweet.id : null)
+                                      }}
+                                      className="max-w-md"
+                                    >
+                                      <div className="p-6 space-y-4">
+                                        <div className="size-12 bg-gray-100 rounded-full flex items-center justify-center">
+                                          <Icons.twitter className="size-6" />
+                                        </div>
+                                        <div className="space-y-2">
+                                          <h2 className="text-lg font-semibold">
+                                            Post to Twitter
+                                          </h2>
+                                          <p className="text-sm text-gray-600">
+                                            This {threadLength > 1 ? 'thread' : 'tweet'}{' '}
+                                            will be posted and removed from your queue
+                                            immediately. Would you like to continue?
+                                          </p>
+                                          <p className="text-sm text-gray-600">
+                                            <span className="font-medium text-gray-900">
+                                              Posting as:
+                                            </span>{' '}
+                                            <AccountName className="font-normal text-gray-600" />{' '}
+                                            (<AccountHandle className="text-gray-600" />)
+                                          </p>
+                                        </div>
+
+                                        <div className="flex gap-3 pt-2">
+                                          <DuolingoButton
+                                            variant="secondary"
+                                            size="sm"
+                                            className="h-11 flex-1"
+                                            onClick={() => setPendingPostId(null)}
+                                          >
+                                            Cancel
+                                          </DuolingoButton>
+                                          <DuolingoButton
+                                            loading={isPosting}
+                                            size="sm"
+                                            className="h-11 flex-1"
+                                            onClick={(e) => {
+                                              e.preventDefault()
+
+                                              postImmediateFromQueue({
+                                                tweetId: baseTweet.id,
+                                              })
+                                            }}
+                                          >
+                                            <Icons.twitter className="size-4 mr-2" />
+                                            {isPosting ? 'Posting...' : 'Post Now'}
+                                          </DuolingoButton>
+                                        </div>
+                                      </div>
+                                    </Modal>
+                                  </>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Card>
     </>
   )
 }

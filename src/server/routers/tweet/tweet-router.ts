@@ -1,13 +1,18 @@
 import { getBaseUrl } from '@/constants/base-url'
 import { db } from '@/db'
-import { account as accountSchema, InsertTweet, tweets } from '@/db/schema'
+import {
+  account as accountSchema,
+  InsertTweet,
+  tweetPropertyEnum,
+  tweets,
+} from '@/db/schema'
 import { qstash } from '@/lib/qstash'
 import { redis } from '@/lib/redis'
 import { Ratelimit } from '@upstash/ratelimit'
 import { waitUntil } from '@vercel/functions'
 import { addDays, isFuture, isSameDay, setHours, startOfDay, startOfHour } from 'date-fns'
 import { fromZonedTime } from 'date-fns-tz'
-import { and, desc, eq, isNotNull, isNull, lte, or, gt } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, isNull, lte, or, gt, gte } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { ContentfulStatusCode } from 'hono/utils/http-status'
 import { ApiResponseError, SendTweetV2Params, TwitterApi } from 'twitter-api-v2'
@@ -18,7 +23,11 @@ import { getAccount } from '../utils/get-account'
 import { ensureValidMedia } from '../utils/upload-media-to-twitter'
 import { fetchMediaFromS3 } from './fetch-media-from-s3'
 
-import { getNextAvailableQueueSlot, applyNaturalPostingTime, getQueueSlotsForAccount } from './queue-utils'
+import {
+  getNextAvailableQueueSlot,
+  applyNaturalPostingTime,
+  getAccountQueueSettings,
+} from './queue-utils'
 import { vector } from '@/lib/vector'
 import { getScheduledTweetCount } from '../utils/get-scheduled-tweet-count'
 
@@ -44,6 +53,7 @@ const postWithQStashSchema = z.object({
   replyToTwitterId: z.string().optional(),
   quoteToTwitterId: z.string().optional(),
   scheduledUnixInSeconds: z.number().optional(),
+  useNaturalTime: z.boolean().optional(),
 })
 
 type PostWithQStashArgs = z.infer<typeof postWithQStashSchema>
@@ -56,6 +66,7 @@ const postWithQStash = async (args: PostWithQStashArgs) => {
     replyToTwitterId,
     scheduledUnixInSeconds,
     quoteToTwitterId,
+    useNaturalTime,
   } = args
 
   const baseUrl =
@@ -68,6 +79,23 @@ const postWithQStash = async (args: PostWithQStashArgs) => {
     replyToTwitterId,
     quoteToTwitterId,
     scheduledUnixInSeconds,
+    useNaturalTime,
+  }
+
+  // if natural time enabled, we call qstash 5 mins before the scheduled time
+  // in that call, we calculate the natural time and do the same call again
+  const CALL_BEFORE_SECONDS = useNaturalTime ? 5 * 60 : 0
+
+  if (useNaturalTime && scheduledUnixInSeconds) {
+    const { messageId } = await qstash.publishJSON({
+      url: baseUrl + '/api/tweet/apply_natural_posting_time',
+      body: payload,
+      notBefore: scheduledUnixInSeconds - CALL_BEFORE_SECONDS,
+      retries: 2,
+      failureCallback: baseUrl + '/api/tweet/post_with_qstash_error',
+    })
+
+    return { messageId }
   }
 
   const { messageId } = await qstash.publishJSON({
@@ -121,14 +149,6 @@ export const tweetRouter = j.router({
         return c.superjson({ tweet: null, thread: [] })
       }
 
-      const activeAccount = await getAccount({ email: user.email })
-
-      if (!activeAccount) {
-        throw new HTTPException(400, {
-          message: 'No active account found',
-        })
-      }
-
       let currentTweet = tweet
 
       // Walk backwards to find the base tweet
@@ -137,7 +157,7 @@ export const tweetRouter = j.router({
           where: and(
             eq(tweets.id, currentTweet.isReplyTo),
             eq(tweets.userId, user.id),
-            eq(tweets.accountId, activeAccount.id),
+            eq(tweets.accountId, account.id),
           ),
         })
         if (!parentTweet) break
@@ -150,21 +170,20 @@ export const tweetRouter = j.router({
         where: and(
           eq(tweets.id, baseTweetId),
           eq(tweets.userId, user.id),
-          eq(tweets.accountId, activeAccount.id),
+          eq(tweets.accountId, account.id),
         ),
       })
 
       if (baseTweet) {
         thread.push(baseTweet)
 
-        // Find all replies in order
         let currentId = baseTweetId
         while (true) {
           const nextTweet = await db.query.tweets.findFirst({
             where: and(
               eq(tweets.isReplyTo, currentId),
               eq(tweets.userId, user.id),
-              eq(tweets.accountId, activeAccount.id),
+              eq(tweets.accountId, account.id),
             ),
           })
           if (!nextTweet) break
@@ -173,7 +192,6 @@ export const tweetRouter = j.router({
         }
       }
 
-      // Fetch media URLs for each tweet in the thread
       const threadWithMedia = await Promise.all(
         thread.map(async (threadTweet) => {
           const enrichedMedia = await fetchMediaFromS3(threadTweet.media || [])
@@ -208,11 +226,31 @@ export const tweetRouter = j.router({
 
       const messages = qstash.messages
 
-      if (tweet.qstashId) {
-        await messages.delete(tweet.qstashId).catch(() => {})
+      const tweetsToDelete = [tweet]
+      const qstashIdsToDelete = tweet.qstashId ? [tweet.qstashId] : []
+
+      let currentId = id
+      while (true) {
+        const reply = await db.query.tweets.findFirst({
+          where: and(eq(tweets.isReplyTo, currentId), eq(tweets.userId, user.id)),
+        })
+        if (!reply) break
+        tweetsToDelete.push(reply)
+        if (reply.qstashId) {
+          qstashIdsToDelete.push(reply.qstashId)
+        }
+        currentId = reply.id
       }
 
-      await db.delete(tweets).where(and(eq(tweets.id, id), eq(tweets.userId, user.id)))
+      await Promise.all(
+        qstashIdsToDelete.map((qstashId) => messages.delete(qstashId).catch(() => {})),
+      )
+
+      for (const tweetToDelete of tweetsToDelete) {
+        await db
+          .delete(tweets)
+          .where(and(eq(tweets.id, tweetToDelete.id), eq(tweets.userId, user.id)))
+      }
 
       return c.json({ success: true })
     }),
@@ -224,11 +262,12 @@ export const tweetRouter = j.router({
         scheduledUnix: z.number(),
         thread: z.array(payloadTweetSchema).min(1),
         useNaturalTime: z.boolean().optional(),
+        timezone: z.string().optional(),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { baseTweetId, scheduledUnix, thread, useNaturalTime } = input
+      const { baseTweetId, scheduledUnix, thread, useNaturalTime, timezone } = input
 
       const account = await getAccount({
         email: user.email,
@@ -250,7 +289,6 @@ export const tweetRouter = j.router({
         })
       }
 
-      // Get the existing base tweet to find the thread
       const existingBaseTweet = await db.query.tweets.findFirst({
         where: and(eq(tweets.id, baseTweetId), eq(tweets.userId, user.id)),
       })
@@ -263,7 +301,6 @@ export const tweetRouter = j.router({
         await qstash.messages.delete(existingBaseTweet.qstashId)
       }
 
-      // delete all current
       const deleteTweet = async (id: string) => {
         const [deletedTweet] = await db
           .delete(tweets)
@@ -288,27 +325,46 @@ export const tweetRouter = j.router({
               ),
             )
 
-          if (next) deleteTweet(next.id)
+          if (next) await deleteTweet(next.id)
         }
       }
 
       await deleteTweet(baseTweetId)
 
       const newBaseTweetId = crypto.randomUUID()
-      const finalScheduledUnix = useNaturalTime
-        ? applyNaturalPostingTime(scheduledUnix)
-        : scheduledUnix
 
       const { messageId } = await postWithQStash({
         accountId: dbAccount.id,
         tweetId: newBaseTweetId,
         userId: user.id,
-        scheduledUnixInSeconds: finalScheduledUnix / 1000,
+        scheduledUnixInSeconds: scheduledUnix / 1000,
+        useNaturalTime,
       })
 
       const generatedIds = thread.map((_, i) =>
         i === 0 ? newBaseTweetId : crypto.randomUUID(),
       )
+
+      let isQueued = false
+      if (timezone) {
+        const queueSettings = await getAccountQueueSettings(account.id)
+        const scheduledDate = new Date(scheduledUnix)
+        const scheduledDayOfWeek = scheduledDate.getDay()
+        const slotsForDay = queueSettings[scheduledDayOfWeek.toString()] || []
+
+        isQueued = slotsForDay.some((slotMinutes: number) => {
+          const slotDate = new Date(scheduledDate)
+          slotDate.setHours(Math.floor(slotMinutes / 60), slotMinutes % 60, 0, 0)
+          return slotDate.getTime() === scheduledUnix
+        })
+      }
+
+      const isNaturalTimeEnabled = Boolean(
+        useNaturalTime ?? account.useNaturalTimeByDefault,
+      )
+
+      const properties: (typeof tweetPropertyEnum.enumValues)[number][] = []
+      if (isNaturalTimeEnabled) properties.push('natural')
 
       const tweetsToInsert: InsertTweet[] = thread.map((tweet, i) => ({
         id: generatedIds[i],
@@ -317,8 +373,9 @@ export const tweetRouter = j.router({
         content: tweet.content,
 
         isScheduled: true,
-        scheduledUnix: finalScheduledUnix,
-        isQueued: existingBaseTweet.isQueued,
+        scheduledUnix: scheduledUnix,
+        isQueued,
+        properties,
 
         media: tweet.media,
         qstashId: messageId,
@@ -378,15 +435,16 @@ export const tweetRouter = j.router({
 
       const tweetId = crypto.randomUUID()
 
-      const finalScheduledUnix = useNaturalTime
-        ? applyNaturalPostingTime(scheduledUnix)
-        : scheduledUnix
+      const isNaturalTimeEnabled = Boolean(
+        useNaturalTime ?? account.useNaturalTimeByDefault,
+      )
 
       const { messageId } = await postWithQStash({
         tweetId,
         userId: user.id,
         accountId: dbAccount.id,
-        scheduledUnixInSeconds: finalScheduledUnix / 1000,
+        scheduledUnixInSeconds: scheduledUnix / 1000,
+        useNaturalTime: isNaturalTimeEnabled,
       })
 
       try {
@@ -394,15 +452,19 @@ export const tweetRouter = j.router({
           i === 0 ? tweetId : crypto.randomUUID(),
         )
 
+        const properties: (typeof tweetPropertyEnum.enumValues)[number][] = []
+        if (isNaturalTimeEnabled) properties.push('natural')
+
         const tweetsToInsert: InsertTweet[] = thread.map((tweet, i) => ({
           id: generatedIds[i],
           accountId: account.id,
           userId: user.id,
           content: tweet.content,
-          scheduledUnix: finalScheduledUnix,
+          scheduledUnix: scheduledUnix,
 
           isScheduled: true,
           isQueued: false,
+          properties,
 
           media: tweet.media,
           qstashId: messageId,
@@ -477,6 +539,45 @@ export const tweetRouter = j.router({
       )
 
     return c.json({ success: true })
+  }),
+
+  apply_natural_posting_time: qstashProcedure.post(async ({ c, ctx }) => {
+    const { body } = ctx
+    const { tweetId, userId, accountId } = postWithQStashSchema.parse(body)
+
+    const tweet = await db.query.tweets.findFirst({
+      where: and(
+        eq(tweets.id, tweetId),
+        eq(tweets.userId, userId),
+        eq(tweets.accountId, accountId),
+      ),
+    })
+
+    if (!tweet) {
+      throw new HTTPException(404, { message: 'Tweet not found' })
+    }
+
+    if (!tweet.scheduledUnix) {
+      throw new HTTPException(400, { message: 'Tweet scheduled unix not found' })
+    }
+
+    const naturalScheduledUnix = applyNaturalPostingTime(tweet.scheduledUnix)
+    const naturalScheduledUnixInSeconds = naturalScheduledUnix / 1000
+
+    const url =
+      process.env.NODE_ENV === 'development' ? process.env.NGROK_URL : getBaseUrl()
+
+    const { messageId } = await qstash.publishJSON({
+      url: url + '/api/tweet/post_with_qstash',
+      body,
+      notBefore: naturalScheduledUnixInSeconds,
+      retries: 2,
+      failureCallback: url + '/api/tweet/post_with_qstash_error',
+    })
+
+    await db.update(tweets).set({ qstashId: messageId }).where(eq(tweets.id, tweetId))
+
+    return c.json({ success: true, naturalScheduledUnixInSeconds })
   }),
 
   post_with_qstash: qstashProcedure.post(async ({ c, ctx }) => {
@@ -819,64 +920,50 @@ export const tweetRouter = j.router({
         })
       }
 
-      try {
-        const generatedIds = thread.map(() => crypto.randomUUID())
+      const generatedIds = thread.map(() => crypto.randomUUID())
 
-        // First create all tweets in the database with proper threading structure
-        const tweetsToInsert: InsertTweet[] = thread.map((tweet, i) => ({
-          id: generatedIds[i],
-          accountId: account.id,
-          userId: user.id,
-          content: tweet.content,
-          media: tweet.media,
-          isScheduled: false,
-          isPublished: false, // Will be set to true when posted
-          isReplyTo: i === 0 ? undefined : generatedIds[i - 1],
-        }))
+      const tweetsToInsert: InsertTweet[] = thread.map((tweet, i) => ({
+        id: generatedIds[i],
+        accountId: account.id,
+        userId: user.id,
+        content: tweet.content,
+        media: tweet.media,
+        isScheduled: false,
+        isPublished: false,
+        isReplyTo: i === 0 ? undefined : generatedIds[i - 1],
+      }))
 
-        await db.insert(tweets).values(tweetsToInsert)
+      await db.insert(tweets).values(tweetsToInsert)
 
-        // Get the base tweet and post the thread
-        const firstTweetId = generatedIds[0]!
-        const baseTweet = await db.query.tweets.findFirst({
-          where: eq(tweets.id, firstTweetId),
-        })
+      const firstTweetId = generatedIds[0]!
+      const baseTweet = await db.query.tweets.findFirst({
+        where: eq(tweets.id, firstTweetId),
+      })
 
-        if (!baseTweet) {
-          throw new HTTPException(500, { message: 'Failed to create base tweet' })
-        }
-
-        const { messageId } = await postWithQStash({
-          accountId: account.id,
-          tweetId: baseTweet.id,
-          userId: user.id,
-          replyToTwitterId,
-          quoteToTwitterId,
-        })
-
-        await db
-          .update(tweets)
-          .set({ qstashId: messageId })
-          .where(eq(tweets.id, baseTweet.id))
-
-        return c.json({
-          success: true,
-          messageId,
-          accountId: account.id,
-          accountName: account.name,
-          accountUsername: account.username,
-        })
-      } catch (err) {
-        console.error('Failed to post tweet:', err)
-
-        if (err instanceof HTTPException) {
-          throw new HTTPException(err.status, { message: err.message })
-        }
-
-        throw new HTTPException(500, {
-          message: 'Failed to post tweet to Twitter',
-        })
+      if (!baseTweet) {
+        throw new HTTPException(500, { message: 'Failed to create base tweet' })
       }
+
+      const { messageId } = await postWithQStash({
+        accountId: account.id,
+        tweetId: baseTweet.id,
+        userId: user.id,
+        replyToTwitterId,
+        quoteToTwitterId,
+      })
+
+      await db
+        .update(tweets)
+        .set({ qstashId: messageId })
+        .where(eq(tweets.id, baseTweet.id))
+
+      return c.json({
+        success: true,
+        messageId,
+        accountId: account.id,
+        accountName: account.name,
+        accountUsername: account.username,
+      })
     }),
 
   enqueue_tweet: privateProcedure
@@ -901,6 +988,10 @@ export const tweetRouter = j.router({
           message: 'Please connect your Twitter account',
         })
       }
+
+      const isNaturalTimeEnabled = Boolean(
+        useNaturalTime ?? account.useNaturalTimeByDefault,
+      )
 
       if (user.plan !== 'pro') {
         const currentScheduledCount = await getScheduledTweetCount(user.id)
@@ -938,16 +1029,14 @@ export const tweetRouter = j.router({
       }
 
       const scheduledUnix = nextSlot.getTime()
-      const finalScheduledUnix = useNaturalTime
-        ? applyNaturalPostingTime(scheduledUnix)
-        : scheduledUnix
       const baseTweetId = crypto.randomUUID()
 
       const { messageId } = await postWithQStash({
         accountId: dbAccount.id,
         tweetId: baseTweetId,
         userId: user.id,
-        scheduledUnixInSeconds: finalScheduledUnix / 1000,
+        scheduledUnixInSeconds: scheduledUnix / 1000,
+        useNaturalTime: isNaturalTimeEnabled,
       })
 
       try {
@@ -955,15 +1044,20 @@ export const tweetRouter = j.router({
           i === 0 ? baseTweetId : crypto.randomUUID(),
         )
 
+        const properties: (typeof tweetPropertyEnum.enumValues)[number][] = []
+
+        if (isNaturalTimeEnabled) properties.push('natural')
+
         const tweetsToInsert: InsertTweet[] = thread.map((tweet, i) => ({
           id: generatedIds[i],
           accountId: account.id,
           userId: user.id,
           content: tweet.content,
-          scheduledUnix: finalScheduledUnix,
+          scheduledUnix: scheduledUnix,
 
           isScheduled: true,
           isQueued: true,
+          properties,
 
           media: tweet.media,
           qstashId: messageId,
@@ -974,19 +1068,15 @@ export const tweetRouter = j.router({
       } catch (err) {
         console.error(err)
 
-        const messages = qstash.messages
+        await qstash.messages.delete(messageId).catch(() => {})
 
-        await messages.delete(messageId)
-
-        throw new HTTPException(500, {
-          message: 'Failed to enqueue tweets',
-        })
+        throw err
       }
 
       return c.json({
         success: true,
         tweetId: baseTweetId,
-        scheduledUnix: finalScheduledUnix,
+        scheduledUnix,
         accountId: account.id,
         accountName: account.name,
       })
@@ -1125,8 +1215,10 @@ export const tweetRouter = j.router({
       const _scheduledTweets = await db.query.tweets.findMany({
         where: and(
           eq(tweets.accountId, account.id),
-          eq(tweets.isScheduled, true),
-          eq(tweets.isError, false),
+          // eq(tweets.isScheduled, true),
+          // eq(tweets.isError, false),
+          lte(tweets.scheduledUnix, addDays(today, 90).getTime()),
+          gte(tweets.scheduledUnix, today.getTime()),
         ),
       })
 
@@ -1161,7 +1253,10 @@ export const tweetRouter = j.router({
 
       const getSlotThread = (unix: number) => {
         const baseTweet = scheduledTweets.find(
-          (t) => Boolean(t.isQueued) && t.scheduledUnix === unix && !t.isReplyTo,
+          (t) =>
+            Boolean(t.isQueued || t.isProcessing || t.isPublished) &&
+            t.scheduledUnix === unix &&
+            !t.isReplyTo,
         )
 
         if (baseTweet) {
@@ -1171,16 +1266,25 @@ export const tweetRouter = j.router({
         return null
       }
 
-      const queueSettings = await getQueueSlotsForAccount(account.id)
+      const queueSettings = await getAccountQueueSettings(account.id)
 
       const furthestScheduledTweet = scheduledTweets.reduce((max, tweet) => {
         if (!tweet.scheduledUnix) return max
         return tweet.scheduledUnix > max ? tweet.scheduledUnix : max
       }, 0)
 
-      const daysToShow = furthestScheduledTweet > 0
-        ? Math.min(90, Math.max(8, Math.ceil((furthestScheduledTweet - today.getTime()) / (1000 * 60 * 60 * 24)) + 14))
-        : 8
+      const daysToShow =
+        furthestScheduledTweet > 0
+          ? Math.min(
+              90,
+              Math.max(
+                8,
+                Math.ceil(
+                  (furthestScheduledTweet - today.getTime()) / (1000 * 60 * 60 * 24),
+                ) + 14,
+              ),
+            )
+          : 8
 
       const all: Array<Record<number, Array<number>>> = []
 
@@ -1189,12 +1293,18 @@ export const tweetRouter = j.router({
         const dayOfWeek = currentDay.getDay()
         const slotsForDay = queueSettings[dayOfWeek.toString()] || []
 
-        const unixTimestamps = slotsForDay.map((minutesFromMidnight) => {
+        const unixTimestamps = slotsForDay.map((minutesFromMidnight: number) => {
           const hours = Math.floor(minutesFromMidnight / 60)
           const minutes = minutesFromMidnight % 60
           const localDate = fromZonedTime(
-            new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate(), hours, minutes),
-            timezone
+            new Date(
+              currentDay.getFullYear(),
+              currentDay.getMonth(),
+              currentDay.getDate(),
+              hours,
+              minutes,
+            ),
+            timezone,
           )
           return localDate.getTime()
         })
@@ -1230,7 +1340,7 @@ export const tweetRouter = j.router({
         })
 
         const manualBaseTweetsForThisDay = baseTweetsForThisDay.filter(
-          (t) => !Boolean(t.isQueued),
+          (t) => !Boolean(t.isQueued || t.isProcessing || t.isPublished),
         )
 
         const timezoneChangedBaseTweets = baseTweetsForThisDay.filter((t) => {
@@ -1257,9 +1367,8 @@ export const tweetRouter = j.router({
               thread: buildThread(tweet.id),
               isQueued: false,
             })),
-          ]
-            .sort((a, b) => a.unix - b.unix)
-            .filter((entry) => isFuture(entry.unix)),
+          ].sort((a, b) => a.unix - b.unix),
+          // .filter((entry) => isFuture(entry.unix)),
         })
       })
 
@@ -1306,82 +1415,6 @@ export const tweetRouter = j.router({
         scheduledUnix: nextSlot.getTime(),
         scheduledDate: nextSlot.toISOString(),
       })
-    }),
-
-  get_queue_settings: privateProcedure.get(async ({ c, ctx }) => {
-    const { user } = ctx
-
-    const account = await getAccount({
-      email: user.email,
-    })
-
-    if (!account?.id) {
-      throw new HTTPException(400, {
-        message: 'Please connect your Twitter account',
-      })
-    }
-
-    const queueSettings = await getQueueSlotsForAccount(account.id)
-
-    return c.json({ queueSettings })
-  }),
-
-  update_queue_settings: privateProcedure
-    .input(
-      z.object({
-        queueSettings: z.record(z.string(), z.array(z.number())),
-      }),
-    )
-    .post(async ({ c, ctx, input }) => {
-      const { user } = ctx
-      const { queueSettings } = input
-
-      const account = await getAccount({
-        email: user.email,
-      })
-
-      if (!account?.id) {
-        throw new HTTPException(400, {
-          message: 'Please connect your Twitter account',
-        })
-      }
-
-      const hasAtLeastOneSlot = Object.values(queueSettings).some((slots) => slots.length > 0)
-
-      if (!hasAtLeastOneSlot) {
-        throw new HTTPException(400, {
-          message: 'At least one time slot must be enabled',
-        })
-      }
-
-      const allSlots = new Set<number>()
-      for (const [day, slots] of Object.entries(queueSettings)) {
-        slots.forEach((slot) => allSlots.add(slot))
-      }
-
-      if (allSlots.size > 10) {
-        throw new HTTPException(400, {
-          message: 'Maximum 10 unique time slots allowed',
-        })
-      }
-
-      for (const [day, slots] of Object.entries(queueSettings)) {
-
-        for (const slot of slots) {
-          if (slot < 0 || slot >= 1440 || slot % 15 !== 0) {
-            throw new HTTPException(400, {
-              message: 'Invalid time slot. Must be in 15-minute intervals between 00:00 and 23:45',
-            })
-          }
-        }
-      }
-
-      await db
-        .update(accountSchema)
-        .set({ queueSettings, updatedAt: new Date() })
-        .where(eq(accountSchema.id, account.id))
-
-      return c.json({ success: true, queueSettings })
     }),
 
   getOpenGraph: privateProcedure

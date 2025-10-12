@@ -8,34 +8,35 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Tweet } from '@/db/schema'
+import { useConfetti } from '@/hooks/use-confetti'
+import { MemoryTweet, PayloadTweet, useTweetsV2 } from '@/hooks/use-tweets-v2'
+import { client } from '@/lib/client'
+import { pollTweetStatus } from '@/lib/poll-tweet-status'
+import { CalendarBlankIcon, InfoIcon } from '@phosphor-icons/react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { format, formatDistanceToNow, isToday, isTomorrow } from 'date-fns'
+import { HTTPException } from 'hono/http-exception'
+import { $getRoot } from 'lexical'
 import {
   ArrowLeftFromLine,
   ArrowRight,
   ArrowRightFromLine,
-  CalendarIcon,
   PanelLeft,
 } from 'lucide-react'
-import DuolingoButton from '../ui/duolingo-button'
-import { useSidebar } from '../ui/sidebar'
-import TweetPostConfirmationDialog from '../tweet-post-confirmation-dialog'
-import { useState } from 'react'
-import { MemoryTweet, PayloadTweet, useTweetsV2 } from '@/hooks/use-tweets-v2'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { client } from '@/lib/client'
-import { format, formatDistanceToNow, isToday, isTomorrow } from 'date-fns'
-import toast from 'react-hot-toast'
 import Link from 'next/link'
-import { useConfetti } from '@/hooks/use-confetti'
-import { $getRoot } from 'lexical'
-import posthog from 'posthog-js'
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
-import { Modal } from '../ui/modal'
-import { Calendar20 } from '../tweet-editor/date-picker'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { HTTPException } from 'hono/http-exception'
-import { Tweet } from '@/db/schema'
-import { pollTweetStatus } from '@/lib/poll-tweet-status'
+import posthog from 'posthog-js'
+import { useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
 import { AccountSwitcher } from '../account-switcher'
+import { Calendar20 } from '../tweet-editor/date-picker'
+import TweetPostConfirmationDialog from '../tweet-post-confirmation-dialog'
+import { Checkbox } from '../ui/checkbox'
+import DuolingoButton from '../ui/duolingo-button'
+import { Label } from '../ui/label'
+import { Modal } from '../ui/modal'
+import { useSidebar } from '../ui/sidebar'
 
 export function AppSidebarInset({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient()
@@ -55,6 +56,22 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   const editMode = Boolean(editTweetId)
+
+  const { data: queueSettings } = useQuery({
+    queryKey: ['queue-settings'],
+    queryFn: async () => {
+      const response = await client.settings.get_queue_settings.$get()
+      return await response.json()
+    },
+  })
+
+  useEffect(() => {
+    if (queueSettings?.useNaturalTimeByDefault !== undefined) {
+      setUseNaturalTime(queueSettings.useNaturalTimeByDefault)
+    }
+  }, [queueSettings?.useNaturalTimeByDefault])
+
+  const [useNaturalTime, setUseNaturalTime] = useState<boolean>(false)
 
   const { data: editTweetData } = useQuery<{ thread: Tweet[] }>({
     queryKey: ['edit-tweet', editTweetId],
@@ -81,11 +98,15 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
   })
 
   const { mutate: enqueueTweet, isPending: isQueueing } = useMutation({
-    mutationFn: async ({ tweets }: { tweets: MemoryTweet[] }) => {
+    mutationFn: async ({
+      tweets,
+      useNaturalTime,
+    }: {
+      tweets: MemoryTweet[]
+      useNaturalTime?: boolean
+    }) => {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       const userNow = new Date()
-      // temporarily disabled
-      // const useNaturalTime = localStorage.getItem('useNaturalPostingTime') === 'true'
 
       const thread: PayloadTweet[] = tweets.map(toPayloadTweet)
 
@@ -93,6 +114,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         thread,
         timezone,
         userNow,
+        useNaturalTime,
       })
 
       return await res.json()
@@ -130,6 +152,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         </div>,
       )
 
+      setRescheduledTime(null)
       fire({
         particleCount: 200,
         spread: 160,
@@ -167,7 +190,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
           loading: 'Scheduling...',
           success: (
             <div className="flex gap-1.5 items-center">
-              <p>Tweet scheduled!</p>
+              <p>Tweet scheduled{useNaturalTime ? ' with natural posting time' : ''}!</p>
               <Link
                 href="/studio/scheduled"
                 className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
@@ -186,6 +209,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     onSuccess: (data, variables) => {
       reset()
       setIsScheduleDialogOpen(false)
+      setRescheduledTime(null)
 
       fire({
         particleCount: 200,
@@ -232,22 +256,28 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         return
       }
 
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
       const res = await client.tweet.update.$post({
         baseTweetId: editTweetData?.thread?.[0]?.id,
         scheduledUnix,
         thread,
         useNaturalTime,
+        timezone,
       })
 
       return await res.json()
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('Tweet updated successfully!')
 
       queryClient.invalidateQueries({ queryKey: ['scheduled-and-published-tweets'] })
       queryClient.invalidateQueries({ queryKey: ['edit-tweet', editTweetId] })
 
+      // cleanup
+      setRescheduledTime(null)
       router.push('/studio/scheduled')
+      setTimeout(() => reset(), 500)
     },
     onError: () => {
       toast.error('Failed to update tweet')
@@ -292,10 +322,11 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     updateTweetMutation.mutate({
       thread: tweets.map(toPayloadTweet),
       scheduledUnix,
+      useNaturalTime,
     })
   }
 
-  const handleScheduleTweet = (date: Date, time: string, useNaturalTime?: boolean) => {
+  const handleScheduleTweet = (date: Date, time: string) => {
     const [hours, minutes] = time.split(':').map(Number)
     const scheduledDateTime = new Date(date)
     scheduledDateTime.setHours(hours || 0, minutes || 0, 0, 0)
@@ -323,7 +354,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     scheduleTweetMutation.mutate({
       thread,
       scheduledUnix,
-      useNaturalTime: useNaturalTime ?? false,
+      useNaturalTime,
     })
   }
 
@@ -343,7 +374,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     setRescheduledTime(scheduledUnix)
     setIsRescheduleDialogOpen(false)
 
-    toast.success('New schedule time selected. Click Save to apply changes.')
+    toast.success('New schedule time selected. Save to apply changes.')
   }
 
   const { mutate: postTweetImmediate, isPending: isPosting } = useMutation({
@@ -384,6 +415,8 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         </div>,
       )
 
+      // cleanup
+      setRescheduledTime(null)
       reset()
       fire({
         particleCount: 200,
@@ -449,7 +482,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       return
     }
 
-    enqueueTweet({ tweets })
+    enqueueTweet({ tweets, useNaturalTime })
   }
 
   const formatQueueSlot = (unix: number) => {
@@ -480,51 +513,113 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       <Modal
         showModal={isScheduleDialogOpen}
         setShowModal={setIsScheduleDialogOpen}
-        className="max-w-2xl"
+        className="max-w-2xl bg-gray-50"
       >
-        <div className="p-6 space-y-4">
-          <div className="">
-            <h2 className="text-lg font-semibold">Schedule</h2>
-            {/* <p className="text-gray-500">All times in <span className="font-medium">Europe / Berlin</span> timezone</p> */}
+        <div className="p-6">
+          <h2 className="text-lg font-semibold">Schedule</h2>
+          <div className="flex mt-3 items-start gap-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="natural-time-default"
+                checked={useNaturalTime}
+                onCheckedChange={(checked) => setUseNaturalTime(checked === true)}
+              />
+              <Label
+                htmlFor="natural-time-default"
+                className="text-sm font-medium text-gray-800 cursor-pointer"
+              >
+                Use natural posting time
+              </Label>
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <InfoIcon
+                  weight="bold"
+                  className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+                />
+              </TooltipTrigger>
+              <TooltipContent className="block max-w-xs space-y-3 px-3 py-3.5">
+                <p className='block'>
+                  When enabled, new posts are published ±4 minutes around the scheduled
+                  time to appear more natural.
+                </p>
+                <DuolingoButton 
+                  className="block mt-2" 
+                  size="sm" 
+                  variant="secondary"
+                  onClick={() => {
+                    router.push('/studio/scheduled?settings=true')
+                    setIsScheduleDialogOpen(false)
+                  }}
+                >
+                  Change default
+                </DuolingoButton>
+              </TooltipContent>
+            </Tooltip>
           </div>
 
-          <Calendar20
-            editMode={editMode}
-            onSchedule={handleScheduleTweet}
-            isPending={scheduleTweetMutation.isPending}
-            initialScheduledTime={
-              editTweetData?.thread?.[0]?.scheduledUnix
-                ? new Date(editTweetData.thread[0].scheduledUnix)
-                : undefined
-            }
-          />
+          <div className="block mt-5">
+            <Calendar20
+              editMode={editMode}
+              onSchedule={handleScheduleTweet}
+              isPending={scheduleTweetMutation.isPending}
+              initialScheduledTime={
+                editTweetData?.thread?.[0]?.scheduledUnix
+                  ? new Date(editTweetData.thread[0].scheduledUnix)
+                  : undefined
+              }
+            />
+          </div>
         </div>
       </Modal>
 
       <Modal
         showModal={isRescheduleDialogOpen}
         setShowModal={setIsRescheduleDialogOpen}
-        className="max-w-2xl"
+        className="max-w-2xl bg-gray-50"
       >
-        <div className="p-6 space-y-4">
-          <div className="size-12 bg-gray-100 rounded-full flex items-center justify-center">
-            <CalendarIcon className="size-6" />
+        <div className="p-6">
+          <h2 className="text-lg font-semibold">Reschedule Post</h2>
+          <div className="flex mt-3 items-start gap-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="natural-time-reschedule"
+                checked={useNaturalTime}
+                onCheckedChange={(checked) => setUseNaturalTime(checked === true)}
+              />
+              <Label
+                htmlFor="natural-time-reschedule"
+                className="text-sm font-medium text-gray-800 cursor-pointer"
+              >
+                Use natural posting time
+              </Label>
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <InfoIcon
+                  weight="bold"
+                  className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+                />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                When enabled, new posts are published ±4 minutes around the scheduled time
+                to appear more natural.
+              </TooltipContent>
+            </Tooltip>
           </div>
 
-          <div className="space-y-2">
-            <h2 className="text-lg font-semibold">Reschedule Post</h2>
+          <div className="block mt-5">
+            <Calendar20
+              editMode={editMode}
+              onSchedule={handleRescheduleTweet}
+              isPending={updateTweetMutation.isPending}
+              initialScheduledTime={
+                editTweetData?.thread?.[0]?.scheduledUnix
+                  ? new Date(editTweetData.thread[0].scheduledUnix)
+                  : undefined
+              }
+            />
           </div>
-
-          <Calendar20
-            editMode={editMode}
-            onSchedule={handleRescheduleTweet}
-            isPending={updateTweetMutation.isPending}
-            initialScheduledTime={
-              editTweetData?.thread?.[0]?.scheduledUnix
-                ? new Date(editTweetData.thread[0].scheduledUnix)
-                : undefined
-            }
-          />
         </div>
       </Modal>
 
@@ -557,10 +652,10 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
                       <DuolingoButton
                         onClick={() => setIsRescheduleDialogOpen(true)}
                         size="sm"
-                        variant="secondary"
                         className="group/toggle-button"
                       >
-                        <CalendarIcon className="size-3.5 mr-1.5" /> Reschedule
+                        <CalendarBlankIcon weight="bold" className="size-3.5 mr-1.5" />{' '}
+                        Reschedule
                       </DuolingoButton>
                       <DuolingoButton
                         onClick={handleUpdateTweet}
@@ -658,9 +753,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
-           
-                  <AccountSwitcher />
-               
+            <AccountSwitcher />
 
             <TooltipProvider delayDuration={0}>
               <Tooltip>

@@ -1,9 +1,9 @@
 'use client'
 
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import { cn } from '@/lib/utils'
 
-interface DuolingoButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface DuolingoButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
   variant?:
     | 'primary'
@@ -16,10 +16,11 @@ interface DuolingoButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'sm' | 'md' | 'lg' | 'icon'
   className?: string
   loading?: boolean
+  ref?: Ref<HTMLButtonElement>
 }
 
 export const baseStyles =
-  'font-semibold h-10 w-full rounded-lg relative transition-transform active:translate-y-0.5 focus:outline-none flex items-center justify-center focus-visible:ring-2 focus-visible:ring-transparent focus-visible:ring-offset-2'
+  'font-semibold disabled:opacity-50 disabled:cursor-not-allowed h-10 w-full rounded-lg relative transition-transform active:translate-y-0.5 focus:outline-none flex items-center justify-center focus-visible:ring-2 focus-visible:ring-transparent focus-visible:ring-offset-2'
 
 export const variantStyles = {
   primary:
@@ -51,6 +52,7 @@ export default function DuolingoButton({
   className,
   disabled,
   loading = false,
+  ref,
   ...props
 }: DuolingoButtonProps) {
   const variantStyle =
@@ -59,6 +61,7 @@ export default function DuolingoButton({
 
   return (
     <button
+      ref={ref}
       className={cn(baseStyles, variantStyle, sizeStyle, className)}
       disabled={disabled || loading || variant === 'disabled'}
       {...props}

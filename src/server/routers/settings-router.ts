@@ -15,6 +15,8 @@ import { DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
 import { getBaseUrl } from '@/constants/base-url'
 import { Ratelimit } from '@upstash/ratelimit'
 import { getScheduledTweetCount } from './utils/get-scheduled-tweet-count'
+import { getAccount } from './utils/get-account'
+import { getAccountQueueSettings } from './tweet/queue-utils'
 
 export type Account = {
   id: string
@@ -23,6 +25,7 @@ export type Account = {
   profile_image_url: string
   verified: boolean
   twitterId?: string // new
+  useNaturalTimeByDefault?: boolean
 }
 
 export const settingsRouter = j.router({
@@ -32,6 +35,101 @@ export const settingsRouter = j.router({
 
     return c.json({ remaining, reset })
   }),
+
+  get_queue_settings: privateProcedure.get(async ({ c, ctx }) => {
+    const { user } = ctx
+
+    const account = await getAccount({
+      email: user.email,
+    })
+
+    if (!account?.id) {
+      throw new HTTPException(400, {
+        message: 'Please connect your Twitter account',
+      })
+    }
+
+    const queueSettings = await getAccountQueueSettings(account.id)
+
+    return c.json({
+      queueSettings,
+      useNaturalTimeByDefault: account.useNaturalTimeByDefault,
+    })
+  }),
+
+  update_queue_settings: privateProcedure
+    .input(
+      z.object({
+        queueSettings: z.record(z.string(), z.array(z.number())),
+        useNaturalTimeByDefault: z.boolean(),
+      }),
+    )
+    .post(async ({ c, ctx, input }) => {
+      const { user } = ctx
+      const { queueSettings, useNaturalTimeByDefault } = input
+
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account?.id) {
+        throw new HTTPException(400, {
+          message: 'Please connect your Twitter account',
+        })
+      }
+
+      const hasAtLeastOneSlot = Object.values(queueSettings).some(
+        (slots) => slots.length > 0,
+      )
+
+      if (!hasAtLeastOneSlot) {
+        throw new HTTPException(400, {
+          message: 'At least one time slot must be enabled',
+        })
+      }
+
+      const allSlots = new Set<number>()
+      for (const [day, slots] of Object.entries(queueSettings)) {
+        slots.forEach((slot) => allSlots.add(slot))
+      }
+
+      if (allSlots.size > 10) {
+        throw new HTTPException(400, {
+          message: 'Maximum 10 unique time slots allowed',
+        })
+      }
+
+      for (const [day, slots] of Object.entries(queueSettings)) {
+        for (const slot of slots) {
+          if (slot < 0 || slot >= 1440 || slot % 15 !== 0) {
+            throw new HTTPException(400, {
+              message:
+                'Invalid time slot. Must be in 15-minute intervals between 00:00 and 23:45',
+            })
+          }
+        }
+      }
+
+      const updatedAccount = {
+        ...account,
+        useNaturalTimeByDefault,
+      }
+
+      await Promise.all([
+        redis.json.set(`account:${user.email}:${account.id}`, '$', updatedAccount),
+        redis.json.set(`active-account:${user.email}`, '$', updatedAccount),
+        db
+          .update(accountSchema)
+          .set({
+            queueSettings,
+            useNaturalTimeByDefault,
+            updatedAt: new Date(),
+          })
+          .where(eq(accountSchema.id, account.id)),
+      ])
+
+      return c.json({ success: true, queueSettings })
+    }),
 
   usage_stats: privateProcedure.get(async ({ c, ctx }) => {
     const { user } = ctx

@@ -28,6 +28,7 @@ export function mapToConnectedAccount(raw: Account): Account {
     username: raw?.username || '',
     profile_image_url: raw?.profile_image_url || '',
     verified: raw?.verified ?? false,
+    useNaturalTimeByDefault: raw?.useNaturalTimeByDefault ?? false,
   }
 }
 

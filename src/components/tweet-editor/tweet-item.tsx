@@ -68,7 +68,7 @@ interface TweetItemProps {
 }
 
 const TweetItem = ({ tweet, index }: TweetItemProps) => {
-  const { removeTweet, clearTweet, addMediaFile, updateMediaFile } = useTweetsV2()
+  const { tweets, removeTweet, clearTweet, addMediaFile, updateMediaFile } = useTweetsV2()
   const [isDragging, setIsDragging] = useState(false)
   const [isDrawerOpen, setisDrawerOpen] = useState(false)
 
@@ -306,13 +306,15 @@ const TweetItem = ({ tweet, index }: TweetItemProps) => {
         <div className="w-full flex gap-3 relative">
           <div
             className={cn(
-              'relative z-50 w-10 h-14 bg-white flex -top-2.5 items-center justify-center transition-colors',
+              'relative z-20 w-10 bg-white h-fit isolate flex items-center justify-center transition-colors',
               {
                 'bg-indigo-50': isDragging,
+                "-mt-2 pt-2": index > 0,
+                "pb-2": index < tweets.length - 1,
               },
             )}
           >
-            <AccountAvatar className="relative !z-50 size-11 mt-2" />
+            <AccountAvatar className="relative !z-50 size-11" />
           </div>
 
           <div className="w-full flex-1">

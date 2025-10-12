@@ -1,6 +1,14 @@
 import { db } from '@/db'
 import { account as accountSchema, tweets } from '@/db/schema'
-import { addDays, getDay, isAfter, setHours, setMinutes, startOfDay, startOfHour } from 'date-fns'
+import {
+  addDays,
+  getDay,
+  isAfter,
+  setHours,
+  setMinutes,
+  startOfDay,
+  startOfHour,
+} from 'date-fns'
 import { fromZonedTime } from 'date-fns-tz'
 import { and, eq } from 'drizzle-orm'
 
@@ -18,7 +26,8 @@ const getDefaultQueueSettings = (): Record<string, number[]> => {
 
 export function applyNaturalPostingTime(scheduledUnix: number): number {
   const fourMinutesInMs = 4 * 60 * 1000
-  const randomOffset = Math.floor(Math.random() * (fourMinutesInMs * 2 + 1)) - fourMinutesInMs
+  const randomOffset =
+    Math.floor(Math.random() * (fourMinutesInMs * 2 + 1)) - fourMinutesInMs
   return scheduledUnix + randomOffset
 }
 
@@ -88,7 +97,7 @@ export async function getNextAvailableQueueSlot({
   return null
 }
 
-export async function getQueueSlotsForAccount(accountId: string): Promise<Record<string, number[]>> {
+export async function getAccountQueueSettings(accountId: string) {
   const dbAccount = await db.query.account.findFirst({
     where: eq(accountSchema.id, accountId),
     columns: { queueSettings: true },

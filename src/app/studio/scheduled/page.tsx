@@ -1,17 +1,21 @@
 'use client'
 
 import { Container } from '@/components/container'
-import TweetQueue from '@/components/tweet-queue'
 import { QueueSettingsModal } from '@/components/queue-settings-modal'
-import { Button } from '@/components/ui/button'
-import { Settings } from 'lucide-react'
-import { useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { GearIcon } from '@phosphor-icons/react'
+import TweetQueue from '@/components/tweet-queue'
 import DuolingoButton from '@/components/ui/duolingo-button'
+import { GearIcon } from '@phosphor-icons/react'
+import { useQueryClient } from '@tanstack/react-query'
+import { parseAsBoolean, useQueryState } from 'nuqs'
 
 export default function ScheduledTweetsPage() {
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useQueryState(
+    'settings',
+    parseAsBoolean.withDefault(false)
+  )
+
+  console.log('SETTINGS OPEN??', settingsOpen);
+
   const queryClient = useQueryClient()
 
   const handleSettingsUpdated = () => {

@@ -238,6 +238,7 @@ export const authRouter = j.router({
       profile_image_url: userProfile.profile_image_url_https,
       verified: data.verified,
       twitterId: data.id,
+      useNaturalTimeByDefault: false,
     }
 
     const [_, exists] = await Promise.all([

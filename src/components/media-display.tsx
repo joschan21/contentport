@@ -1,13 +1,7 @@
 import { AlertCircle, X } from 'lucide-react'
 import { useState } from 'react'
 import { Loader } from './ai-elements/loader'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog'
+import { Modal } from './ui/modal'
 
 interface MediaFile {
   url: string
@@ -19,7 +13,7 @@ interface MediaFile {
 interface MediaDisplayProps {
   mediaFiles: MediaFile[]
   selectionMode?: boolean
-  removeMediaFile: (url: string) => void
+  removeMediaFile?: (url: string) => void
 }
 
 export default function MediaDisplay({
@@ -51,40 +45,35 @@ export default function MediaDisplay({
   )
 
   const renderImage = (mediaFile: MediaFile, className: string) => (
-    <Dialog
-      open={openImageUrl === mediaFile.url}
-      onOpenChange={(open) => setOpenImageUrl(open ? mediaFile.url : null)}
-    >
-      <DialogTrigger asChild>
-        <img
-          src={mediaFile.url}
-          alt="Upload preview"
-          className={`${className} cursor-pointer rounded-lg hover:opacity-90 transition-opacity`}
-        />
-      </DialogTrigger>
-      <DialogContent
+    <>
+      <img
+        src={mediaFile.url}
+        alt="Upload preview"
+        className={`${className} cursor-pointer rounded-lg hover:opacity-90 transition-opacity`}
+        onClick={() => setOpenImageUrl(mediaFile.url)}
+      />
+      <Modal
+        showModal={openImageUrl === mediaFile.url}
+        setShowModal={(open) => setOpenImageUrl(open ? mediaFile.url : null)}
         className="max-w-4xl w-full h-fit max-h-[90vh] p-0 bg-transparent border-none shadow-none"
-        noClose
       >
-        <DialogTitle className="sr-only">Image Zoom View</DialogTitle>
         <div className="relative w-full h-full flex items-center justify-center">
           <div className="relative">
             <img
               src={mediaFile.url}
+              alt="Image zoom view"
               className="max-w-full max-h-full object-contain rounded-lg"
             />
-            <DialogClose className="absolute top-2 right-2" asChild>
-              <button
-                onClick={() => setOpenImageUrl(null)}
-                className="bg-black bg-opacity-50 hover:bg-opacity-75 text-white rounded-full p-2 transition-all"
-              >
-                <X className="size-5" />
-              </button>
-            </DialogClose>
+            <button
+              onClick={() => setOpenImageUrl(null)}
+              className="absolute top-2 right-2 bg-black bg-opacity-50 hover:bg-opacity-75 text-white rounded-full p-2 transition-all"
+            >
+              <X className="size-5" />
+            </button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </Modal>
+    </>
   )
 
   return (

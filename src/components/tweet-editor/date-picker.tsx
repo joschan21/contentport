@@ -2,20 +2,20 @@
 
 import * as React from 'react'
 
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { authClient } from '@/lib/auth-client'
 import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
-import { CalendarBlankIcon, InfoIcon } from '@phosphor-icons/react'
+import { InfoIcon } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
+import { isToday, isTomorrow } from 'date-fns'
 import { DayFlag, DayPicker, UI } from 'react-day-picker'
 import DuolingoButton from '../ui/duolingo-button'
-import { isToday, isTomorrow } from 'date-fns'
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
-  onSchedule?: (date: Date, time: string, useNaturalTime?: boolean) => void
+  onSchedule?: (date: Date, time: string) => void
   isPending?: boolean
   initialScheduledTime?: Date
   editMode?: boolean
@@ -111,10 +111,16 @@ export const Calendar20 = ({
   const [selectedTime, setSelectedTime] = React.useState<string | null>(getInitialTime())
 
   const getInitialAmPm = (): 'AM' | 'PM' => {
+    if (initialScheduledTime) {
+      const scheduledDate = new Date(initialScheduledTime)
+      return scheduledDate.getHours() >= 12 ? 'PM' : 'AM'
+    }
     return currentHour >= 12 ? 'PM' : 'AM'
   }
 
   const [ampm, setAmPm] = React.useState<'AM' | 'PM'>(getInitialAmPm())
+  const timeListRef = React.useRef<HTMLDivElement>(null)
+  const selectedTimeRef = React.useRef<HTMLButtonElement>(null)
 
   const isTimeSlotDisabled = (value: string) => {
     if (!date || date.toDateString() !== today.toDateString()) {
@@ -164,6 +170,15 @@ export const Calendar20 = ({
       }
     }
   }, [ampm, hasAvailableSlots])
+
+  React.useEffect(() => {
+    if (selectedTimeRef.current) {
+      selectedTimeRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      })
+    }
+  }, [selectedTime, ampm])
 
   const selectedTimeLabel = React.useMemo(() => {
     const found = timeSlots.find((t) => t.value === selectedTime)
@@ -257,7 +272,7 @@ export const Calendar20 = ({
               </DuolingoButton>
             ))}
           </div>
-          <div className="grid gap-2">
+          <div ref={timeListRef} className="grid gap-2">
             {timeSlots
               .filter((t) => {
                 const h = parseInt(t.value.split(':')[0] ?? '0', 10)
@@ -266,6 +281,7 @@ export const Calendar20 = ({
               .filter((t) => !isTimeSlotDisabled(t.value))
               .map((t, i) => (
                 <DuolingoButton
+                  ref={selectedTime === t.value ? selectedTimeRef : null}
                   size="sm"
                   className="h-9"
                   key={`${t.value}-${i}`}
@@ -286,10 +302,7 @@ export const Calendar20 = ({
                 <span className="text-gray-500">
                   {editMode ? 'Reschedule for' : 'Schedule for'}{' '}
                 </span>
-                <span className="font-medium">
-                  {' '}
-                  {formatDateDisplay(date)}{' '}
-                </span>
+                <span className="font-medium"> {formatDateDisplay(date)} </span>
                 <span className="text-gray-500">at</span>{' '}
                 <span className="font-medium">{selectedTimeLabel}</span>
               </>
@@ -297,8 +310,8 @@ export const Calendar20 = ({
           </div>
           {session?.data?.user?.plan === 'free' ? (
             <p className="inline-flex items-center text-xs text-gray-500">
-              <InfoIcon className="size-3 mr-1" /> Upgrade to schedule unlimited tweets
-              ({data?.count ?? 0}/3 used)
+              <InfoIcon className="size-3 mr-1" /> Upgrade to schedule unlimited tweets (
+              {data?.count ?? 0}/3 used)
             </p>
           ) : (
             <p className="inline-flex items-center text-xs text-gray-500">
@@ -308,29 +321,6 @@ export const Calendar20 = ({
         </div>
 
         <div className="flex flex-col gap-3 w-full md:ml-auto md:w-auto">
-          {/* temporarily disabled */}
-          {/* <div className="flex items-center space-x-2">
-            <Checkbox
-              id="natural-time"
-              checked={useNaturalTime}
-              onCheckedChange={(checked) => {
-                const isChecked = checked === true
-                setUseNaturalTime(isChecked)
-                if (isChecked) {
-                  localStorage.setItem('useNaturalPostingTime', 'true')
-                } else {
-                  localStorage.removeItem('useNaturalPostingTime')
-                }
-              }}
-            />
-            <Label
-              htmlFor="natural-time"
-              className="text-sm font-normal cursor-pointer text-muted-foreground"
-            >
-              Natural posting time (±4 min)
-            </Label>
-          </div> */}
-
           <DuolingoButton
             loading={isPending}
             size="sm"
@@ -345,8 +335,7 @@ export const Calendar20 = ({
               }
             }}
           >
-            {editMode ? null : <CalendarBlankIcon className="size-4 mr-1.5" />}
-            {editMode ? 'Reschedule' : 'Schedule'}
+            {editMode ? 'Save' : 'Schedule'}
           </DuolingoButton>
         </div>
       </CardFooter>

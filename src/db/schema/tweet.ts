@@ -4,12 +4,18 @@ import {
   boolean,
   integer,
   json,
+  pgEnum,
   pgTable,
   text,
   timestamp
 } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
 import { account, user } from './auth'
+
+export const tweetPropertyEnum = pgEnum('tweet_property', [
+  'natural',
+  'auto-delay'
+])
 
 type Media = {
   s3Key: string // s3
@@ -41,8 +47,8 @@ export const tweets = pgTable('tweets', {
   isError: boolean('is_error').default(false).notNull(),
   errorMessage: text('error_message'),
   isProcessing: boolean('is_processing').default(false).notNull(),
+  properties: json('properties').$type<Array<typeof tweetPropertyEnum.enumValues[number]>>().default([]),
 
-  // unix timestamp in milliseconds
   scheduledUnix: bigint('scheduled_unix', { mode: 'number' }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

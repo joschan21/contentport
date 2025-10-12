@@ -14,11 +14,12 @@ interface TweetProps {
 }
 
 export default function Tweet({ editMode = false }: TweetProps) {
-  const { tweets, addTweet } = useTweetsV2()
+  const { tweets, addTweet, reset } = useTweetsV2()
   const router = useRouter()
 
   const handleCancelEdit = () => {
     router.push('/studio/scheduled')
+    setTimeout(() => reset(), 500)
   }
 
   return (
@@ -27,15 +28,14 @@ export default function Tweet({ editMode = false }: TweetProps) {
       {Boolean(editMode) && (
         <div className="flex w-full justify-between">
           <div className="flex items-center gap-2">
-            <div className="size-1.5 bg-indigo-600 rounded-full" />
-            <p className="text-xs uppercase leading-8 text-indigo-600 font-medium">
+            <p className="text-sm uppercase leading-8 text-indigo-600 font-medium">
               EDITING
             </p>
           </div>
 
           <button
             onClick={handleCancelEdit}
-            className="text-xs hover:underline uppercase leading-8 text-red-500 font-medium flex items-center gap-1"
+            className="text-sm hover:underline uppercase leading-8 text-red-500 font-medium flex items-center gap-1"
           >
             <X className="size-3" />
             Cancel Edit
@@ -44,15 +44,15 @@ export default function Tweet({ editMode = false }: TweetProps) {
       )}
 
       <Card
-        className={cn('p-3 gap-0', {
-          'border border-indigo-300': editMode,
+        className={cn('relative z-0 p-3 gap-0', {
+          'border-2 border-indigo-600': editMode,
         })}
       >
         {tweets.map((tweet, index) => {
           return (
             <div
               key={tweet.id}
-              className={cn('relative z-50', {
+              className={cn('relative', {
                 'pb-0': index > 0 && index < tweets.length - 1,
               })}
             >
@@ -61,9 +61,9 @@ export default function Tweet({ editMode = false }: TweetProps) {
               {tweets.length > 1 && index < tweets.length - 1 && (
                 <motion.div
                   initial={{ height: 0 }}
-                  animate={{ height: '100%' }}
+                  animate={{ height: 'calc(100%)' }}
                   transition={{ duration: 0.5 }}
-                  className="absolute z-10 left-8 top-[44px] w-0.5 bg-gray-200/75 h-[calc(100%+100px)]"
+                  className="absolute z-10 left-8 top-8 w-0.5 bg-gray-200/75 h-[calc(100%)]"
                 />
               )}
             </div>

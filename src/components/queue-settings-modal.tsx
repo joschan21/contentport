@@ -1,7 +1,7 @@
-import { useState, useEffect, Dispatch, SetStateAction } from 'react'
-import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import { Modal } from '@/components/ui/modal'
 import {
   Select,
   SelectContent,
@@ -9,19 +9,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { AccountAvatar, AccountName } from '@/hooks/account-ctx'
 import { client } from '@/lib/client'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
-import DuolingoButton from './ui/duolingo-button'
-import { Loader } from './ai-elements/loader'
-import { AccountAvatar, AccountName, AccountHandle } from '@/hooks/account-ctx'
+import { ClockIcon, InfoIcon } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Plus, Trash2 } from 'lucide-react'
+import { Dispatch, SetStateAction, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { Loader } from './ai-elements/loader'
+import DuolingoButton from './ui/duolingo-button'
+import { Card, CardFooter } from './ui/card'
 
 type QueueSettings = Record<string, number[]>
 
 interface QueueSettingsModalProps {
   open: boolean
-  setOpen: Dispatch<SetStateAction<boolean>>
+  setOpen: (open: boolean) => void
   onSettingsUpdated?: () => void
 }
 
@@ -67,11 +71,12 @@ export const QueueSettingsModal = ({
   const queryClient = useQueryClient()
   const [settings, setSettings] = useState<QueueSettings>({})
   const [availableTimes, setAvailableTimes] = useState<number[]>([600, 720, 840])
+  const [useNaturalTimeByDefault, setUseNaturalTimeByDefault] = useState(false)
 
   const { data, isPending: loading } = useQuery({
     queryKey: ['queue-settings'],
     queryFn: async () => {
-      const response = await client.tweet.get_queue_settings.$get()
+      const response = await client.settings.get_queue_settings.$get()
       return await response.json()
     },
   })
@@ -79,6 +84,7 @@ export const QueueSettingsModal = ({
   useEffect(() => {
     if (data) {
       setSettings(data.queueSettings)
+      setUseNaturalTimeByDefault(data.useNaturalTimeByDefault ?? false)
 
       const allTimes = new Set<number>()
       Object.values(data.queueSettings).forEach((times) => {
@@ -91,9 +97,16 @@ export const QueueSettingsModal = ({
   }, [data])
 
   const { mutate: handleSave, isPending: saving } = useMutation({
-    mutationFn: async (queueSettings: QueueSettings) => {
-      const response = await client.tweet.update_queue_settings.$post({
+    mutationFn: async ({
+      queueSettings,
+      useNaturalTimeByDefault,
+    }: {
+      queueSettings: QueueSettings
+      useNaturalTimeByDefault: boolean
+    }) => {
+      const response = await client.settings.update_queue_settings.$post({
         queueSettings,
+        useNaturalTimeByDefault,
       })
       return await response.json()
     },
@@ -168,11 +181,6 @@ export const QueueSettingsModal = ({
               <p className="text-sm leading-none text-gray-500">Queue Settings</p>
             </div>
           </div>
-
-          <p className="text-gray-500">
-            Don't worry: Editing your schedule here won't affect posts that are already
-            scheduled.
-          </p>
         </div>
 
         {loading ? (
@@ -182,7 +190,37 @@ export const QueueSettingsModal = ({
           </div>
         ) : (
           <div className="space-y-5">
-            <div className="border rounded-lg overflow-hidden">
+            <div className="flex items-start gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="natural-time-default"
+                  checked={useNaturalTimeByDefault}
+                  onCheckedChange={(checked) =>
+                    setUseNaturalTimeByDefault(checked === true)
+                  }
+                />
+                <Label
+                  htmlFor="natural-time-default"
+                  className="text-sm font-medium text-gray-800 cursor-pointer"
+                >
+                  Use natural posting times by default
+                </Label>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InfoIcon
+                    weight="bold"
+                    className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+                  />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  When enabled, new posts are published ±4 minutes around the scheduled
+                  time to appear more natural.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <Card className="p-0 gap-0">
               <div
                 className="grid bg-muted"
                 style={{ gridTemplateColumns: 'minmax(140px, auto) repeat(7, 1fr)' }}
@@ -206,7 +244,9 @@ export const QueueSettingsModal = ({
                     style={{ gridTemplateColumns: 'minmax(140px, auto) repeat(7, 1fr)' }}
                   >
                     <div className="px-4 py-3.5 text-sm border-r flex items-center justify-between gap-4">
-                      <span className="whitespace-nowrap">{formatTime(time)}</span>
+                      <span className="whitespace-nowrap font-medium">
+                        {formatTime(time)}
+                      </span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -240,7 +280,7 @@ export const QueueSettingsModal = ({
                       }
                     }}
                   >
-                    <div className="p-4 flex items-center justify-center gap-2">
+                    <div className="p-4 flex items-center justify-start gap-2">
                       <Plus className="w-4 h-4 text-gray-400" />
                       <Select
                         value={selectedTime}
@@ -250,7 +290,7 @@ export const QueueSettingsModal = ({
                           setSelectedTime('')
                         }}
                       >
-                        <SelectTrigger className="h-8 w-full bg-white border-dashed">
+                        <SelectTrigger className="h-8 w-fit bg-white border-dashed">
                           <SelectValue placeholder="Add time slot..." />
                         </SelectTrigger>
                         <SelectContent className="max-h-[300px]">
@@ -260,6 +300,7 @@ export const QueueSettingsModal = ({
                             <SelectItem
                               key={option.value}
                               value={option.value.toString()}
+                              className="font-medium flex items-center gap-2"
                             >
                               {option.label}
                             </SelectItem>
@@ -276,7 +317,13 @@ export const QueueSettingsModal = ({
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
+
+            <p className="text-gray-500 inline-flex items-center gap-1.5 text-sm">
+              <InfoIcon weight="bold" className="size-4" />
+              Don't worry: Editing your schedule here won't affect posts that are already
+              scheduled.
+            </p>
 
             <div className="flex justify-end gap-2">
               <DuolingoButton
@@ -286,8 +333,13 @@ export const QueueSettingsModal = ({
               >
                 Cancel
               </DuolingoButton>
-              <DuolingoButton onClick={() => handleSave(settings)} loading={saving}>
-                Save Settings
+              <DuolingoButton
+                onClick={() =>
+                  handleSave({ queueSettings: settings, useNaturalTimeByDefault })
+                }
+                loading={saving}
+              >
+                Save
               </DuolingoButton>
             </div>
           </div>
