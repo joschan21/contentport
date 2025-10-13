@@ -37,19 +37,13 @@ export async function getNextAvailableQueueSlot({
   userNow,
   timezone,
   maxDaysAhead = 90,
-  isAdmin = false,
 }: {
   userId: string
   accountId: string
   userNow: Date
   timezone: string
   maxDaysAhead?: number
-  isAdmin?: boolean
 }): Promise<Date | null> {
-  if (process.env.VERCEL_ENV === 'preview' || isAdmin) {
-    return new Date(userNow.getTime() + 60000)
-  }
-
   const dbAccount = await db.query.account.findFirst({
     where: eq(accountSchema.id, accountId),
     columns: { queueSettings: true },
