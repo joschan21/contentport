@@ -37,12 +37,14 @@ export async function getNextAvailableQueueSlot({
   userNow,
   timezone,
   maxDaysAhead = 90,
+  isAdmin = false,
 }: {
   userId: string
   accountId: string
   userNow: Date
   timezone: string
   maxDaysAhead?: number
+  isAdmin?: boolean
 }): Promise<Date | null> {
   const dbAccount = await db.query.account.findFirst({
     where: eq(accountSchema.id, accountId),
