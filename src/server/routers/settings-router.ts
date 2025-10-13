@@ -120,11 +120,7 @@ export const settingsRouter = j.router({
         redis.json.set(`active-account:${user.email}`, '$', updatedAccount),
         db
           .update(accountSchema)
-          .set({
-            queueSettings,
-            useNaturalTimeByDefault,
-            updatedAt: new Date(),
-          })
+          .set({ queueSettings, updatedAt: new Date() })
           .where(eq(accountSchema.id, account.id)),
       ])
 
