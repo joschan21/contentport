@@ -48,6 +48,7 @@ export const account = pgTable('account', {
   password: text('password'),
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull(),
+  queueSettings: json('queue_settings').$type<Record<string, number[]>>(),
 })
 
 export type Account = typeof account.$inferSelect

@@ -36,6 +36,10 @@ export function Modal({
       document.body.style.overflow = ''
     }
 
+    if (showModal) {
+      document.body.style.overflow = 'hidden'
+    }
+
     if (!showModal) {
       const timeoutId = setTimeout(cleanup, 100)
       return () => clearTimeout(timeoutId)
