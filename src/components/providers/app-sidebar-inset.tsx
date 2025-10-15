@@ -69,9 +69,13 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     if (queueSettings?.useNaturalTimeByDefault !== undefined) {
       setUseNaturalTime(queueSettings.useNaturalTimeByDefault)
     }
-  }, [queueSettings?.useNaturalTimeByDefault])
+    if (queueSettings?.useAutoDelayByDefault !== undefined) {
+      setUseAutoDelay(queueSettings.useAutoDelayByDefault)
+    }
+  }, [queueSettings?.useNaturalTimeByDefault, queueSettings?.useAutoDelayByDefault])
 
   const [useNaturalTime, setUseNaturalTime] = useState<boolean>(false)
+  const [useAutoDelay, setUseAutoDelay] = useState<boolean>(false)
 
   const { data: editTweetData } = useQuery<{ thread: Tweet[] }>({
     queryKey: ['edit-tweet', editTweetId],
@@ -101,9 +105,11 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     mutationFn: async ({
       tweets,
       useNaturalTime,
+      useAutoDelay,
     }: {
       tweets: MemoryTweet[]
       useNaturalTime?: boolean
+      useAutoDelay?: boolean
     }) => {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       const userNow = new Date()
@@ -115,6 +121,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         timezone,
         userNow,
         useNaturalTime,
+        useAutoDelay,
       })
 
       return await res.json()
@@ -173,16 +180,19 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       thread,
       showToast = true,
       useNaturalTime = false,
+      useAutoDelay = false,
     }: {
       scheduledUnix: number
       thread: PayloadTweet[]
       showToast?: boolean
       useNaturalTime?: boolean
+      useAutoDelay?: boolean
     }) => {
       const promise = client.tweet.schedule.$post({
         scheduledUnix,
         thread,
         useNaturalTime,
+        useAutoDelay,
       })
 
       if (showToast) {
@@ -241,10 +251,12 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       scheduledUnix,
       thread,
       useNaturalTime = false,
+      useAutoDelay = false,
     }: {
       scheduledUnix: number
       thread: PayloadTweet[]
       useNaturalTime?: boolean
+      useAutoDelay?: boolean
     }) => {
       if (!scheduledUnix) {
         toast.error('Something went wrong, please reload the page.')
@@ -263,6 +275,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         scheduledUnix,
         thread,
         useNaturalTime,
+        useAutoDelay,
         timezone,
       })
 
@@ -323,6 +336,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       thread: tweets.map(toPayloadTweet),
       scheduledUnix,
       useNaturalTime,
+      useAutoDelay,
     })
   }
 
@@ -355,6 +369,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       thread,
       scheduledUnix,
       useNaturalTime,
+      useAutoDelay,
     })
   }
 
@@ -378,10 +393,10 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
   }
 
   const { mutate: postTweetImmediate, isPending: isPosting } = useMutation({
-    mutationFn: async ({ tweets }: { tweets: MemoryTweet[] }) => {
+    mutationFn: async ({ tweets, useAutoDelay }: { tweets: MemoryTweet[], useAutoDelay?: boolean }) => {
       const thread: PayloadTweet[] = tweets.map(toPayloadTweet)
 
-      const res = await client.tweet.postImmediate.$post({ thread })
+      const res = await client.tweet.postImmediate.$post({ thread, useAutoDelay })
       const { messageId, accountUsername } = await res.json()
 
       // Poll for completion
@@ -439,7 +454,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
     },
   })
 
-  const handlePostImmediate = async () => {
+  const handlePostImmediate = async (useAutoDelay?: boolean) => {
     if (
       tweets.some(
         (f) => f.editor?.read(() => $getRoot().getTextContent().trim()).trim() === '',
@@ -459,7 +474,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       return
     }
 
-    postTweetImmediate({ tweets })
+    postTweetImmediate({ tweets, useAutoDelay })
   }
 
   const handleAddToQueue = async () => {
@@ -482,7 +497,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       return
     }
 
-    enqueueTweet({ tweets, useNaturalTime })
+    enqueueTweet({ tweets, useNaturalTime, useAutoDelay })
   }
 
   const formatQueueSlot = (unix: number) => {
@@ -506,8 +521,9 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       <TweetPostConfirmationDialog
         open={isPostDialogOpen}
         onOpenChange={setIsPostDialogOpen}
-        onConfirm={handlePostImmediate}
+        onConfirm={(useAutoDelay) => handlePostImmediate(useAutoDelay)}
         isPosting={isPosting}
+        threadLength={tweets.length}
       />
 
       <Modal
@@ -517,45 +533,87 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       >
         <div className="p-6">
           <h2 className="text-lg font-semibold">Schedule</h2>
-          <div className="flex mt-3 items-start gap-2">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="natural-time-default"
-                checked={useNaturalTime}
-                onCheckedChange={(checked) => setUseNaturalTime(checked === true)}
-              />
-              <Label
-                htmlFor="natural-time-default"
-                className="text-sm font-medium text-gray-800 cursor-pointer"
-              >
-                Use natural posting time
-              </Label>
-            </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <InfoIcon
-                  weight="bold"
-                  className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+          <div className="space-y-3 mt-3">
+            <div className="flex items-start gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="natural-time-default"
+                  checked={useNaturalTime}
+                  onCheckedChange={(checked) => setUseNaturalTime(checked === true)}
                 />
-              </TooltipTrigger>
-              <TooltipContent className="block max-w-xs space-y-3 px-3 py-3.5">
-                <p className='block'>
-                  When enabled, new posts are published ±4 minutes around the scheduled
-                  time to appear more natural.
-                </p>
-                <DuolingoButton 
-                  className="block mt-2" 
-                  size="sm" 
-                  variant="secondary"
-                  onClick={() => {
-                    router.push('/studio/scheduled?settings=true')
-                    setIsScheduleDialogOpen(false)
-                  }}
+                <Label
+                  htmlFor="natural-time-default"
+                  className="text-sm font-medium text-gray-800 cursor-pointer"
                 >
-                  Change default
-                </DuolingoButton>
-              </TooltipContent>
-            </Tooltip>
+                  Use natural posting time
+                </Label>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InfoIcon
+                    weight="bold"
+                    className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+                  />
+                </TooltipTrigger>
+                <TooltipContent className="block max-w-xs space-y-3 px-3 py-3.5">
+                  <p className='block'>
+                    When enabled, new posts are published ±4 minutes around the scheduled
+                    time to appear more natural.
+                  </p>
+                  <DuolingoButton 
+                    className="block mt-2" 
+                    size="sm" 
+                    variant="secondary"
+                    onClick={() => {
+                      router.push('/studio/scheduled?settings=true')
+                      setIsScheduleDialogOpen(false)
+                    }}
+                  >
+                    Change default
+                  </DuolingoButton>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="auto-delay-schedule"
+                  checked={useAutoDelay}
+                  onCheckedChange={(checked) => setUseAutoDelay(checked === true)}
+                />
+                <Label
+                  htmlFor="auto-delay-schedule"
+                  className="text-sm font-medium text-gray-800 cursor-pointer"
+                >
+                  Use auto-delay for threads
+                </Label>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InfoIcon
+                    weight="bold"
+                    className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+                  />
+                </TooltipTrigger>
+                <TooltipContent className="block max-w-xs space-y-3 px-3 py-3.5">
+                  <p className='block'>
+                    When enabled, each tweet in a thread is delayed by 1 minute from the previous tweet for better algorithmic performance.
+                  </p>
+                  <DuolingoButton 
+                    className="block mt-2" 
+                    size="sm" 
+                    variant="secondary"
+                    onClick={() => {
+                      router.push('/studio/scheduled?settings=true')
+                      setIsScheduleDialogOpen(false)
+                    }}
+                  >
+                    Change default
+                  </DuolingoButton>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
           <div className="block mt-5">
@@ -580,32 +638,61 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       >
         <div className="p-6">
           <h2 className="text-lg font-semibold">Reschedule Post</h2>
-          <div className="flex mt-3 items-start gap-2">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="natural-time-reschedule"
-                checked={useNaturalTime}
-                onCheckedChange={(checked) => setUseNaturalTime(checked === true)}
-              />
-              <Label
-                htmlFor="natural-time-reschedule"
-                className="text-sm font-medium text-gray-800 cursor-pointer"
-              >
-                Use natural posting time
-              </Label>
-            </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <InfoIcon
-                  weight="bold"
-                  className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+          <div className="space-y-3 mt-3">
+            <div className="flex items-start gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="natural-time-reschedule"
+                  checked={useNaturalTime}
+                  onCheckedChange={(checked) => setUseNaturalTime(checked === true)}
                 />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                When enabled, new posts are published ±4 minutes around the scheduled time
-                to appear more natural.
-              </TooltipContent>
-            </Tooltip>
+                <Label
+                  htmlFor="natural-time-reschedule"
+                  className="text-sm font-medium text-gray-800 cursor-pointer"
+                >
+                  Use natural posting time
+                </Label>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InfoIcon
+                    weight="bold"
+                    className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+                  />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  When enabled, new posts are published ±4 minutes around the scheduled time
+                  to appear more natural.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="auto-delay-reschedule"
+                  checked={useAutoDelay}
+                  onCheckedChange={(checked) => setUseAutoDelay(checked === true)}
+                />
+                <Label
+                  htmlFor="auto-delay-reschedule"
+                  className="text-sm font-medium text-gray-800 cursor-pointer"
+                >
+                  Use auto-delay for threads
+                </Label>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InfoIcon
+                    weight="bold"
+                    className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+                  />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  When enabled, each tweet in a thread is delayed by 1 minute from the previous tweet for better algorithmic performance.
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
           <div className="block mt-5">

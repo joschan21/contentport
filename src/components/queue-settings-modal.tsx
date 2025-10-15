@@ -72,6 +72,7 @@ export const QueueSettingsModal = ({
   const [settings, setSettings] = useState<QueueSettings>({})
   const [availableTimes, setAvailableTimes] = useState<number[]>([600, 720, 840])
   const [useNaturalTimeByDefault, setUseNaturalTimeByDefault] = useState(false)
+  const [useAutoDelayByDefault, setUseAutoDelayByDefault] = useState(false)
 
   const { data, isPending: loading } = useQuery({
     queryKey: ['queue-settings'],
@@ -85,6 +86,7 @@ export const QueueSettingsModal = ({
     if (data) {
       setSettings(data.queueSettings)
       setUseNaturalTimeByDefault(data.useNaturalTimeByDefault ?? false)
+      setUseAutoDelayByDefault(data.useAutoDelayByDefault ?? false)
 
       const allTimes = new Set<number>()
       Object.values(data.queueSettings).forEach((times) => {
@@ -100,13 +102,16 @@ export const QueueSettingsModal = ({
     mutationFn: async ({
       queueSettings,
       useNaturalTimeByDefault,
+      useAutoDelayByDefault,
     }: {
       queueSettings: QueueSettings
       useNaturalTimeByDefault: boolean
+      useAutoDelayByDefault: boolean
     }) => {
       const response = await client.settings.update_queue_settings.$post({
         queueSettings,
         useNaturalTimeByDefault,
+        useAutoDelayByDefault,
       })
       return await response.json()
     },
@@ -190,34 +195,66 @@ export const QueueSettingsModal = ({
           </div>
         ) : (
           <div className="space-y-5">
-            <div className="flex items-start gap-2">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="natural-time-default"
-                  checked={useNaturalTimeByDefault}
-                  onCheckedChange={(checked) =>
-                    setUseNaturalTimeByDefault(checked === true)
-                  }
-                />
-                <Label
-                  htmlFor="natural-time-default"
-                  className="text-sm font-medium text-gray-800 cursor-pointer"
-                >
-                  Use natural posting times by default
-                </Label>
-              </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <InfoIcon
-                    weight="bold"
-                    className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+            <div className="space-y-3">
+              <div className="flex items-start gap-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="natural-time-default"
+                    checked={useNaturalTimeByDefault}
+                    onCheckedChange={(checked) =>
+                      setUseNaturalTimeByDefault(checked === true)
+                    }
                   />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  When enabled, new posts are published ±4 minutes around the scheduled
-                  time to appear more natural.
-                </TooltipContent>
-              </Tooltip>
+                  <Label
+                    htmlFor="natural-time-default"
+                    className="text-sm font-medium text-gray-800 cursor-pointer"
+                  >
+                    Use natural posting times (recommended)
+                  </Label>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <InfoIcon
+                      weight="bold"
+                      className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    When enabled, new posts are published ±4 minutes around the scheduled
+                    time to appear more natural.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="auto-delay-default"
+                    checked={useAutoDelayByDefault}
+                    onCheckedChange={(checked) =>
+                      setUseAutoDelayByDefault(checked === true)
+                    }
+                  />
+                  <Label
+                    htmlFor="auto-delay-default"
+                    className="text-sm font-medium text-gray-800 cursor-pointer"
+                  >
+                    Use auto-delay for threads (recommended)
+                  </Label>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <InfoIcon
+                      weight="bold"
+                      className="size-4 text-gray-500 shrink-0 mt-px cursor-help"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    When enabled, each tweet in a thread is delayed by 1 minute from the
+                    previous tweet for better algorithmic performance.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
 
             <Card className="p-0 gap-0">
@@ -335,7 +372,11 @@ export const QueueSettingsModal = ({
               </DuolingoButton>
               <DuolingoButton
                 onClick={() =>
-                  handleSave({ queueSettings: settings, useNaturalTimeByDefault })
+                  handleSave({
+                    queueSettings: settings,
+                    useNaturalTimeByDefault,
+                    useAutoDelayByDefault,
+                  })
                 }
                 loading={saving}
               >

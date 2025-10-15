@@ -1,4 +1,4 @@
-import { useAccount } from '@/hooks/account-ctx'
+import { AccountName, AccountHandle, useAccount } from '@/hooks/account-ctx'
 import { client } from '@/lib/client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HTTPException } from 'hono/http-exception'
@@ -14,11 +14,10 @@ import DuolingoButton from './ui/duolingo-button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 
 interface AccountSwitcherProps {
-  isCollapsed?: boolean
-  isMounted?: boolean
+  showFullDetails?: boolean
 }
 
-export const AccountSwitcher = ({ isCollapsed, isMounted }: AccountSwitcherProps) => {
+export const AccountSwitcher = ({ showFullDetails }: AccountSwitcherProps) => {
   const { account: activeAccount } = useAccount()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
@@ -64,9 +63,15 @@ export const AccountSwitcher = ({ isCollapsed, isMounted }: AccountSwitcherProps
     <TooltipProvider delayDuration={0}>
       <Tooltip open={open ? false : undefined}>
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <TooltipTrigger asChild>
-              <DuolingoButton size="icon" variant="secondary" className="w-fit px-1">
+          <PopoverTrigger className='w-full' asChild>
+            <TooltipTrigger className='w-full' asChild>
+              <DuolingoButton
+                size={showFullDetails ? "lg" : 'icon'}
+                variant="secondary"
+                className={cn('w-fit px-1 gap-2', {
+                  'px-2 justify-start h-12 min-w-[calc(50%-6px)]': showFullDetails,
+                })}
+              >
                 <Avatar className="rounded-md">
                   <AvatarImage
                     className="rounded-md"
@@ -81,68 +86,82 @@ export const AccountSwitcher = ({ isCollapsed, isMounted }: AccountSwitcherProps
                     ).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
+
+                {showFullDetails && (
+                  <div className="flex flex-col items-start">
+                    <p className="text-sm font-medium truncate">
+                      <span>{activeAccount.name}</span>
+                      <span>
+                        {activeAccount.verified && (
+                          <Icons.verificationBadge className="size-3.5 shrink-0" />
+                        )}
+                      </span>
+                    </p>
+                    <p className="text-xs font-normal text-gray-600">@{activeAccount.username}</p>
+                  </div>
+                )}
               </DuolingoButton>
             </TooltipTrigger>
           </PopoverTrigger>
 
-      <PopoverContent className="w-72 p-2" align="start" side="bottom">
-        <div className="space-y-1">
-          <div className="px-2 py-1.5">
-            <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">
-              Switch Account
-            </p>
-          </div>
-          {accounts.map((acc) => {
-            const isActive = acc.id === activeAccount.id
-            const isSwitchingThis =
-              isSwitching && switchAccountVariables?.accountId === acc.id
+          <PopoverContent className="w-72 p-2" align="start" side="bottom">
+            <div className="space-y-1">
+              <div className="px-2 py-1.5">
+                <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">
+                  Switch Account
+                </p>
+              </div>
+              {accounts.map((acc) => {
+                const isActive = acc.id === activeAccount.id
+                const isSwitchingThis =
+                  isSwitching && switchAccountVariables?.accountId === acc.id
 
-            return (
-              <button
-                key={acc.id}
-                onClick={() => !isActive && switchAccount({ accountId: acc.id })}
-                disabled={isActive || isSwitchingThis}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group',
-                  isActive
-                    ? 'bg-gray-100 cursor-default'
-                    : 'hover:bg-stone-100 cursor-pointer',
-                )}
-              >
-                <Avatar className="size-9 ring-2 ring-white shrink-0">
-                  <AvatarImage
-                    src={acc.profile_image_url?.replace('_normal', '_200x200')}
-                    alt={acc.username}
-                  />
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                    {(acc.name?.[0] || acc.username?.[0] || '?').toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-medium text-stone-900 truncate">
-                      {acc.name}
-                    </p>
-                    {acc.verified && (
-                      <Icons.verificationBadge className="size-3.5 shrink-0" />
+                return (
+                  <button
+                    key={acc.id}
+                    onClick={() => !isActive && switchAccount({ accountId: acc.id })}
+                    disabled={isActive || isSwitchingThis}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group',
+                      isActive
+                        ? 'bg-gray-100 cursor-default'
+                        : 'hover:bg-stone-100 cursor-pointer',
                     )}
-                  </div>
-                  <p className="text-xs text-stone-500 truncate">@{acc.username}</p>
-                </div>
-                <div className="shrink-0">
-                  {isSwitchingThis ? (
-                    <Loader />
-                  ) : isActive ? (
-                    <div className="size-5 rounded-full bg-stone-800 flex items-center justify-center">
-                      <CheckIcon weight="bold" className="size-3 text-white" />
+                  >
+                    <Avatar className="size-9 ring-2 ring-white shrink-0">
+                      <AvatarImage
+                        src={acc.profile_image_url?.replace('_normal', '_200x200')}
+                        alt={acc.username}
+                      />
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                        {(acc.name?.[0] || acc.username?.[0] || '?').toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-stone-900 truncate">
+                          {acc.name}
+                        </p>
+                        {acc.verified && (
+                          <Icons.verificationBadge className="size-3.5 shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-xs text-stone-500 truncate">@{acc.username}</p>
                     </div>
-                  ) : null}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </PopoverContent>
+                    <div className="shrink-0">
+                      {isSwitchingThis ? (
+                        <Loader />
+                      ) : isActive ? (
+                        <div className="size-5 rounded-full bg-stone-800 flex items-center justify-center">
+                          <CheckIcon weight="bold" className="size-3 text-white" />
+                        </div>
+                      ) : null}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </PopoverContent>
         </Popover>
         <TooltipContent side="bottom" className="bg-stone-800 text-white">
           Switch Account

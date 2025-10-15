@@ -231,14 +231,15 @@ export const authRouter = j.router({
       })
       .onConflictDoNothing()
 
-    const connectedAccount = {
+    const connectedAccount: Account = {
       id: dbAccountId,
       username: userProfile.screen_name,
       name: userProfile.name,
       profile_image_url: userProfile.profile_image_url_https,
-      verified: data.verified,
+      verified: Boolean(data.verified),
       twitterId: data.id,
       useNaturalTimeByDefault: false,
+      useAutoDelayByDefault: false,
     }
 
     const [_, exists] = await Promise.all([

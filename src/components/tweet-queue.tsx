@@ -2,45 +2,30 @@
 
 import { client } from '@/lib/client'
 import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  format,
-  isThisWeek,
-  isToday,
-  isTomorrow,
-  differenceInDays,
-  isWeekend,
-  startOfDay,
-} from 'date-fns'
-import {
-  ArrowRight,
-  ChevronDown,
-  Clock,
-  Edit,
-  Image,
-  MoreHorizontal,
-  Send,
-  Trash2,
-  Video,
-} from 'lucide-react'
+import { differenceInDays, format, isToday, isTomorrow, startOfDay } from 'date-fns'
+import { motion } from 'framer-motion'
+import { ArrowRight, Edit, MoreHorizontal, Send, Trash2 } from 'lucide-react'
 
 import { useConfetti } from '@/hooks/use-confetti'
 
-import { Tweet } from '@/db/schema'
+import { Tweet, user } from '@/db/schema'
 import {
+  AccountAvatar,
   AccountHandle,
   AccountName,
-  AccountAvatar,
   mapToConnectedAccount,
 } from '@/hooks/account-ctx'
 import { useTweetsV2 } from '@/hooks/use-tweets-v2'
+import { CaretRightIcon } from '@phosphor-icons/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Fragment, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Icons } from './icons'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Loader } from './ai-elements/loader'
+import MediaDisplay from './media-display'
+import TweetPostConfirmationDialog from './tweet-post-confirmation-dialog'
+import { Card } from './ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible'
 import {
   DropdownMenu,
@@ -48,13 +33,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
-import { Modal } from './ui/modal'
-import DuolingoBadge from './ui/duolingo-badge'
 import DuolingoButton from './ui/duolingo-button'
 import { Separator } from './ui/separator'
-import { Loader } from './ai-elements/loader'
-import { CaretRightIcon, ImageIcon } from '@phosphor-icons/react'
-import MediaDisplay from './media-display'
+import { useRealtime } from '@upstash/realtime/client'
+import { RealtimeEvents } from '@/lib/realtime'
+import { authClient } from '@/lib/auth-client'
 
 export default function TweetQueue() {
   const queryClient = useQueryClient()
@@ -62,11 +45,50 @@ export default function TweetQueue() {
   const [pendingPostId, setPendingPostId] = useState<string | null>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const { loadThread } = useTweetsV2()
+  const { data: session } = authClient.useSession()
+
+  // realtime stuff
+  const [channels, setChannels] = useState<string[]>([])
+  const [statusMap, setStatusMap] = useState<
+    Record<string, { status: string; timestamp?: number; tweetId?: string }>
+  >({})
+  const [, setTick] = useState(0)
 
   const router = useRouter()
 
   const userNow = new Date()
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  useRealtime<RealtimeEvents>({
+    channels: channels.map((channel) => session?.user.id + '-' + channel),
+    history: true,
+    enabled: Boolean(session?.user.id) && Boolean(channels.length),
+    events: {
+      tweet: {
+        status: ({ id, status, timestamp, tweetId }) => {
+          setStatusMap((prev) => {
+            return { ...prev, [id]: { status, timestamp, tweetId } }
+          })
+
+          if (status === 'success') {
+            setChannels((prev) => prev.filter((c) => c.includes(id)))
+          }
+        },
+      },
+    },
+  })
+
+  useEffect(() => {
+    const hasWaitingStatus = Object.values(statusMap).some((s) => s.status === 'waiting')
+
+    if (!hasWaitingStatus) return
+
+    const interval = setInterval(() => {
+      setTick((t) => t + 1)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [statusMap])
 
   const { data: activeAccount } = useQuery({
     queryKey: ['get-active-account'],
@@ -77,8 +99,6 @@ export default function TweetQueue() {
     },
   })
 
-  const useNaturalTimeByDefault = activeAccount?.useNaturalTimeByDefault ?? false
-
   const { data, isPending } = useQuery({
     queryKey: ['queue-slots', activeAccount?.id],
     queryFn: async () => {
@@ -86,6 +106,31 @@ export default function TweetQueue() {
       return await res.json()
     },
   })
+
+  // if any tweets are being posted, subscribe
+  useEffect(() => {
+    const allThreads = data?.results.flatMap((result) => {
+      const [day, threads] = Object.entries(result)[0]!
+      const dayUnix = Number(day)
+      return threads.map((slot) => ({ dayUnix, ...slot }))
+    })
+
+    const processingIds = new Set<string>()
+
+    allThreads?.forEach(({ thread }) => {
+      const hasPublished = thread?.some((tweet) => tweet.isPublished)
+      const hasUnpublished = thread?.some((tweet) => !tweet.isPublished)
+      const hasProcessing = hasPublished && hasUnpublished
+      if (!hasProcessing) return
+
+      const baseTweetId = thread?.[0]?.id
+      if (!baseTweetId) return
+
+      processingIds.add(baseTweetId)
+    })
+
+    setChannels((prev) => [...prev, ...Array.from(processingIds)])
+  }, [data])
 
   const { mutate: deleteTweet } = useMutation({
     mutationFn: async (tweetId: string) => {
@@ -110,13 +155,20 @@ export default function TweetQueue() {
   const toastRef = useRef<string | null>(null)
 
   const { mutate: postImmediateFromQueue, isPending: isPosting } = useMutation({
-    mutationFn: async ({ tweetId }: { tweetId: string }) => {
+    mutationFn: async ({
+      baseTweetId,
+      useAutoDelay,
+    }: {
+      baseTweetId: string
+      useAutoDelay?: boolean
+    }) => {
       const res = await client.tweet.postImmediateFromQueue.$post({
-        baseTweetId: tweetId,
+        baseTweetId,
+        useAutoDelay,
       })
       const { messageId, accountUsername, hasExpiredMedia } = await res.json()
 
-      return { messageId, accountUsername, hasExpiredMedia }
+      return { baseTweetId, messageId, accountUsername, hasExpiredMedia }
     },
     onMutate: async () => {
       toastRef.current = toast.loading('Preparing tweet...')
@@ -127,6 +179,8 @@ export default function TweetQueue() {
         toast.dismiss(toastRef.current)
         toastRef.current = null
       }
+
+      setChannels((prev) => [...prev, data.baseTweetId])
 
       setPendingPostId(null)
 
@@ -247,9 +301,28 @@ export default function TweetQueue() {
     return threads.map((slot) => ({ dayUnix, ...slot }))
   })
 
+  const pendingThread =
+    allThreads?.find((t) => t.thread?.[0]?.id === pendingPostId)?.thread || []
+  const pendingThreadLength = pendingThread.length
+
   return (
     <>
+      <TweetPostConfirmationDialog
+        open={Boolean(pendingPostId)}
+        onOpenChange={(open) => setPendingPostId(open ? pendingPostId : null)}
+        onConfirm={(useAutoDelay) => {
+          if (pendingPostId) {
+            postImmediateFromQueue({ baseTweetId: pendingPostId, useAutoDelay })
+          }
+        }}
+        isPosting={isPosting}
+        threadLength={pendingThreadLength}
+      />
+
       <Card className="overflow-hidden p-0">
+        <button onClick={() => console.log('👀 STATUS MAP:', statusMap)}>
+          Log status map
+        </button>
         <div className="flow-root">
           <div className="">
             <table className="min-w-full">
@@ -343,6 +416,11 @@ export default function TweetQueue() {
                                   baseTweet ? 'py-4' : 'py-2.5',
                                 )}
                               >
+                                {/* {
+                                  <span className="text-sm inline-flex items-center gap-1.5 font-medium text-gray-500">
+                                    <Loader className="size-3.5" /> Posting
+                                  </span>
+                                } */}
                                 {baseTweet?.isError ? (
                                   <span className="text-sm font-medium text-red-600">
                                     Error
@@ -392,24 +470,58 @@ export default function TweetQueue() {
                                           )
                                         : null
 
+                                      const statusInfo = statusMap[tweet.id]
+                                      const status = statusInfo?.status
+
+                                      const getRemainingSeconds = () => {
+                                        if (
+                                          status !== 'waiting' ||
+                                          !statusInfo?.timestamp
+                                        )
+                                          return null
+                                        const elapsed = Math.floor(
+                                          (Date.now() - statusInfo.timestamp) / 1000,
+                                        )
+                                        const remaining = Math.max(0, 60 - elapsed)
+                                        return remaining
+                                      }
+
+                                      const remainingSeconds = getRemainingSeconds()
+
                                       return (
                                         <div
                                           key={index}
                                           className={cn('relative', index > 0 && 'pt-3')}
                                         >
-                                          {index === 0 &&
-                                            tweet.properties?.includes('natural') && (
-                                              <span className="inline-flex mb-3 items-center gap-x-1.5 rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
-                                                <svg
-                                                  viewBox="0 0 6 6"
-                                                  aria-hidden="true"
-                                                  className="size-1.5 fill-emerald-500"
-                                                >
-                                                  <circle r={3} cx={3} cy={3} />
-                                                </svg>
-                                                Natural time
-                                              </span>
-                                            )}
+                                          {index === 0 && (
+                                            <div className="flex gap-2 mb-3">
+                                              {tweet.properties?.includes('natural') && (
+                                                <span className="inline-flex items-center gap-x-1.5 rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
+                                                  <svg
+                                                    viewBox="0 0 6 6"
+                                                    aria-hidden="true"
+                                                    className="size-1.5 fill-emerald-500"
+                                                  >
+                                                    <circle r={3} cx={3} cy={3} />
+                                                  </svg>
+                                                  Natural time
+                                                </span>
+                                              )}
+                                              {tweet.properties?.includes('auto-delay') &&
+                                                thread.length > 1 && (
+                                                  <span className="inline-flex items-center gap-x-1.5 rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
+                                                    <svg
+                                                      viewBox="0 0 6 6"
+                                                      aria-hidden="true"
+                                                      className="size-1.5 fill-blue-500"
+                                                    >
+                                                      <circle r={3} cx={3} cy={3} />
+                                                    </svg>
+                                                    Auto-delay
+                                                  </span>
+                                                )}
+                                            </div>
+                                          )}
                                           <div className="flex gap-3">
                                             <div
                                               className={cn(
@@ -428,6 +540,35 @@ export default function TweetQueue() {
                                               <div className="flex items-center gap-1.5 mb-0.5">
                                                 <AccountName className="text-sm font-medium text-gray-800" />
                                                 <AccountHandle className="text-sm text-stone-400 truncate" />
+                                                {status === 'pending' ||
+                                                status === 'started' ? (
+                                                  <div className="text-sm inline-flex items-center gap-1.5 font-medium text-gray-500">
+                                                    <Loader className="size-3.5" />{' '}
+                                                    Posting
+                                                  </div>
+                                                ) : status === 'waiting' ? (
+                                                  <div className="text-sm inline-flex items-center gap-1.5 font-medium text-gray-500">
+                                                    <Loader className="size-3.5" />{' '}
+                                                    Waiting{' '}
+                                                    {remainingSeconds !== null &&
+                                                    remainingSeconds > 0
+                                                      ? `${remainingSeconds}s`
+                                                      : '...'}
+                                                  </div>
+                                                ) : status === 'success' ? (
+                                                  <a
+                                                    href={
+                                                      activeAccount && statusInfo?.tweetId
+                                                        ? `https://x.com/${activeAccount?.username}/status/${statusInfo?.tweetId}`
+                                                        : '#'
+                                                    }
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-sm underline inline-flex items-center gap-1.5 font-medium text-emerald-500"
+                                                  >
+                                                    Posted{' '}
+                                                  </a>
+                                                ) : null}
                                               </div>
                                               <p className="text-gray-900 whitespace-pre-line text-sm leading-relaxed">
                                                 {tweet.content || 'No content'}
@@ -482,10 +623,19 @@ export default function TweetQueue() {
                                                 initial={{ height: 0 }}
                                                 animate={{ height: '100%' }}
                                                 transition={{ duration: 0.3 }}
-                                                className={cn("absolute z-0 left-4 top-8 w-0.5 bg-gray-200/75 h-full", {
-                                                  // offset badges
-                                                  "top-11": tweet.properties?.includes('natural')
-                                                })}
+                                                className={cn(
+                                                  'absolute z-0 left-4 top-8 w-0.5 bg-gray-200/75 h-full',
+                                                  {
+                                                    // offset badges
+                                                    'top-11':
+                                                      tweet.properties?.includes(
+                                                        'natural',
+                                                      ) ||
+                                                      tweet.properties?.includes(
+                                                        'auto-delay',
+                                                      ),
+                                                  },
+                                                )}
                                               />
                                             )}
                                         </div>
@@ -590,63 +740,6 @@ export default function TweetQueue() {
                                         </DropdownMenuItem>
                                       </DropdownMenuContent>
                                     </DropdownMenu>
-
-                                    <Modal
-                                      showModal={pendingPostId === baseTweet.id}
-                                      setShowModal={(open) => {
-                                        setPendingPostId(open ? baseTweet.id : null)
-                                      }}
-                                      className="max-w-md"
-                                    >
-                                      <div className="p-6 space-y-4">
-                                        <div className="size-12 bg-gray-100 rounded-full flex items-center justify-center">
-                                          <Icons.twitter className="size-6" />
-                                        </div>
-                                        <div className="space-y-2">
-                                          <h2 className="text-lg font-semibold">
-                                            Post to Twitter
-                                          </h2>
-                                          <p className="text-sm text-gray-600">
-                                            This {threadLength > 1 ? 'thread' : 'tweet'}{' '}
-                                            will be posted and removed from your queue
-                                            immediately. Would you like to continue?
-                                          </p>
-                                          <p className="text-sm text-gray-600">
-                                            <span className="font-medium text-gray-900">
-                                              Posting as:
-                                            </span>{' '}
-                                            <AccountName className="font-normal text-gray-600" />{' '}
-                                            (<AccountHandle className="text-gray-600" />)
-                                          </p>
-                                        </div>
-
-                                        <div className="flex gap-3 pt-2">
-                                          <DuolingoButton
-                                            variant="secondary"
-                                            size="sm"
-                                            className="h-11 flex-1"
-                                            onClick={() => setPendingPostId(null)}
-                                          >
-                                            Cancel
-                                          </DuolingoButton>
-                                          <DuolingoButton
-                                            loading={isPosting}
-                                            size="sm"
-                                            className="h-11 flex-1"
-                                            onClick={(e) => {
-                                              e.preventDefault()
-
-                                              postImmediateFromQueue({
-                                                tweetId: baseTweet.id,
-                                              })
-                                            }}
-                                          >
-                                            <Icons.twitter className="size-4 mr-2" />
-                                            {isPosting ? 'Posting...' : 'Post Now'}
-                                          </DuolingoButton>
-                                        </div>
-                                      </div>
-                                    </Modal>
                                   </>
                                 )}
                               </td>

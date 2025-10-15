@@ -3,14 +3,12 @@ import { Realtime, InferRealtimeEvents } from '@upstash/realtime'
 import { redis } from './redis'
 
 const schema = {
-  workflow: z.object({
-    status: z.string(),
-  }),
-  chat: z.object({
-    message: z.object({
-      username: z.string(),
-      message: z.string(),
-      timestamp: z.number(),
+  tweet: z.object({
+    status: z.object({
+      id: z.string(),
+      status: z.enum(['pending', 'started', 'waiting', 'success', 'error']),
+      timestamp: z.number().optional(),
+      tweetId: z.string().optional(),
     }),
   }),
   index_tweets: z.object({
