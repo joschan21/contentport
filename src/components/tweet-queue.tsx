@@ -264,7 +264,6 @@ export default function TweetQueue() {
       return (
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-900">Tomorrow</span>
-          {/* <span className="text-gray-400">·</span> */}
           <span className="text-gray-400">{weekday}</span>
         </div>
       )
@@ -274,9 +273,7 @@ export default function TweetQueue() {
       return (
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-900">{weekday}</span>
-          {/* <span className="text-gray-400">·</span>
-          <span className="text-gray-500">{monthDay}</span> */}
-          {/* <span className="text-gray-400">·</span> */}
+
           <span className="text-gray-400">
             in {daysAway} day{daysAway === 1 ? '' : 's'}
           </span>
@@ -317,9 +314,6 @@ export default function TweetQueue() {
       />
 
       <Card className="overflow-hidden p-0">
-        <button onClick={() => console.log('👀 STATUS MAP:', statusMap)}>
-          Log status map
-        </button>
         <div className="flow-root">
           <div className="">
             <table className="min-w-full">
