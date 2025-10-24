@@ -345,19 +345,19 @@ export const tweetRouter = j.router({
         i === 0 ? newBaseTweetId : crypto.randomUUID(),
       )
 
-      let isQueued = false
-      if (timezone) {
-        const queueSettings = await getAccountQueueSettings(account.id)
-        const scheduledDate = new Date(scheduledUnix)
-        const scheduledDayOfWeek = scheduledDate.getDay()
-        const slotsForDay = queueSettings[scheduledDayOfWeek.toString()] || []
+      // let isQueued = false
+      // if (timezone) {
+      //   const queueSettings = await getAccountQueueSettings(account.id)
+      //   const scheduledDate = new Date(scheduledUnix)
+      //   const scheduledDayOfWeek = scheduledDate.getDay()
+      //   const slotsForDay = queueSettings[scheduledDayOfWeek.toString()] || []
 
-        isQueued = slotsForDay.some((slotMinutes: number) => {
-          const slotDate = new Date(scheduledDate)
-          slotDate.setHours(Math.floor(slotMinutes / 60), slotMinutes % 60, 0, 0)
-          return slotDate.getTime() === scheduledUnix
-        })
-      }
+      //   isQueued = slotsForDay.some((slotMinutes: number) => {
+      //     const slotDate = new Date(scheduledDate)
+      //     slotDate.setHours(Math.floor(slotMinutes / 60), slotMinutes % 60, 0, 0)
+      //     return slotDate.getTime() === scheduledUnix
+      //   })
+      // }
 
       const isNaturalTimeEnabled = Boolean(
         useNaturalTime ?? account.useNaturalTimeByDefault,
@@ -374,7 +374,7 @@ export const tweetRouter = j.router({
 
         isScheduled: true,
         scheduledUnix: scheduledUnix,
-        isQueued,
+        isQueued: false,
         properties,
 
         media: tweet.media,
@@ -1200,7 +1200,22 @@ export const tweetRouter = j.router({
       const { user } = ctx
       const { timezone, userNow } = input
 
-      const today = startOfDay(userNow)
+      const today = fromZonedTime(
+        new Date(
+          userNow.getFullYear(),
+          userNow.getMonth(),
+          userNow.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+        timezone,
+      )
+
+      // const today = startOfDay(userNow)
+
+      console.log('timezone, usernow, startofDay', timezone, userNow, today)
 
       const account = await getAccount({
         email: user.email,
@@ -1251,19 +1266,15 @@ export const tweetRouter = j.router({
         return thread
       }
 
-      const getSlotThread = (unix: number) => {
-        const baseTweet = scheduledTweets.find(
+      const getSlotThreads = (unix: number) => {
+        const baseTweets = scheduledTweets.filter(
           (t) =>
             Boolean(t.isQueued || t.isProcessing || t.isPublished) &&
             t.scheduledUnix === unix &&
             !t.isReplyTo,
         )
 
-        if (baseTweet) {
-          return buildThread(baseTweet.id)
-        }
-
-        return null
+        return baseTweets.map((baseTweet) => buildThread(baseTweet.id))
       }
 
       const queueSettings = await getAccountQueueSettings(account.id)
@@ -1290,6 +1301,20 @@ export const tweetRouter = j.router({
 
       for (let i = 0; i < daysToShow; i++) {
         const currentDay = addDays(today, i)
+
+        const currentDayStartInTz = fromZonedTime(
+          new Date(
+            currentDay.getFullYear(),
+            currentDay.getMonth(),
+            currentDay.getDate(),
+            0,
+            0,
+            0,
+            0,
+          ),
+          timezone,
+        )
+
         const dayOfWeek = currentDay.getDay()
         const slotsForDay = queueSettings[dayOfWeek.toString()] || []
 
@@ -1309,7 +1334,7 @@ export const tweetRouter = j.router({
           return localDate.getTime()
         })
 
-        all.push({ [currentDay.getTime()]: unixTimestamps })
+        all.push({ [currentDayStartInTz.getTime()]: unixTimestamps })
       }
 
       const results: Array<
@@ -1317,7 +1342,7 @@ export const tweetRouter = j.router({
           number,
           Array<{
             unix: number
-            thread: ReturnType<typeof getSlotThread>
+            thread: ReturnType<typeof buildThread>
             isQueued: boolean
           }>
         >
@@ -1352,11 +1377,14 @@ export const tweetRouter = j.router({
 
         results.push({
           [dayUnix]: [
-            ...timestamps.map((timestamp) => ({
-              unix: timestamp,
-              thread: getSlotThread(timestamp),
-              isQueued: true,
-            })),
+            ...timestamps.flatMap((timestamp) => {
+              const threads = getSlotThreads(timestamp)
+              return threads.map((thread) => ({
+                unix: timestamp,
+                thread,
+                isQueued: true,
+              }))
+            }),
             ...manualBaseTweetsForThisDay.map((tweet) => ({
               unix: tweet.scheduledUnix!,
               thread: buildThread(tweet.id),

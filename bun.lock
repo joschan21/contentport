@@ -58,7 +58,7 @@
         "@types/pdf-parse": "^1.1.5",
         "@upstash/qstash": "^2.8.1",
         "@upstash/ratelimit": "^2.0.5",
-        "@upstash/realtime": "^0.2.4",
+        "@upstash/realtime": "^0.2.7",
         "@upstash/redis": "^1.35.4",
         "@upstash/vector": "^1.2.2",
         "@vercel/analytics": "^1.5.0",
@@ -1116,7 +1116,7 @@
 
     "@upstash/ratelimit": ["@upstash/ratelimit@2.0.6", "", { "dependencies": { "@upstash/core-analytics": "^0.0.10" }, "peerDependencies": { "@upstash/redis": "^1.34.3" } }, "sha512-Uak5qklMfzFN5RXltxY6IXRENu+Hgmo9iEgMPOlUs2etSQas2N+hJfbHw37OUy4vldLRXeD0OzL+YRvO2l5acg=="],
 
-    "@upstash/realtime": ["@upstash/realtime@0.2.4", "", { "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0", "zod": "^3.25.0 || ^4.0.0" } }, "sha512-CWPzkRlmb1Yq2bZDsTR2FKVL0+n2famkTQRC2KmpAQgTZa9u+ftwTd9t28ExIe/WVDjD+Gkrwws3NK6pjDrShw=="],
+    "@upstash/realtime": ["@upstash/realtime@0.2.7", "", { "peerDependencies": { "@upstash/redis": ">=1.35.4", "react": ">=16.8.0", "react-dom": ">=16.8.0", "zod": "^3.25.0 || ^4.0.0" } }, "sha512-7VdeGjekc7GqrtDaPS4ZqG3RuowbBdjhP1mjiqYthIsVhuazt/CSW+ai3oCJ7M1/swUpV86agJu5t23RugingQ=="],
 
     "@upstash/redis": ["@upstash/redis@1.35.5", "", { "dependencies": { "uncrypto": "^0.1.3" } }, "sha512-KdLdNAspQGOTGeC++o2LDBzNbMXrfInnmW5nUJfNXabnVh8X4NPrlJ0X4j75cBUShiMpXB3uI1ql4KpFQeqrHQ=="],
 
