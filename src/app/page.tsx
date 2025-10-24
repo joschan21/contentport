@@ -1,14 +1,13 @@
-import TestimonialCard from '@/frontend/studio/components/TestimonialCard'
+import Footer from '@/components/footer'
+import { Icons } from '@/components/icons'
 import { LogoCloud } from '@/components/logo-cloud'
 import Navbar from '@/components/navbar'
-import Footer from '@/components/footer'
 import DuolingoButton from '@/components/ui/duolingo-button'
+import TestimonialCard from '@/frontend/studio/components/TestimonialCard'
 import { auth } from '@/lib/auth'
 import MuxPlayer from '@mux/mux-player-react'
 import { headers } from 'next/headers'
 import Link from 'next/link'
-import Pricing from '@/frontend/studio/components/Pricing'
-import { Icons } from '@/components/icons'
 
 const Page = async () => {
   const session = await auth.api.getSession({
