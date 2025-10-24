@@ -78,31 +78,21 @@ const ChatInput = ({
 
   useRealtime<RealtimeEvents>({
     channels: [session?.user.id],
-    enabled: open && accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+    enabled:
+      open &&
+      accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
     event: 'index_tweets.status',
     onData: () => refetchAccounts(),
   })
 
-  useRealtime<RealtimeEvents>({
+  const { status } = useRealtime<RealtimeEvents>({
     channels: [session?.user.id],
-    enabled: open && accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+    enabled:
+      open &&
+      accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
     event: 'index_memories.status',
     onData: () => refetchAccounts(),
   })
-
-  // const { status } = useRealtime<RealtimeEvents>({
-  //   channel: [session?.user.id],
-  //   enabled:
-  //     Boolean(Boolean(session?.user.id)) &&
-  //     Boolean(open) &&
-  //     Boolean(
-  //       accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
-  //     ),
-  //   events: {
-  //     index_memories: { status: () => refetchAccounts() },
-  //     index_tweets: { status: () => refetchAccounts() },
-  //   },
-  // })
 
   const isIndexing = status === 'connecting' || status === 'connected'
 
