@@ -46,31 +46,27 @@ export const WritingStyleTab = () => {
     },
   })
 
-  const { status } = useRealtime<RealtimeEvents>({
-    channel: session?.user.id,
-    enabled:
-      Boolean(Boolean(session?.user.id)) &&
-      Boolean(open) &&
-      Boolean(
-        accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
-      ),
-    events: {
-      index_memories: {
-        status: () => {
-          refetchOwnTweets()
-          refetchAccounts()
-        },
-      },
-      index_tweets: {
-        status: () => {
-          refetchOwnTweets()
-          refetchAccounts()
-        },
-      },
+  useRealtime<RealtimeEvents>({
+    channels: [session?.user.id],
+    enabled: accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+    event: 'index_tweets.status',
+    onData: () => {
+      refetchOwnTweets()
+      refetchAccounts()
     },
   })
 
-  if (status === 'connecting' || status === 'connected') {
+  useRealtime<RealtimeEvents>({
+    channels: [session?.user.id],
+    enabled: accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+    event: 'index_memories.status',
+    onData: () => {
+      refetchOwnTweets()
+      refetchAccounts()
+    },
+  })
+
+  if (accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started')) {
     return (
       <div className="flex items-center gap-2.5">
         <Loader />

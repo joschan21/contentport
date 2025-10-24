@@ -68,7 +68,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@upstash/qstash": "^2.8.1",
     "@upstash/ratelimit": "^2.0.5",
-    "@upstash/realtime": "^0.2.7",
+    "@upstash/realtime": "^0.3.0",
     "@upstash/redis": "^1.35.4",
     "@upstash/vector": "^1.2.2",
     "@vercel/analytics": "^1.5.0",

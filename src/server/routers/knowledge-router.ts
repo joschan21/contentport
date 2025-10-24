@@ -232,8 +232,8 @@ export const knowledgeRouter = j.router({
       }),
     )
 
-    const namespace = realtime.channel(userId)
-    await namespace.index_memories.status.emit({ status: 'success' })
+    const channel = realtime.channel(userId)
+    channel.emit('index_memories.status', 'success')
 
     return c.json({ success: true })
   }),
@@ -382,8 +382,8 @@ export const knowledgeRouter = j.router({
     // should take max 2 mins
     await redis.expire(`status:posts:${accountId}`, 60 * 2)
 
-    const namespace = realtime.channel(userId)
-    await namespace.index_tweets.status.emit({ status: 'resolved' })
+    const channel = realtime.channel(userId)
+    channel.emit('index_tweets.status', 'resolved')
 
     return c.json({ success: true })
   }),

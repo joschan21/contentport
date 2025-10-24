@@ -111,16 +111,17 @@ export default function AccountsPage() {
   })
 
   useRealtime<RealtimeEvents>({
-    channel: session?.user.id,
-    enabled:
-      Boolean(Boolean(session?.user.id)) &&
-      Boolean(
-        accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
-      ),
-    events: {
-      index_memories: { status: () => refetchAccounts() },
-      index_tweets: { status: () => refetchAccounts() },
-    },
+    channels: [session?.user.id],
+    enabled: accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+    event: 'index_tweets.status',
+    onData: () => refetchAccounts(),
+  })
+
+  useRealtime<RealtimeEvents>({
+    channels: [session?.user.id],
+    enabled: accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+    event: 'index_memories.status',
+    onData: () => refetchAccounts(),
   })
 
   const {

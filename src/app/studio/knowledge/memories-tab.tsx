@@ -10,13 +10,6 @@ import { type RealtimeEvents } from '@/lib/realtime'
 import { TrashIcon } from '@phosphor-icons/react'
 import { useRealtime } from '@upstash/realtime/client'
 
-interface Memory {
-  id: string
-  content: string
-  createdAt: Date
-  relevanceScore?: number
-}
-
 export const MemoriesTab = () => {
   const queryClient = useQueryClient()
   const { data: session } = authClient.useSession()
@@ -46,14 +39,10 @@ export const MemoriesTab = () => {
   })
 
   useRealtime<RealtimeEvents>({
-    channel: session?.user.id,
-    enabled:
-      Boolean(session?.user.id) && Boolean(!memories?.length) && Boolean(isFetched),
-    events: {
-      index_memories: {
-        status: () => refetch(),
-      },
-    },
+    channels: [session?.user.id],
+    enabled: Boolean(!memories?.length) && Boolean(isFetched),
+    event: 'index_memories.status',
+    onData: () => refetch(),
   })
 
   const { mutate: deleteMemory } = useMutation({

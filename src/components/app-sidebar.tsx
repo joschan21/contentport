@@ -50,8 +50,6 @@ import { Modal } from './ui/modal'
 import { PromptSuggestion } from './ui/prompt-suggestion'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 
-
-
 const ChatInput = ({
   onSubmit,
   onStop,
@@ -78,19 +76,33 @@ const ChatInput = ({
     },
   })
 
-  const { status } = useRealtime<RealtimeEvents>({
-    channel: session?.user.id,
-    enabled:
-      Boolean(Boolean(session?.user.id)) &&
-      Boolean(open) &&
-      Boolean(
-        accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
-      ),
-    events: {
-      index_memories: { status: () => refetchAccounts() },
-      index_tweets: { status: () => refetchAccounts() },
-    },
+  useRealtime<RealtimeEvents>({
+    channels: [session?.user.id],
+    enabled: open && accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+    event: 'index_tweets.status',
+    onData: () => refetchAccounts(),
   })
+
+  useRealtime<RealtimeEvents>({
+    channels: [session?.user.id],
+    enabled: open && accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+    event: 'index_memories.status',
+    onData: () => refetchAccounts(),
+  })
+
+  // const { status } = useRealtime<RealtimeEvents>({
+  //   channel: [session?.user.id],
+  //   enabled:
+  //     Boolean(Boolean(session?.user.id)) &&
+  //     Boolean(open) &&
+  //     Boolean(
+  //       accounts?.some(({ postIndexingStatus }) => postIndexingStatus === 'started'),
+  //     ),
+  //   events: {
+  //     index_memories: { status: () => refetchAccounts() },
+  //     index_tweets: { status: () => refetchAccounts() },
+  //   },
+  // })
 
   const isIndexing = status === 'connecting' || status === 'connected'
 
@@ -406,7 +418,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
         <SidebarHeader className="flex flex-col border-b border-stone-200 bg-stone-100 items-center justify-end gap-2 px-4">
           <div className="w-full flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <p className='text-sm font-medium'>Assistant</p>
+              <p className="text-sm font-medium">Assistant</p>
             </div>
             <div className="flex gap-2">
               <TooltipProvider>
