@@ -5,6 +5,7 @@ import {
   InsertTweet,
   tweetPropertyEnum,
   tweets,
+  user as userSchema,
 } from '@/db/schema'
 import { qstash } from '@/lib/qstash'
 import { redis } from '@/lib/redis'
@@ -30,6 +31,7 @@ import {
 } from './queue-utils'
 import { vector } from '@/lib/vector'
 import { getScheduledTweetCount } from '../utils/get-scheduled-tweet-count'
+import { realtime } from '@/lib/realtime'
 
 const consumerKey = process.env.TWITTER_CONSUMER_KEY as string
 const consumerSecret = process.env.TWITTER_CONSUMER_SECRET as string
@@ -54,6 +56,10 @@ const postWithQStashSchema = z.object({
   quoteToTwitterId: z.string().optional(),
   scheduledUnixInSeconds: z.number().optional(),
   useNaturalTime: z.boolean().optional(),
+  useAutoDelay: z.boolean().optional(),
+  threadIndex: z.number().optional(),
+  delay: z.number().optional(),
+  channelName: z.string().optional(),
 })
 
 type PostWithQStashArgs = z.infer<typeof postWithQStashSchema>
@@ -67,6 +73,10 @@ const postWithQStash = async (args: PostWithQStashArgs) => {
     scheduledUnixInSeconds,
     quoteToTwitterId,
     useNaturalTime,
+    useAutoDelay,
+    threadIndex,
+    delay,
+    channelName,
   } = args
 
   const baseUrl =
@@ -80,6 +90,10 @@ const postWithQStash = async (args: PostWithQStashArgs) => {
     quoteToTwitterId,
     scheduledUnixInSeconds,
     useNaturalTime,
+    useAutoDelay,
+    threadIndex,
+    delay,
+    channelName,
   }
 
   // if natural time enabled, we call qstash 5 mins before the scheduled time
@@ -104,6 +118,7 @@ const postWithQStash = async (args: PostWithQStashArgs) => {
     notBefore: scheduledUnixInSeconds,
     retries: 2,
     failureCallback: baseUrl + '/api/tweet/post_with_qstash_error',
+    delay,
   })
 
   return { messageId }
@@ -262,12 +277,20 @@ export const tweetRouter = j.router({
         scheduledUnix: z.number(),
         thread: z.array(payloadTweetSchema).min(1),
         useNaturalTime: z.boolean().optional(),
+        useAutoDelay: z.boolean().optional(),
         timezone: z.string().optional(),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { baseTweetId, scheduledUnix, thread, useNaturalTime, timezone } = input
+      const {
+        baseTweetId,
+        scheduledUnix,
+        thread,
+        useNaturalTime,
+        useAutoDelay,
+        timezone,
+      } = input
 
       const account = await getAccount({
         email: user.email,
@@ -339,6 +362,8 @@ export const tweetRouter = j.router({
         userId: user.id,
         scheduledUnixInSeconds: scheduledUnix / 1000,
         useNaturalTime,
+        useAutoDelay,
+        threadIndex: 0,
       })
 
       const generatedIds = thread.map((_, i) =>
@@ -363,8 +388,11 @@ export const tweetRouter = j.router({
         useNaturalTime ?? account.useNaturalTimeByDefault,
       )
 
+      const isAutoDelayEnabled = Boolean(useAutoDelay ?? account.useAutoDelayByDefault)
+
       const properties: (typeof tweetPropertyEnum.enumValues)[number][] = []
       if (isNaturalTimeEnabled) properties.push('natural')
+      if (isAutoDelayEnabled) properties.push('auto-delay')
 
       const tweetsToInsert: InsertTweet[] = thread.map((tweet, i) => ({
         id: generatedIds[i],
@@ -397,11 +425,12 @@ export const tweetRouter = j.router({
         thread: z.array(payloadTweetSchema).min(1),
         scheduledUnix: z.number(),
         useNaturalTime: z.boolean().optional(),
+        useAutoDelay: z.boolean().optional(),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { thread, scheduledUnix, useNaturalTime } = input
+      const { thread, scheduledUnix, useNaturalTime, useAutoDelay } = input
 
       const account = await getAccount({
         email: user.email,
@@ -439,12 +468,15 @@ export const tweetRouter = j.router({
         useNaturalTime ?? account.useNaturalTimeByDefault,
       )
 
+      const isAutoDelayEnabled = Boolean(useAutoDelay ?? account.useAutoDelayByDefault)
+
       const { messageId } = await postWithQStash({
         tweetId,
         userId: user.id,
         accountId: dbAccount.id,
         scheduledUnixInSeconds: scheduledUnix / 1000,
         useNaturalTime: isNaturalTimeEnabled,
+        useAutoDelay: isAutoDelayEnabled,
       })
 
       try {
@@ -454,6 +486,7 @@ export const tweetRouter = j.router({
 
         const properties: (typeof tweetPropertyEnum.enumValues)[number][] = []
         if (isNaturalTimeEnabled) properties.push('natural')
+        if (isAutoDelayEnabled) properties.push('auto-delay')
 
         const tweetsToInsert: InsertTweet[] = thread.map((tweet, i) => ({
           id: generatedIds[i],
@@ -584,81 +617,35 @@ export const tweetRouter = j.router({
     const { body } = ctx
     const messageId = c.req.header('upstash-message-id')
 
-    const { tweetId, userId, accountId, replyToTwitterId, quoteToTwitterId } =
-      postWithQStashSchema.parse(body)
+    const {
+      tweetId,
+      userId,
+      accountId,
+      replyToTwitterId,
+      quoteToTwitterId,
+      useAutoDelay,
+      channelName,
+    } = postWithQStashSchema.parse(body)
 
-    const [tweet] = await db
-      .select()
-      .from(tweets)
-      .where(
-        and(
-          eq(tweets.id, tweetId),
-          eq(tweets.userId, userId),
-          eq(tweets.accountId, accountId),
-        ),
-      )
-
-    if (!tweet) {
-      console.error('Tweet not found', { tweetId, userId, accountId })
-      throw new HTTPException(404, { message: 'Tweet not found' })
-    }
-
-    if (tweet.isPublished) {
-      console.error('Tweet already published', { tweetId, userId, accountId })
-      throw new HTTPException(409, {
-        message: `Tweet with id '${tweetId}' is already published, aborting`,
-      })
-    }
-
-    const account = await db.query.account.findFirst({
-      where: and(eq(accountSchema.userId, userId), eq(accountSchema.id, accountId)),
-    })
-
-    if (!account || !account.accessToken) {
-      console.error('Account not found', { tweetId, userId, accountId })
-      throw new HTTPException(400, {
-        message: 'Twitter account not connected or access token missing',
-      })
-    }
-
-    await db
-      .update(tweets)
-      .set({ isProcessing: true, updatedAt: new Date() })
-      .where(
-        and(
-          eq(tweets.id, tweetId),
-          eq(tweets.userId, userId),
-          eq(tweets.accountId, accountId),
-        ),
-      )
-
-    const client = new TwitterApi({
-      appKey: consumerKey as string,
-      appSecret: consumerSecret as string,
-      accessToken: account.accessToken as string,
-      accessSecret: account.accessSecret as string,
-    })
-
-    const payload: Partial<SendTweetV2Params> = {
-      text: tweet.content,
-    }
-
-    if (tweet.media && tweet.media.length > 0) {
-      const validatedMedia = await ensureValidMedia({
-        account,
-        mediaItems: tweet.media.slice(0, 4),
-      })
-
-      const validMediaIds = validatedMedia.map((media) => media.media_id).filter(Boolean)
-
-      if (validMediaIds.length > 0) {
-        // @ts-expect-error max-4 length tuple
-        payload.media = { media_ids: validMediaIds }
+    try {
+      if (channelName) {
+        await realtime.channel(channelName).emit('tweet.status', {
+          tweetId,
+          status: 'started',
+          timestamp: Date.now(),
+        })
       }
 
-      await db
-        .update(tweets)
-        .set({ media: validatedMedia, updatedAt: new Date() })
+      const [user] = await db.select().from(userSchema).where(eq(userSchema.id, userId))
+
+      if (!user) {
+        console.error('User not found', { userId })
+        throw new HTTPException(404, { message: 'User not found' })
+      }
+
+      const [tweet] = await db
+        .select()
+        .from(tweets)
         .where(
           and(
             eq(tweets.id, tweetId),
@@ -666,19 +653,93 @@ export const tweetRouter = j.router({
             eq(tweets.accountId, accountId),
           ),
         )
-    }
 
-    if (replyToTwitterId) {
-      payload.reply = {
-        in_reply_to_tweet_id: replyToTwitterId,
+      if (!tweet) {
+        console.error('Tweet not found', { tweetId, userId, accountId })
+        throw new HTTPException(404, { message: 'Tweet not found' })
       }
-    }
 
-    if (quoteToTwitterId) {
-      payload.quote_tweet_id = quoteToTwitterId
-    }
+      if (tweet.isPublished) {
+        console.error('Tweet already published', { tweetId, userId, accountId })
+        throw new HTTPException(409, {
+          message: `Tweet with id '${tweetId}' is already published, aborting`,
+        })
+      }
 
-    try {
+      const dbAccount = await db.query.account.findFirst({
+        where: and(eq(accountSchema.userId, userId), eq(accountSchema.id, accountId)),
+      })
+
+      const account = await getAccount({
+        email: user.email,
+      })
+
+      if (!account || !dbAccount || !dbAccount.accessToken) {
+        console.error('Account not found', { tweetId, userId, accountId })
+        throw new HTTPException(400, {
+          message: 'Twitter account not connected or access token missing',
+        })
+      }
+
+      await db
+        .update(tweets)
+        .set({ isProcessing: true, updatedAt: new Date() })
+        .where(
+          and(
+            eq(tweets.id, tweetId),
+            eq(tweets.userId, userId),
+            eq(tweets.accountId, accountId),
+          ),
+        )
+
+      const client = new TwitterApi({
+        appKey: consumerKey as string,
+        appSecret: consumerSecret as string,
+        accessToken: dbAccount.accessToken as string,
+        accessSecret: dbAccount.accessSecret as string,
+      })
+
+      const payload: Partial<SendTweetV2Params> = {
+        text: tweet.content,
+      }
+
+      if (tweet.media && tweet.media.length > 0) {
+        const validatedMedia = await ensureValidMedia({
+          account: dbAccount,
+          mediaItems: tweet.media.slice(0, 4),
+        })
+
+        const validMediaIds = validatedMedia
+          .map((media) => media.media_id)
+          .filter(Boolean)
+
+        if (validMediaIds.length > 0) {
+          // @ts-expect-error max-4 length tuple
+          payload.media = { media_ids: validMediaIds }
+        }
+
+        await db
+          .update(tweets)
+          .set({ media: validatedMedia, updatedAt: new Date() })
+          .where(
+            and(
+              eq(tweets.id, tweetId),
+              eq(tweets.userId, userId),
+              eq(tweets.accountId, accountId),
+            ),
+          )
+      }
+
+      if (replyToTwitterId) {
+        payload.reply = {
+          in_reply_to_tweet_id: replyToTwitterId,
+        }
+      }
+
+      if (quoteToTwitterId) {
+        payload.quote_tweet_id = quoteToTwitterId
+      }
+
       const res = await client.v2.tweet(payload)
 
       if (res.errors && res.errors.length > 0) {
@@ -729,12 +790,48 @@ export const tweetRouter = j.router({
         ),
       })
 
+      if (channelName) {
+        await realtime.channel(channelName).emit('tweet.status', {
+          tweetId,
+          status: 'success',
+          timestamp: Date.now(),
+        })
+
+        if (next) {
+          await realtime.channel(channelName).emit('tweet.status', {
+            tweetId: next.id,
+            status: useAutoDelay ? 'waiting' : 'started',
+            timestamp: useAutoDelay ? Date.now() : undefined,
+          })
+        }
+      }
+
+      // if (channelName) {
+      //   await Promise.all([
+      //     realtime.channel(channelName).tweet.status.emit({
+      //       id: tweetId,
+      //       status: 'success',
+      //       tweetId: res.data.id,
+      //     }),
+      //     next
+      //       ? realtime.channel(channelName).tweet.status.emit({
+      //           id: next.id,
+      //           status: useAutoDelay ? 'waiting' : 'started',
+      //           timestamp: useAutoDelay ? Date.now() : undefined,
+      //         })
+      //       : Promise.resolve(),
+      //   ])
+      // }
+
       if (next) {
         await postWithQStash({
           tweetId: next.id,
           accountId: next.accountId,
           userId: next.userId,
           replyToTwitterId: res.data.id,
+          useAutoDelay,
+          delay: useAutoDelay && next.isReplyTo ? 60 : 0,
+          channelName,
         })
       }
 
@@ -787,6 +884,14 @@ export const tweetRouter = j.router({
         await updateWithErrorMessage(message)
       }
 
+      if (channelName) {
+        await realtime.channel(channelName).emit('tweet.status', {
+          tweetId,
+          status: 'error',
+          timestamp: Date.now(),
+        })
+      }
+
       throw new HTTPException(statusCode, { message, cause: err })
     }
   }),
@@ -795,63 +900,74 @@ export const tweetRouter = j.router({
     .input(
       z.object({
         baseTweetId: z.string(),
+        useAutoDelay: z.boolean().optional(),
       }),
     )
     .mutation(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { baseTweetId } = input
+      const { baseTweetId, useAutoDelay } = input
 
-      const account = await getAccount({
-        email: user.email,
-      })
-
-      if (!account?.id) {
-        throw new HTTPException(400, {
-          message: 'Please connect your Twitter account',
-        })
-      }
-
-      const dbAccount = await db.query.account.findFirst({
-        where: and(eq(accountSchema.userId, user.id), eq(accountSchema.id, account.id)),
-      })
-
-      if (!dbAccount || !dbAccount.accessToken) {
-        throw new HTTPException(400, {
-          message: 'Account not found',
-        })
-      }
-
-      const [baseTweet] = await db
-        .select()
-        .from(tweets)
-        .where(
-          and(
-            eq(tweets.id, baseTweetId),
-            eq(tweets.userId, user.id),
-            eq(tweets.accountId, account.id),
-            eq(tweets.isScheduled, true),
-            eq(tweets.isPublished, false),
-          ),
-        )
-
-      if (!baseTweet) {
-        throw new HTTPException(404, { message: 'Tweet not found' })
-      }
-
-      let hasExpiredMedia = false
-
-      if (baseTweet.media && baseTweet.media.length > 0) {
-        for (const { media_id } of baseTweet.media) {
-          const expiryUnix = await redis.get(`tweet-media-upload:${media_id}`)
-
-          if (!expiryUnix || Number(expiryUnix) < Date.now()) {
-            hasExpiredMedia = true
-            break
-          }
-        }
-      }
+      const channelName = user.id + '-' + baseTweetId
+      const channel = realtime.channel(channelName)
 
       try {
+        await channel.emit('tweet.status', {
+          tweetId: baseTweetId,
+          status: 'started',
+        })
+
+        const account = await getAccount({
+          email: user.email,
+        })
+
+        if (!account?.id) {
+          throw new HTTPException(400, {
+            message: 'Please connect your Twitter account',
+          })
+        }
+
+        const dbAccount = await db.query.account.findFirst({
+          where: and(eq(accountSchema.userId, user.id), eq(accountSchema.id, account.id)),
+        })
+
+        if (!dbAccount || !dbAccount.accessToken) {
+          throw new HTTPException(400, {
+            message: 'Account not found',
+          })
+        }
+
+        const [baseTweet] = await db
+          .select()
+          .from(tweets)
+          .where(
+            and(
+              eq(tweets.id, baseTweetId),
+              eq(tweets.userId, user.id),
+              eq(tweets.accountId, account.id),
+              eq(tweets.isScheduled, true),
+              eq(tweets.isPublished, false),
+            ),
+          )
+
+        if (!baseTweet) {
+          throw new HTTPException(404, { message: 'Tweet not found' })
+        }
+
+        let hasExpiredMedia = false
+
+        if (baseTweet.media && baseTweet.media.length > 0) {
+          for (const { media_id } of baseTweet.media) {
+            const expiryUnix = await redis.get(`tweet-media-upload:${media_id}`)
+
+            if (!expiryUnix || Number(expiryUnix) < Date.now()) {
+              hasExpiredMedia = true
+              break
+            }
+          }
+        }
+
+        const isAutoDelayEnabled = Boolean(useAutoDelay ?? account.useAutoDelayByDefault)
+
         if (baseTweet.qstashId) {
           await qstash.messages.delete(baseTweet.qstashId).catch(() => {})
         }
@@ -860,6 +976,8 @@ export const tweetRouter = j.router({
           accountId: account.id,
           tweetId: baseTweet.id,
           userId: user.id,
+          useAutoDelay: isAutoDelayEnabled,
+          channelName,
         })
 
         await db
@@ -878,6 +996,14 @@ export const tweetRouter = j.router({
       } catch (err) {
         console.error('Failed to post tweet:', err)
 
+        if (channelName) {
+          await channel.emit('tweet.status', {
+            tweetId: baseTweetId,
+            status: 'error',
+            timestamp: Date.now(),
+          })
+        }
+
         if (err instanceof HTTPException) {
           throw new HTTPException(err.status, { message: err.message })
         }
@@ -894,11 +1020,12 @@ export const tweetRouter = j.router({
         thread: z.array(payloadTweetSchema).min(1),
         replyToTwitterId: z.string().optional(),
         quoteToTwitterId: z.string().optional(),
+        useAutoDelay: z.boolean().optional(),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { thread, replyToTwitterId, quoteToTwitterId } = input
+      const { thread, replyToTwitterId, quoteToTwitterId, useAutoDelay } = input
 
       const account = await getAccount({
         email: user.email,
@@ -920,7 +1047,12 @@ export const tweetRouter = j.router({
         })
       }
 
+      const isAutoDelayEnabled = Boolean(useAutoDelay ?? account.useAutoDelayByDefault)
+
       const generatedIds = thread.map(() => crypto.randomUUID())
+
+      const properties: (typeof tweetPropertyEnum.enumValues)[number][] = []
+      if (isAutoDelayEnabled) properties.push('auto-delay')
 
       const tweetsToInsert: InsertTweet[] = thread.map((tweet, i) => ({
         id: generatedIds[i],
@@ -931,6 +1063,7 @@ export const tweetRouter = j.router({
         isScheduled: false,
         isPublished: false,
         isReplyTo: i === 0 ? undefined : generatedIds[i - 1],
+        properties,
       }))
 
       await db.insert(tweets).values(tweetsToInsert)
@@ -950,6 +1083,7 @@ export const tweetRouter = j.router({
         userId: user.id,
         replyToTwitterId,
         quoteToTwitterId,
+        useAutoDelay: isAutoDelayEnabled,
       })
 
       await db
@@ -973,11 +1107,12 @@ export const tweetRouter = j.router({
         timezone: z.string(),
         thread: z.array(payloadTweetSchema).min(1),
         useNaturalTime: z.boolean().optional(),
+        useAutoDelay: z.boolean().optional(),
       }),
     )
     .mutation(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { userNow, timezone, thread, useNaturalTime } = input
+      const { userNow, timezone, thread, useNaturalTime, useAutoDelay } = input
 
       const account = await getAccount({
         email: user.email,
@@ -992,6 +1127,8 @@ export const tweetRouter = j.router({
       const isNaturalTimeEnabled = Boolean(
         useNaturalTime ?? account.useNaturalTimeByDefault,
       )
+
+      const isAutoDelayEnabled = Boolean(useAutoDelay ?? account.useAutoDelayByDefault)
 
       if (user.plan !== 'pro') {
         const currentScheduledCount = await getScheduledTweetCount(user.id)
@@ -1037,6 +1174,7 @@ export const tweetRouter = j.router({
         userId: user.id,
         scheduledUnixInSeconds: scheduledUnix / 1000,
         useNaturalTime: isNaturalTimeEnabled,
+        useAutoDelay: isAutoDelayEnabled,
       })
 
       try {
@@ -1047,6 +1185,7 @@ export const tweetRouter = j.router({
         const properties: (typeof tweetPropertyEnum.enumValues)[number][] = []
 
         if (isNaturalTimeEnabled) properties.push('natural')
+        if (isAutoDelayEnabled) properties.push('auto-delay')
 
         const tweetsToInsert: InsertTweet[] = thread.map((tweet, i) => ({
           id: generatedIds[i],

@@ -9,6 +9,13 @@ const schema = {
   index_memories: {
     status: z.enum(['started', 'success', 'error']),
   },
+  tweet: {
+    status: z.object({
+      status: z.enum(['started', 'waiting', 'success', 'error']),
+      tweetId: z.string(),
+      timestamp: z.number().optional(),
+    }),
+  },
 }
 
 export const realtime = new Realtime({

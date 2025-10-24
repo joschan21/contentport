@@ -26,6 +26,7 @@ export type Account = {
   verified: boolean
   twitterId?: string // new
   useNaturalTimeByDefault?: boolean
+  useAutoDelayByDefault?: boolean
 }
 
 export const settingsRouter = j.router({
@@ -54,6 +55,7 @@ export const settingsRouter = j.router({
     return c.json({
       queueSettings,
       useNaturalTimeByDefault: account.useNaturalTimeByDefault,
+      useAutoDelayByDefault: account.useAutoDelayByDefault,
     })
   }),
 
@@ -62,11 +64,12 @@ export const settingsRouter = j.router({
       z.object({
         queueSettings: z.record(z.string(), z.array(z.number())),
         useNaturalTimeByDefault: z.boolean(),
+        useAutoDelayByDefault: z.boolean(),
       }),
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { queueSettings, useNaturalTimeByDefault } = input
+      const { queueSettings, useNaturalTimeByDefault, useAutoDelayByDefault } = input
 
       const account = await getAccount({
         email: user.email,
@@ -113,6 +116,7 @@ export const settingsRouter = j.router({
       const updatedAccount = {
         ...account,
         useNaturalTimeByDefault,
+        useAutoDelayByDefault,
       }
 
       await Promise.all([
