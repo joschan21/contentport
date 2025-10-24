@@ -70,6 +70,7 @@ export default function TweetQueue() {
       })
 
       if (status === 'success') {
+        queryClient.invalidateQueries({ queryKey: ['queue-slots'] })
         setChannels((prev) => prev.filter((c) => c.includes(tweetId)))
       }
     },
