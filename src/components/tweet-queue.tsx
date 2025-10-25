@@ -175,7 +175,7 @@ export default function TweetQueue() {
       const hasUnpublished = thread?.some((tweet) => !tweet.isPublished)
       const hasProcessing = hasPublished && hasUnpublished
       const hasAnyProcessingTweet = thread?.some((tweet) => tweet.isProcessing)
-      
+
       if (!hasProcessing && !hasAnyProcessingTweet) return
 
       const baseTweetId = thread?.[0]?.id
@@ -500,7 +500,7 @@ export default function TweetQueue() {
                                   <span className="text-sm inline-flex items-center gap-1.5 font-medium text-gray-500">
                                     <Loader className="size-3.5" /> Processing
                                   </span>
-                                ) : baseTweet?.isPublished && baseTweet.twitterId  ? (
+                                ) : baseTweet?.isPublished && baseTweet.twitterId ? (
                                   <Link
                                     href={`https://x.com/${activeAccount?.username}/status/${baseTweet?.twitterId}`}
                                     target="_blank"
@@ -569,7 +569,7 @@ export default function TweetQueue() {
                                           key={index}
                                           className={cn('relative', index > 0 && 'pt-3')}
                                         >
-                                          {index === 0 && tweet.properties?.length && (
+                                          {index === 0 && tweet.properties?.length ? (
                                             <div
                                               className={cn('flex gap-2', {
                                                 'mb-3':
@@ -607,7 +607,8 @@ export default function TweetQueue() {
                                                   </span>
                                                 )}
                                             </div>
-                                          )}
+                                          ) : null}
+
                                           <div className="flex gap-3">
                                             <div
                                               className={cn(
