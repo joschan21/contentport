@@ -12,7 +12,7 @@ import { redis } from '@/lib/redis'
 import { Ratelimit } from '@upstash/ratelimit'
 import { waitUntil } from '@vercel/functions'
 import { addDays, isFuture, isSameDay, setHours, startOfDay, startOfHour } from 'date-fns'
-import { fromZonedTime } from 'date-fns-tz'
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { and, desc, eq, isNotNull, isNull, lte, or, gt, gte } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { ContentfulStatusCode } from 'hono/utils/http-status'
@@ -1362,18 +1362,9 @@ export const tweetRouter = j.router({
       const { user } = ctx
       const { timezone, userNow } = input
 
-      const today = fromZonedTime(
-        new Date(
-          userNow.getFullYear(),
-          userNow.getMonth(),
-          userNow.getDate(),
-          0,
-          0,
-          0,
-          0,
-        ),
-        timezone,
-      )
+      const userNowInTimezone = toZonedTime(userNow, timezone)
+      const todayInTimezone = startOfDay(userNowInTimezone)
+      const today = fromZonedTime(todayInTimezone, timezone)
 
       const account = await getAccount({
         email: user.email,
