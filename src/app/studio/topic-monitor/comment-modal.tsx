@@ -22,6 +22,7 @@ import { format } from 'date-fns'
 import isHotkey from 'is-hotkey'
 import { $getRoot, COMMAND_PRIORITY_HIGH, KEY_ENTER_COMMAND } from 'lexical'
 import {
+  ArrowRight,
   ArrowUp,
   AtSign,
   CornerDownLeft,
@@ -40,6 +41,7 @@ import {
   type EnrichedTweet,
 } from 'react-tweet'
 import { QuotedTweet } from './quoted-tweet'
+import Link from 'next/link'
 
 interface CommentModalProps {
   isOpen: boolean
@@ -109,9 +111,25 @@ export function CommentModal({ isOpen, onClose, tweet, onSubmit }: CommentModalP
 
       return await res.json()
     },
-    onMutate: () => {
-      toast.success('Reply is being sent!')
+    onSuccess: () => {
       onClose()
+      toast.success(
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="font-medium">Reply is being posted!</p>
+            <p className="text-sm text-gray-600">
+              Track the status of your post in the queue
+            </p>
+          </div>
+          <Link
+            href="/studio/scheduled"
+            className="text-sm text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            See status <ArrowRight className="size-3.5" />
+          </Link>
+        </div>,
+        { duration: 6000 },
+      )
     },
   })
 

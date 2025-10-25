@@ -60,6 +60,7 @@ const postWithQStashSchema = z.object({
   threadIndex: z.number().optional(),
   delay: z.number().optional(),
   channelName: z.string().optional(),
+  isPostImmediate: z.boolean().optional(),
 })
 
 type PostWithQStashArgs = z.infer<typeof postWithQStashSchema>
@@ -77,6 +78,7 @@ const postWithQStash = async (args: PostWithQStashArgs) => {
     threadIndex,
     delay,
     channelName,
+    isPostImmediate,
   } = args
 
   const baseUrl =
@@ -94,11 +96,14 @@ const postWithQStash = async (args: PostWithQStashArgs) => {
     threadIndex,
     delay,
     channelName,
+    isPostImmediate,
   }
 
   // if natural time enabled, we call qstash 5 mins before the scheduled time
   // in that call, we calculate the natural time and do the same call again
   const CALL_BEFORE_SECONDS = useNaturalTime ? 5 * 60 : 0
+
+  console.log('⚠️ CHANNELNAME IN POSTWITHQSTASH:', channelName)
 
   if (useNaturalTime && scheduledUnixInSeconds) {
     const { messageId } = await qstash.publishJSON({
@@ -625,12 +630,17 @@ export const tweetRouter = j.router({
       quoteToTwitterId,
       useAutoDelay,
       channelName,
+      isPostImmediate,
     } = postWithQStashSchema.parse(body)
+
+    console.log('⚠️ CHANNEL NAME IN ACTUAL POST:', channelName)
 
     try {
       if (channelName) {
+        console.log('⚠️ EMITTING TO CHANNEL:', channelName)
+
         await realtime.channel(channelName).emit('tweet.status', {
-          tweetId,
+          databaseTweetId: tweetId,
           status: 'started',
           timestamp: Date.now(),
         })
@@ -757,6 +767,7 @@ export const tweetRouter = j.router({
           isProcessing: false,
           isScheduled: false,
           isError: false,
+          scheduledUnix: isPostImmediate ? Date.now() : undefined,
           updatedAt: new Date(),
         })
         .where(
@@ -792,14 +803,15 @@ export const tweetRouter = j.router({
 
       if (channelName) {
         await realtime.channel(channelName).emit('tweet.status', {
-          tweetId,
+          databaseTweetId: tweetId,
+          twitterTweetId: res.data.id,
           status: 'success',
           timestamp: Date.now(),
         })
 
         if (next) {
           await realtime.channel(channelName).emit('tweet.status', {
-            tweetId: next.id,
+            databaseTweetId: next.id,
             status: useAutoDelay ? 'waiting' : 'started',
             timestamp: useAutoDelay ? Date.now() : undefined,
           })
@@ -886,7 +898,7 @@ export const tweetRouter = j.router({
 
       if (channelName) {
         await realtime.channel(channelName).emit('tweet.status', {
-          tweetId,
+          databaseTweetId: tweetId,
           status: 'error',
           timestamp: Date.now(),
         })
@@ -912,7 +924,7 @@ export const tweetRouter = j.router({
 
       try {
         await channel.emit('tweet.status', {
-          tweetId: baseTweetId,
+          databaseTweetId: baseTweetId,
           status: 'started',
         })
 
@@ -972,17 +984,20 @@ export const tweetRouter = j.router({
           await qstash.messages.delete(baseTweet.qstashId).catch(() => {})
         }
 
+        console.log('⚠️ CHANNELNAME WITH POSTIMMEDIATE:', channelName)
+
         const { messageId } = await postWithQStash({
           accountId: account.id,
           tweetId: baseTweet.id,
           userId: user.id,
           useAutoDelay: isAutoDelayEnabled,
           channelName,
+          isPostImmediate: true,
         })
 
         await db
           .update(tweets)
-          .set({ qstashId: messageId })
+          .set({ qstashId: messageId, isProcessing: true })
           .where(eq(tweets.id, baseTweet.id))
 
         return c.json({
@@ -998,7 +1013,7 @@ export const tweetRouter = j.router({
 
         if (channelName) {
           await channel.emit('tweet.status', {
-            tweetId: baseTweetId,
+            databaseTweetId: baseTweetId,
             status: 'error',
             timestamp: Date.now(),
           })
@@ -1060,10 +1075,12 @@ export const tweetRouter = j.router({
         userId: user.id,
         content: tweet.content,
         media: tweet.media,
+        isProcessing: true,
         isScheduled: false,
         isPublished: false,
         isReplyTo: i === 0 ? undefined : generatedIds[i - 1],
         properties,
+        scheduledUnix: Date.now(),
       }))
 
       await db.insert(tweets).values(tweetsToInsert)
@@ -1077,6 +1094,10 @@ export const tweetRouter = j.router({
         throw new HTTPException(500, { message: 'Failed to create base tweet' })
       }
 
+      const channelName = user.id + '-' + baseTweet.id
+
+      console.log('⚠️ CHANNELNAME WITH POSTIMMEDIATE:', channelName)
+
       const { messageId } = await postWithQStash({
         accountId: account.id,
         tweetId: baseTweet.id,
@@ -1084,6 +1105,8 @@ export const tweetRouter = j.router({
         replyToTwitterId,
         quoteToTwitterId,
         useAutoDelay: isAutoDelayEnabled,
+        channelName,
+        isPostImmediate: true,
       })
 
       await db
@@ -1352,10 +1375,6 @@ export const tweetRouter = j.router({
         timezone,
       )
 
-      // const today = startOfDay(userNow)
-
-      console.log('timezone, usernow, startofDay', timezone, userNow, today)
-
       const account = await getAccount({
         email: user.email,
       })
@@ -1369,8 +1388,6 @@ export const tweetRouter = j.router({
       const _scheduledTweets = await db.query.tweets.findMany({
         where: and(
           eq(tweets.accountId, account.id),
-          // eq(tweets.isScheduled, true),
-          // eq(tweets.isError, false),
           lte(tweets.scheduledUnix, addDays(today, 90).getTime()),
           gte(tweets.scheduledUnix, today.getTime()),
         ),
@@ -1518,6 +1535,15 @@ export const tweetRouter = j.router({
           [dayUnix]: [
             ...timestamps.flatMap((timestamp) => {
               const threads = getSlotThreads(timestamp)
+              if (threads.length === 0) {
+                return [
+                  {
+                    unix: timestamp,
+                    thread: [],
+                    isQueued: true,
+                  },
+                ]
+              }
               return threads.map((thread) => ({
                 unix: timestamp,
                 thread,

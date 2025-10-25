@@ -12,7 +12,6 @@ import { Tweet } from '@/db/schema'
 import { useConfetti } from '@/hooks/use-confetti'
 import { MemoryTweet, PayloadTweet, useTweetsV2 } from '@/hooks/use-tweets-v2'
 import { client } from '@/lib/client'
-import { pollTweetStatus } from '@/lib/poll-tweet-status'
 import { CalendarBlankIcon, InfoIcon } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format, formatDistanceToNow, isToday, isTomorrow } from 'date-fns'
@@ -399,13 +398,7 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       const res = await client.tweet.postImmediate.$post({ thread, useAutoDelay })
       const { messageId, accountUsername } = await res.json()
 
-      // Poll for completion
-      const { twitterId } = await pollTweetStatus(messageId, {
-        timeout: 10000,
-        interval: 250,
-      })
-
-      return { accountUsername, tweetId: twitterId }
+      return { messageId, accountUsername }
     },
     onMutate: () => {
       const toastId = toast.loading('Posting...')
@@ -417,20 +410,23 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
       }
 
       toast.success(
-        <div className="flex items-center gap-2">
-          <p>Tweet posted!</p>
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="font-medium">Tweet is being posted!</p>
+            <p className="text-sm text-gray-600">
+              Track the status of your post in the queue
+            </p>
+          </div>
           <Link
-            target="_blank"
-            rel="noreferrer"
-            href={`https://x.com/${data.accountUsername}/status/${data.tweetId}`}
-            className="text-base text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 rounded py-0.5 transition-colors"
+            href="/studio/scheduled"
+            className="text-sm text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 transition-colors"
           >
-            See tweet
+            See status <ArrowRight className="size-3.5" />
           </Link>
         </div>,
+        { duration: 6000 },
       )
 
-      // cleanup
       setRescheduledTime(null)
       reset()
       fire({
@@ -438,11 +434,8 @@ export function AppSidebarInset({ children }: { children: React.ReactNode }) {
         spread: 160,
       })
 
-      // Analytics (uncomment when ready)
-      // posthog.capture('tweet_posted', {
-      //   tweetId: data.tweetId,
-      //   accountUsername: data.accountUsername,
-      // });
+      queryClient.invalidateQueries({ queryKey: ['queue-slots'] })
+      queryClient.invalidateQueries({ queryKey: ['scheduled-and-published-tweets'] })
     },
     onError: (error: HTTPException, variables, context) => {
       if (context?.toastId) {

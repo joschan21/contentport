@@ -11,8 +11,9 @@ const schema = {
   },
   tweet: {
     status: z.object({
+      databaseTweetId: z.string(),
       status: z.enum(['started', 'waiting', 'success', 'error']),
-      tweetId: z.string(),
+      twitterTweetId: z.string().optional(),
       timestamp: z.number().optional(),
     }),
   },
@@ -21,6 +22,7 @@ const schema = {
 export const realtime = new Realtime({
   schema,
   redis,
+  verbose: true,
 })
 
 export type RealtimeEvents = InferRealtimeEvents<typeof realtime>

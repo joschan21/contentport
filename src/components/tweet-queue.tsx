@@ -17,7 +17,7 @@ import {
   mapToConnectedAccount,
 } from '@/hooks/account-ctx'
 import { useTweetsV2 } from '@/hooks/use-tweets-v2'
-import { CaretRightIcon } from '@phosphor-icons/react'
+import { CaretRightIcon, EyeIcon } from '@phosphor-icons/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Fragment, useEffect, useRef, useState } from 'react'
@@ -50,8 +50,18 @@ export default function TweetQueue() {
   // realtime stuff
   const [channels, setChannels] = useState<string[]>([])
   const [statusMap, setStatusMap] = useState<
-    Record<string, { status: string; timestamp?: number; tweetId?: string }>
+    Record<
+      // base tweet id
+      string,
+      {
+        status: string
+        timestamp?: number
+        twitterTweetId?: string
+        databaseTweetId?: string
+      }
+    >
   >({})
+
   const [, setTick] = useState(0)
 
   const router = useRouter()
@@ -61,17 +71,35 @@ export default function TweetQueue() {
 
   useRealtime<RealtimeEvents>({
     channels: channels.map((channel) => session?.user.id + '-' + channel),
-    history: { length: 100 },
     enabled: Boolean(session?.user.id) && Boolean(channels.length),
     event: 'tweet.status',
-    onData: ({ tweetId, status, timestamp }) => {
+    history: true,
+    onData: ({ databaseTweetId, twitterTweetId, status, timestamp }) => {
       setStatusMap((prev) => {
-        return { ...prev, [tweetId]: { status, timestamp, tweetId } }
+        return {
+          ...prev,
+          [databaseTweetId]: { status, timestamp, twitterTweetId, databaseTweetId },
+        }
       })
 
-      if (status === 'success') {
+      if (status === 'success' || status === 'error') {
+        const allThreads = data?.results.flatMap((result) => {
+          const [day, threads] = Object.entries(result)[0]!
+          return threads.map((slot) => slot.thread)
+        })
+
+        const hasBeenProcessed = allThreads?.some((thread) =>
+          thread.some(
+            (tweet) =>
+              tweet.id === databaseTweetId && (tweet.isPublished || tweet.isError),
+          ),
+        )
+
+        if (hasBeenProcessed) {
+          return
+        }
+
         queryClient.invalidateQueries({ queryKey: ['queue-slots'] })
-        setChannels((prev) => prev.filter((c) => c.includes(tweetId)))
       }
     },
   })
@@ -105,6 +133,33 @@ export default function TweetQueue() {
     },
   })
 
+  // useEffect(() => {
+  //   if (!data?.results) return
+
+  //   const allThreads = data.results.flatMap((result) => {
+  //     const [day, threads] = Object.entries(result)[0]!
+  //     return threads.map((slot) => slot.thread)
+  //   })
+
+  //   setChannels((currentChannels) => {
+  //     const channelsToRemove = currentChannels.filter((baseTweetId) => {
+  //       const thread = allThreads.find((t) => t?.[0]?.id === baseTweetId)
+  //       if (!thread || thread.length === 0) return false
+
+  //       const allPublished = thread.every((tweet) => tweet.isPublished)
+  //       const allHaveSuccessStatus = thread.every(
+  //         (tweet) => statusMap[tweet.id]?.status === 'success',
+  //       )
+
+  //       return allPublished || allHaveSuccessStatus
+  //     })
+
+  //     if (channelsToRemove.length === 0) return currentChannels
+
+  //     return currentChannels.filter((c) => !channelsToRemove.includes(c))
+  //   })
+  // }, [data, statusMap])
+
   // if any tweets are being posted, subscribe
   useEffect(() => {
     const allThreads = data?.results.flatMap((result) => {
@@ -119,7 +174,9 @@ export default function TweetQueue() {
       const hasPublished = thread?.some((tweet) => tweet.isPublished)
       const hasUnpublished = thread?.some((tweet) => !tweet.isPublished)
       const hasProcessing = hasPublished && hasUnpublished
-      if (!hasProcessing) return
+      const hasAnyProcessingTweet = thread?.some((tweet) => tweet.isProcessing)
+      
+      if (!hasProcessing && !hasAnyProcessingTweet) return
 
       const baseTweetId = thread?.[0]?.id
       if (!baseTweetId) return
@@ -127,7 +184,11 @@ export default function TweetQueue() {
       processingIds.add(baseTweetId)
     })
 
-    setChannels((prev) => [...prev, ...Array.from(processingIds)])
+    const newChannels = Array.from(processingIds)
+    setChannels((prev) => {
+      const combined = [...new Set([...prev, ...newChannels])]
+      return combined
+    })
   }, [data])
 
   const { mutate: deleteTweet } = useMutation({
@@ -168,8 +229,13 @@ export default function TweetQueue() {
 
       return { baseTweetId, messageId, accountUsername, hasExpiredMedia }
     },
-    onMutate: async () => {
+    onMutate: async ({ baseTweetId }) => {
       toastRef.current = toast.loading('Preparing tweet...')
+
+      setStatusMap((prev) => {
+        return { ...prev, [baseTweetId]: { status: 'started', timestamp: Date.now() } }
+      })
+
       return { toastId: toastRef.current }
     },
     onSuccess: (data, variables, context) => {
@@ -196,10 +262,10 @@ export default function TweetQueue() {
               </p>
             </div>
             <Link
-              href="/studio/posted"
+              href="/studio/scheduled"
               className="text-sm text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 transition-colors"
             >
-              Check status in Posted Tweets <ArrowRight className="size-3.5" />
+              See status <ArrowRight className="size-3.5" />
             </Link>
           </div>,
           { duration: 8000 },
@@ -208,13 +274,13 @@ export default function TweetQueue() {
         toast.success(
           <div className="flex flex-col gap-3">
             <div>
-              <p className="font-medium">Tweet is being posted!</p>
+              <p className="font-medium">Tweet is being prepared!</p>
             </div>
             <Link
-              href="/studio/posted"
+              href="/studio/scheduled"
               className="text-sm text-indigo-600 decoration-2 underline-offset-2 flex items-center gap-1 underline shrink-0 bg-white/10 hover:bg-white/20 transition-colors"
             >
-              Check status in Posted Tweets <ArrowRight className="size-3.5" />
+              See status <ArrowRight className="size-3.5" />
             </Link>
           </div>,
           { duration: 6000 },
@@ -374,6 +440,20 @@ export default function TweetQueue() {
                           const baseTweet = thread?.[0]
                           const threadLength = thread?.length || 0
 
+                          const hasPublished = thread?.some((tweet) => tweet.isPublished)
+                          const hasUnpublished = thread?.some(
+                            (tweet) => !tweet.isPublished,
+                          )
+                          const isThreadProcessing = hasPublished && hasUnpublished
+                          const isAnyTweetActivelyPosting = thread?.some((tweet) => {
+                            const status = statusMap[tweet.id]?.status
+                            return (
+                              status === 'started' ||
+                              status === 'waiting' ||
+                              status === 'pending'
+                            )
+                          })
+
                           return (
                             <tr
                               key={slotIdx}
@@ -408,23 +488,27 @@ export default function TweetQueue() {
                                   baseTweet ? 'py-4' : 'py-2.5',
                                 )}
                               >
-                                {/* {
-                                  <span className="text-sm inline-flex items-center gap-1.5 font-medium text-gray-500">
-                                    <Loader className="size-3.5" /> Posting
-                                  </span>
-                                } */}
                                 {baseTweet?.isError ? (
                                   <span className="text-sm font-medium text-red-600">
                                     Error
                                   </span>
+                                ) : isThreadProcessing || isAnyTweetActivelyPosting ? (
+                                  <span className="text-sm inline-flex items-center gap-1.5 font-medium text-gray-500">
+                                    <Loader className="size-3.5" /> Posting
+                                  </span>
                                 ) : baseTweet?.isProcessing ? (
-                                  <span className="text-sm font-medium text-gray-500">
-                                    Processing
+                                  <span className="text-sm inline-flex items-center gap-1.5 font-medium text-gray-500">
+                                    <Loader className="size-3.5" /> Processing
                                   </span>
-                                ) : baseTweet?.isPublished ? (
-                                  <span className="text-sm font-medium text-emerald-500">
-                                    Posted
-                                  </span>
+                                ) : baseTweet?.isPublished && baseTweet.twitterId  ? (
+                                  <Link
+                                    href={`https://x.com/${activeAccount?.username}/status/${baseTweet?.twitterId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm underline inline-flex items-center gap-1.5 font-medium text-emerald-500"
+                                  >
+                                    Posted <EyeIcon weight="bold" className="size-3.5" />
+                                  </Link>
                                 ) : baseTweet?.isQueued ? (
                                   <span className="text-sm font-medium text-indigo-500">
                                     Queued
@@ -485,8 +569,17 @@ export default function TweetQueue() {
                                           key={index}
                                           className={cn('relative', index > 0 && 'pt-3')}
                                         >
-                                          {index === 0 && (
-                                            <div className="flex gap-2 mb-3">
+                                          {index === 0 && tweet.properties?.length && (
+                                            <div
+                                              className={cn('flex gap-2', {
+                                                'mb-3':
+                                                  tweet.properties?.includes('natural') ||
+                                                  (tweet.properties?.includes(
+                                                    'auto-delay',
+                                                  ) &&
+                                                    thread.length > 1),
+                                              })}
+                                            >
                                               {tweet.properties?.includes('natural') && (
                                                 <span className="inline-flex items-center gap-x-1.5 rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
                                                   <svg
@@ -499,6 +592,7 @@ export default function TweetQueue() {
                                                   Natural time
                                                 </span>
                                               )}
+
                                               {tweet.properties?.includes('auto-delay') &&
                                                 thread.length > 1 && (
                                                   <span className="inline-flex items-center gap-x-1.5 rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
@@ -538,7 +632,8 @@ export default function TweetQueue() {
                                                     <Loader className="size-3.5" />{' '}
                                                     Posting
                                                   </div>
-                                                ) : status === 'waiting' ? (
+                                                ) : status === 'waiting' ||
+                                                  tweet.isProcessing ? (
                                                   <div className="text-sm inline-flex items-center gap-1.5 font-medium text-gray-500">
                                                     <Loader className="size-3.5" />{' '}
                                                     Waiting{' '}
@@ -547,19 +642,21 @@ export default function TweetQueue() {
                                                       ? `${remainingSeconds}s`
                                                       : '...'}
                                                   </div>
-                                                ) : status === 'success' ? (
-                                                  <a
-                                                    href={
-                                                      activeAccount && statusInfo?.tweetId
-                                                        ? `https://x.com/${activeAccount?.username}/status/${statusInfo?.tweetId}`
-                                                        : '#'
-                                                    }
+                                                ) : status === 'success' ||
+                                                  (tweet.isPublished &&
+                                                    tweet.twitterId) ? (
+                                                  <Link
+                                                    href={`https://x.com/${activeAccount?.username}/status/${baseTweet?.twitterId || tweet.twitterId}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-sm underline inline-flex items-center gap-1.5 font-medium text-emerald-500"
                                                   >
-                                                    Posted{' '}
-                                                  </a>
+                                                    Posted
+                                                    <EyeIcon
+                                                      weight="bold"
+                                                      className="size-3.5"
+                                                    />
+                                                  </Link>
                                                 ) : null}
                                               </div>
                                               <p className="text-gray-900 whitespace-pre-line text-sm leading-relaxed">
