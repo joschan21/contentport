@@ -11,10 +11,8 @@ import { parseAsBoolean, useQueryState } from 'nuqs'
 export default function ScheduledTweetsPage() {
   const [settingsOpen, setSettingsOpen] = useQueryState(
     'settings',
-    parseAsBoolean.withDefault(false)
+    parseAsBoolean.withDefault(false),
   )
-
-  console.log('SETTINGS OPEN??', settingsOpen);
 
   const queryClient = useQueryClient()
 
@@ -31,13 +29,13 @@ export default function ScheduledTweetsPage() {
         className="pb-24"
       >
         <div className="flex items-center justify-end mb-4">
-          <DuolingoButton className='w-fit' onClick={() => setSettingsOpen(true)}>
-            <GearIcon weight='bold' className="size-4 mr-2" />
+          <DuolingoButton className="w-fit" onClick={() => setSettingsOpen(true)}>
+            <GearIcon weight="bold" className="size-4 mr-2" />
             Queue Settings
           </DuolingoButton>
         </div>
         <div className="mt-6">
-          <TweetQueue />
+          <TweetQueue setSettingsOpen={setSettingsOpen} />
         </div>
       </Container>
       <QueueSettingsModal

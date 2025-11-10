@@ -59,6 +59,7 @@ export type Metadata = {
   userMessage: string
   attachments: Array<TAttachment>
   tweets: PayloadTweet[]
+  isRegenerated?: boolean
 }
 
 export interface ChatHistoryItem {
@@ -144,6 +145,19 @@ export const chatRouter = j.router({
         user.plan === 'pro'
           ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(80, '4h') })
           : new Ratelimit({ redis, limiter: Ratelimit.fixedWindow(5, '1d') })
+
+      if (message.metadata?.isRegenerated) {
+        const history = await redis.get<MyUIMessage[]>(`chat:history:${id}`)
+
+        const messageIndex = history?.findIndex((m) => m.id === message.id)
+
+        console.log({ messageIndex, history: JSON.stringify(history, null, 2) })
+
+        if (messageIndex !== -1) {
+          const messages = history?.slice(0, messageIndex)
+          await redis.set(`chat:history:${id}`, messages)
+        }
+      }
 
       const [account, history, parsedAttachments, limitResult] = await Promise.all([
         getAccount({ email: user.email }),

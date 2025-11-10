@@ -127,6 +127,16 @@ Share genuine thoughts, experiences, and insights instead of promotional languag
   )
 
   prompt.tag(
+    'assertive_contrast_pattern_rule',
+    `NEVER use the "setup? punchline." structure..
+  For example:
+  - Their entire code? Copied.
+  - He did the entire thing by himself? Wrong.
+  - The engineer who seems confident? They struggled too.
+  Write full, natural sentences instead (e.g. "Fixed a few UI bugs today.").`
+  )
+
+  prompt.tag(
     'no_more_pattern_rule',
     `NEVER use the "no more..." pattern when describing improvements or solutions. This includes phrases like:
 - "No more waiting for..."

@@ -92,7 +92,11 @@ export const Messages = memo(
                     {message.parts.map((part, i) => {
                       if (part.type === 'data-tool-reasoning') {
                         return (
-                          <Reasoning key={i} className="w-full" isStreaming={part.data.status === "reasoning"}>
+                          <Reasoning
+                            key={i}
+                            className="w-full"
+                            isStreaming={part.data.status === 'reasoning'}
+                          >
                             <ReasoningTrigger />
                             <ReasoningContent>{part.data.text}</ReasoningContent>
                           </Reasoning>

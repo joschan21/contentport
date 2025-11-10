@@ -58,6 +58,8 @@ export const create_read_website_content = ({ chatId }: { chatId: string }) =>
 
           return tweetContent
         } catch (error) {
+          console.error(error)
+
           return {
             url: website_url,
             title: 'Error reading tweet',
@@ -82,6 +84,8 @@ export const create_read_website_content = ({ chatId }: { chatId: string }) =>
 
         return websiteContent
       } else {
+        console.error(response.error)
+        
         const errorContent = {
           url: website_url,
           title: 'Error reading website',

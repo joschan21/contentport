@@ -336,7 +336,7 @@ export const LeftSidebar = () => {
           </SidebarGroup>
         </SidebarContent>
 
-        <SidebarFooter className="relative p-0">
+        <SidebarFooter className="relative p-0 gap-0">
           {isCollapsed && (
             <div className="absolute w-10 mx-auto top-0 left-0 right-0 border-t border-stone-200" />
           )}

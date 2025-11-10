@@ -172,11 +172,7 @@ export const QueueSettingsModal = ({
   }
 
   return (
-    <Modal
-      showModal={open}
-      setShowModal={handleModalChange}
-      className="max-w-3xl max-h-[90vh]"
-    >
+    <Modal showModal={open} setShowModal={handleModalChange} className="max-w-3xl">
       <div className="p-6">
         <div className="mb-5">
           <div className="flex items-center gap-3 mb-4">
@@ -273,7 +269,7 @@ export const QueueSettingsModal = ({
                 ))}
               </div>
 
-              <div className="divide-y max-h-[400px] overflow-y-auto">
+              <div className="divide-y ">
                 {availableTimes.map((time) => (
                   <div
                     key={time}

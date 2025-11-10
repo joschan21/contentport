@@ -39,7 +39,11 @@ import { useRealtime } from '@upstash/realtime/client'
 import { RealtimeEvents } from '@/lib/realtime'
 import { authClient } from '@/lib/auth-client'
 
-export default function TweetQueue() {
+export default function TweetQueue({
+  setSettingsOpen,
+}: {
+  setSettingsOpen: (open: boolean) => void
+}) {
   const queryClient = useQueryClient()
   const { fire } = useConfetti()
   const [pendingPostId, setPendingPostId] = useState<string | null>(null)
@@ -379,6 +383,19 @@ export default function TweetQueue() {
         isPosting={isPosting}
         threadLength={pendingThreadLength}
       />
+
+      <p className="text-gray-500 mb-3">
+        All times in{' '}
+        <span
+          onClick={() => {
+            setSettingsOpen(true)
+          }}
+          className="bg-gray-100 font-medium text-gray-700 px-1.5 py-0.5 cursor-pointer rounded-md"
+        >
+          Europe &gt; Berlin
+        </span>{' '}
+        timezone.
+      </p>
 
       <Card className="overflow-hidden p-0">
         <div className="flow-root">

@@ -67,10 +67,11 @@ export const createTweetTool = ({ writer, ctx }: Context) => {
 
       prompt.open('output_format', {
         note: 'Follow these formatting rules for your output based on what the user is requesting',
+        default: "Default to writing 3 versions of the tweet."
       })
       prompt.text(
-        `- For THREADS: Separate each tweet in the thread with three hyphens (---) on their own line
-- For MULTIPLE SEPARATE TWEETS: Separate each distinct tweet with three equals signs (===) on their own line  
+        `- For THREADS: Separate each tweet in the thread with three hyphens (---) on their own line. The same three hyphen (---) formatting works for writing a reply to the main tweet, because essentially it's the same as writing a thread.
+- For MULTIPLE SEPARATE TWEETS: Separate each distinct tweet with three equals signs (===) on their own line.
 - For a SINGLE TWEET: Just output the tweet text directly with no delimiters
 
 Examples:
@@ -170,9 +171,7 @@ Examples:
         },
       ]
 
-      console.log('⚠️⚠️⚠️ PROMPT', JSON.stringify(prompt.toString(), null, 2))
-
-      const model = openrouter.chat('anthropic/claude-sonnet-4.5', {
+        const model = openrouter.chat('anthropic/claude-sonnet-4.5', {
         reasoning: { enabled: true, effort: 'low' },
         models: ['anthropic/claude-sonnet-4', 'anthropic/claude-3.7-sonnet'],
       })
