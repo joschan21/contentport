@@ -17,15 +17,12 @@ export function SupportModal({
       <div className="p-6">
         <div className="space-y-6">
           <div className="space-y-1">
-            <h2 className="text-xl font-semibold">Support</h2>
-            <p className="text-sm text-gray-500">
-              If you have any questions or need assistance, feel free to contact us.
-            </p>
+            <h2 className="text-xl font-semibold">Reach out to us! </h2>
           </div>
 
           <Card className="border border-black border-opacity-[0.01] bg-clip-padding shadow-[0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)]">
             <CardContent className="p-6">
-              <div className="flex flex-col items-center text-center space-y-6">
+              <div className="flex flex-col items-center text-center space-y-3">
                 <div className="relative z-10 isolate flex items-center -space-x-1.5">
                   <img
                     alt="Jo"
@@ -39,20 +36,12 @@ export function SupportModal({
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold text-gray-900">Jo & Josh</h3>
-                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Jo & Josh</h3>
 
-                <div className="space-y-4 text-gray-700 leading-relaxed">
-                  <p>
-                    If you have any issues, found bugs, or need some help, feel free to
-                    contact us directly through Twitter DMs.
-                  </p>
-                  <p>
-                    Our DMs are open and we try to read and come back to you as soon as
-                    possible!
-                  </p>
-                </div>
+                <p>
+                  If you have any issues, found bugs, or need help, feel free to chat with
+                  us on Twitter DMs.
+                </p>
 
                 <div className="pt-2 space-y-3 w-full">
                   <p className="text-xs text-gray-400 font-medium text-center">
@@ -80,12 +69,14 @@ export function SupportModal({
                   </p>
                   <div className="flex gap-3 justify-center">
                     <DuolingoButton
+                      variant="secondary"
                       size="sm"
                       onClick={() => window.open('https://x.com/jomeerkatz', '_blank')}
                     >
                       DM Jo
                     </DuolingoButton>
                     <DuolingoButton
+                      variant="secondary"
                       size="sm"
                       onClick={() =>
                         window.open('https://x.com/joshtriedcoding', '_blank')
@@ -94,12 +85,6 @@ export function SupportModal({
                       DM Josh
                     </DuolingoButton>
                   </div>
-                </div>
-
-                <div className="pt-2">
-                  <DuolingoButton variant="secondary" onClick={() => onOpenChange(false)}>
-                    Close
-                  </DuolingoButton>
                 </div>
               </div>
             </CardContent>
