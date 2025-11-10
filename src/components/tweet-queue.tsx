@@ -384,19 +384,6 @@ export default function TweetQueue({
         threadLength={pendingThreadLength}
       />
 
-      <p className="text-gray-500 mb-3">
-        All times in{' '}
-        <span
-          onClick={() => {
-            setSettingsOpen(true)
-          }}
-          className="bg-gray-100 font-medium text-gray-700 px-1.5 py-0.5 cursor-pointer rounded-md"
-        >
-          Europe &gt; Berlin
-        </span>{' '}
-        timezone.
-      </p>
-
       <Card className="overflow-hidden p-0">
         <div className="flow-root">
           <div className="">
