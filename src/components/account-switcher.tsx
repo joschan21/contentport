@@ -94,7 +94,7 @@ export const AccountSwitcher = ({ showFullDetails }: AccountSwitcherProps) => {
                         {activeAccount.name}
                       </p>
                       {activeAccount.verified && (
-                        <Icons.verificationBadge className="size-3.5 shrink-0 flex-shrink-0" />
+                        <Icons.verificationBadge className="size-3.5 shrink-0" />
                       )}
                     </div>
                     <p className="text-xs font-normal text-muted-foreground">@{activeAccount.username}</p>
