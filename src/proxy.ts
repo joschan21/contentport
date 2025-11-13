@@ -5,7 +5,7 @@ import { redis } from './lib/redis'
 
 type Session = typeof auth.$Infer.Session
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   const { data: session } = await betterFetch<Session>('/api/auth/get-session', {

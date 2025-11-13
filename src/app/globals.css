@@ -1,9 +1,10 @@
-@tailwind base;
 @import 'tw-animate-css';
 
-@custom-variant dark (&:is(.dark *));
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@custom-variant dark (&:is(.dark *));
 
 @layer utilities {
   .animation-delay-150 {

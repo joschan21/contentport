@@ -3,7 +3,9 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   serverExternalPackages: ['pdf-parse'],
   devIndicators: false,
-  
+  experimental: {
+    optimizePackageImports: ["@phosphor-icons/react"],
+  },
   images: {
     remotePatterns: [
       {
