@@ -166,7 +166,6 @@
       rgba(255, 255, 255, 0) 90%
     );
     mix-blend-mode: lighten;
-    pointer-events: none;
   }
 
   .glass::after {
