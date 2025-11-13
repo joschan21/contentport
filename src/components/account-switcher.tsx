@@ -1,4 +1,4 @@
-import { AccountName, AccountHandle, useAccount } from '@/hooks/account-ctx'
+import { useAccount } from '@/hooks/account-ctx'
 import { client } from '@/lib/client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HTTPException } from 'hono/http-exception'
