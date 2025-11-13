@@ -1,7 +1,6 @@
 import { avoidPrompt, editToolSystemPrompt, styleGuide } from '@/lib/prompt-utils'
 import { redis } from '@/lib/redis'
 import { XmlPrompt } from '@/lib/xml-prompt'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { convertToModelMessages, generateId, streamText, tool } from 'ai'
 import { format } from 'date-fns'
 import { HTTPException } from 'hono/http-exception'
@@ -11,10 +10,7 @@ import { Account } from '../../settings-router'
 import { MyUIMessage } from '../chat-router'
 import { WebsiteContent } from '../read-website-content'
 import { Context } from './shared'
-
-const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
-})
+import { openrouter } from '@/lib/openrouter'
 
 const singleTweetSchema = z.object({
   imageDescriptions: z

@@ -20,14 +20,10 @@ import { create_read_website_content } from './read-website-content'
 import { parseAttachments } from './utils'
 
 import { PayloadTweet } from '@/hooks/use-tweets-v2'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { Ratelimit } from '@upstash/ratelimit'
 import { getAccount } from '../utils/get-account'
 import { createTweetTool } from './tools/create-tweet-tool'
-
-const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
-})
+import { openrouter } from '@/lib/openrouter'
 
 export interface WebScrapingResult {
   url: string

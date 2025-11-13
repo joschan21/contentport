@@ -11,7 +11,6 @@ import { realtime } from '@/lib/realtime'
 import { redis } from '@/lib/redis'
 import { vector } from '@/lib/vector'
 import { XmlPrompt } from '@/lib/xml-prompt'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { generateText } from 'ai'
 import { and, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
@@ -22,10 +21,7 @@ import { j, privateProcedure, qstashProcedure } from '../jstack'
 import { Account } from './settings-router'
 import { getAccount, getAccounts } from './utils/get-account'
 import { getTweet } from './utils/get-tweet'
-
-const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
-})
+import { openrouter } from '@/lib/openrouter'
 
 const client = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!).readOnly
 
