@@ -1,4 +1,4 @@
-import { AccountName, AccountHandle, useAccount } from '@/hooks/account-ctx'
+import { useAccount } from '@/hooks/account-ctx'
 import { client } from '@/lib/client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HTTPException } from 'hono/http-exception'
@@ -6,7 +6,7 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
-import { CaretDownIcon, CheckIcon } from '@phosphor-icons/react'
+import { CheckIcon } from '@phosphor-icons/react'
 import { Icons } from './icons'
 import { Loader } from './ai-elements/loader'
 import { cn } from '@/lib/utils'
@@ -43,7 +43,7 @@ export const AccountSwitcher = ({ showFullDetails }: AccountSwitcherProps) => {
     onSuccess: ({ account }) => {
       toast.success(
         <span>
-          Switched to <span className="font-medium text-gray-800">{account.name}</span>.
+          Switched to <span className="font-medium text-foreground">{account.name}</span>.
         </span>,
       )
       setOpen(false)
@@ -88,16 +88,16 @@ export const AccountSwitcher = ({ showFullDetails }: AccountSwitcherProps) => {
                 </Avatar>
 
                 {showFullDetails && (
-                  <div className="flex flex-col items-start">
-                    <p className="text-sm font-medium truncate">
-                      <span>{activeAccount.name}</span>
-                      <span>
-                        {activeAccount.verified && (
-                          <Icons.verificationBadge className="size-3.5 shrink-0" />
-                        )}
-                      </span>
-                    </p>
-                    <p className="text-xs font-normal text-gray-600">@{activeAccount.username}</p>
+                  <div className="flex flex-col items-start min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0 w-full">
+                      <p className="text-sm font-medium truncate text-foreground">
+                        {activeAccount.name}
+                      </p>
+                      {activeAccount.verified && (
+                        <Icons.verificationBadge className="size-3.5 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-xs font-normal text-muted-foreground">@{activeAccount.username}</p>
                   </div>
                 )}
               </DuolingoButton>
@@ -107,7 +107,7 @@ export const AccountSwitcher = ({ showFullDetails }: AccountSwitcherProps) => {
           <PopoverContent className="w-72 p-2" align="start" side="bottom">
             <div className="space-y-1">
               <div className="px-2 py-1.5">
-                <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Switch Account
                 </p>
               </div>
@@ -124,11 +124,11 @@ export const AccountSwitcher = ({ showFullDetails }: AccountSwitcherProps) => {
                     className={cn(
                       'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group',
                       isActive
-                        ? 'bg-gray-100 cursor-default'
-                        : 'hover:bg-stone-100 cursor-pointer',
+                        ? 'bg-accent cursor-default'
+                        : 'hover:bg-accent cursor-pointer',
                     )}
                   >
-                    <Avatar className="size-9 ring-2 ring-white shrink-0">
+                    <Avatar className="size-9 ring-2 ring-background shrink-0">
                       <AvatarImage
                         src={acc.profile_image_url?.replace('_normal', '_200x200')}
                         alt={acc.username}
@@ -138,22 +138,22 @@ export const AccountSwitcher = ({ showFullDetails }: AccountSwitcherProps) => {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0 text-left">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-sm font-medium text-stone-900 truncate">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
                           {acc.name}
                         </p>
                         {acc.verified && (
-                          <Icons.verificationBadge className="size-3.5 shrink-0" />
+                          <Icons.verificationBadge className="size-3.5 shrink-0 flex-shrink-0" />
                         )}
                       </div>
-                      <p className="text-xs text-stone-500 truncate">@{acc.username}</p>
+                      <p className="text-xs text-muted-foreground truncate">@{acc.username}</p>
                     </div>
                     <div className="shrink-0">
                       {isSwitchingThis ? (
                         <Loader />
                       ) : isActive ? (
-                        <div className="size-5 rounded-full bg-stone-800 flex items-center justify-center">
-                          <CheckIcon weight="bold" className="size-3 text-white" />
+                        <div className="size-5 rounded-full bg-foreground flex items-center justify-center">
+                          <CheckIcon weight="bold" className="size-3 text-background" />
                         </div>
                       ) : null}
                     </div>
@@ -163,7 +163,7 @@ export const AccountSwitcher = ({ showFullDetails }: AccountSwitcherProps) => {
             </div>
           </PopoverContent>
         </Popover>
-        <TooltipContent side="bottom" className="bg-stone-800 text-white">
+        <TooltipContent side="bottom" className="bg-foreground text-background">
           Switch Account
         </TooltipContent>
       </Tooltip>
