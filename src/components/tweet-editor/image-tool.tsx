@@ -226,8 +226,8 @@ export function ImageTool({
       aspectRatio: 'aspect-auto',
       theme: 'bg-gradient-to-br from-cyan-300 to-sky-400',
       customTheme: {
-        colorStart: '#f3f4f6',
-        colorEnd: '#e5e7eb',
+        colorStart: '',
+        colorEnd: '',
       },
       rounded: 12,
       roundedWrapper: 'rounded-xl',
@@ -252,6 +252,12 @@ export function ImageTool({
   const [userResized, setUserResized] = useState(!!initialEditorState?.canvasWidth)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const hasCustomGradientColors =
+    Boolean(options.customTheme.colorStart) || Boolean(options.customTheme.colorEnd)
+  const customGradientStart =
+    options.customTheme.colorStart || options.customTheme.colorEnd || '#f3f4f6'
+  const customGradientEnd =
+    options.customTheme.colorEnd || options.customTheme.colorStart || '#e5e7eb'
 
   useEffect(() => {
     const preset = localStorage.getItem('options')
@@ -481,6 +487,17 @@ export function ImageTool({
     }
   }
 
+  const handleCustomColorChange = (key: 'colorStart' | 'colorEnd', value: string) => {
+    setOptions((prev) => ({
+      ...prev,
+      theme: 'custom',
+      customTheme: {
+        ...prev.customTheme,
+        [key]: value,
+      },
+    }))
+  }
+
   const getMostCommonBorderColor = (
     imageSrc: string,
     callback: (color: string) => void,
@@ -637,10 +654,14 @@ export function ImageTool({
                   height: '100%',
                   boxShadow: shadowMap[options.shadow],
                   //   borderRadius: `${options.rounded}px`,
+                  ...(options.theme === 'custom' &&
+                    hasCustomGradientColors && {
+                      background: `linear-gradient(to bottom right, ${customGradientStart}, ${customGradientEnd})`,
+                    }),
                 }}
                 className={cn(
                   'transition-all duration-200 ease-in-out flex items-center justify-center overflow-hidden w-full h-full flex-col',
-                  [options.theme],
+                  options.theme !== 'custom' && [options.theme],
                   options.aspectRatio,
                 )}
               >
@@ -1212,16 +1233,28 @@ export function ImageTool({
                           className="size-8 rounded-md border border-gray-300 flex items-center justify-center transition-all shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400"
                         >
                           <div
-                            className={cn('size-7 rounded-sm', options.theme)}
+                            className={cn(
+                              'size-7 rounded-sm',
+                              options.theme !== 'custom' && options.theme,
+                              options.theme === 'custom' &&
+                                !hasCustomGradientColors &&
+                                'border border-dashed border-gray-300 bg-white flex items-center justify-center text-[10px] font-semibold text-gray-400',
+                            )}
                             style={{
-                              background: options.theme.includes('gradient')
-                                ? undefined
-                                : options.theme,
-                              backgroundImage: options.theme.includes('gradient')
-                                ? undefined
-                                : undefined,
+                              ...(options.theme === 'custom' &&
+                                hasCustomGradientColors && {
+                                  background: `linear-gradient(to bottom right, ${customGradientStart}, ${customGradientEnd})`,
+                                }),
+                              ...(options.theme !== 'custom' &&
+                                !options.theme.includes('gradient') && {
+                                  background: options.theme,
+                                }),
                             }}
-                          />
+                          >
+                            {options.theme === 'custom' && !hasCustomGradientColors && (
+                              <span>+</span>
+                            )}
+                          </div>
                         </button>
                       </PopoverTrigger>
                     </div>
@@ -1269,14 +1302,79 @@ export function ImageTool({
                                   ...options,
                                   theme: theme,
                                   customTheme: {
-                                    colorStart: '#f3f4f6',
-                                    colorEnd: '#e5e7eb',
+                                    colorStart: '',
+                                    colorEnd: '',
                                   },
                                 })
                               }}
                             />
                           ))}
                         </div>
+                        <Separator className="my-4" />
+                        <span className="block font-medium text-sm text-gray-900 mb-2">
+                          Custom Gradient
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            {
+                              key: 'colorStart' as const,
+                              label: 'Start color',
+                              helper: 'Top-left',
+                            },
+                            {
+                              key: 'colorEnd' as const,
+                              label: 'End color',
+                              helper: 'Bottom-right',
+                            },
+                          ].map(({ key, label, helper }) => {
+                            const color = options.customTheme[key] || ''
+                            return (
+                              <label key={key} className="flex flex-col gap-1 text-xs">
+                                <span className="font-medium text-gray-600">{label}</span>
+                                <div className="relative">
+                                  <div
+                                    className={cn(
+                                      'h-10 w-full rounded-md border flex items-center justify-between px-3 text-[13px] font-medium transition-colors',
+                                      color
+                                        ? 'border-gray-300 bg-white text-gray-700'
+                                        : 'border-dashed border-gray-300 text-gray-500',
+                                    )}
+                                  >
+                                    <span className="truncate">
+                                      {color || 'Pick color'}
+                                    </span>
+                                    <span
+                                      className="ml-3 size-6 rounded-md border border-gray-200"
+                                      style={{
+                                        background: color || 'transparent',
+                                      }}
+                                    />
+                                  </div>
+                                  <input
+                                    type="color"
+                                    value={color || '#ffffff'}
+                                    onChange={(e) =>
+                                      handleCustomColorChange(key, e.target.value)
+                                    }
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                    style={{
+                                      WebkitAppearance: 'none',
+                                      MozAppearance: 'none',
+                                      appearance: 'none',
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-[11px] text-gray-500">
+                                  {helper}
+                                </span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Select two colors to fade from the first swatch to the second on
+                          a diagonal.
+                        </p>
                       </div>
                     </PopoverContent>
                   </Popover>
