@@ -2,7 +2,6 @@ import { useTweetsV2 } from '@/hooks/use-tweets-v2'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $getRoot } from 'lexical'
 import { useEffect, useState } from 'react'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const ContentLengthIndicator = ({ tweetId }: { tweetId: string }) => {
   const [editor] = useLexicalComposerContext()
@@ -32,55 +31,41 @@ const ContentLengthIndicator = ({ tweetId }: { tweetId: string }) => {
   const circumference = 2 * Math.PI * 10
   const strokeDashoffset = circumference - (progress / 100) * circumference
 
-  const getTooltipText = () => {
-    if (charCount > 280) {
-      return `${charCount} / 280 characters (over by ${charCount - 280})`
-    }
-    return `${charCount} / 280 characters`
-  }
-
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="relative flex items-center justify-center">
-          <div className="h-8 w-8">
-            <svg className="-ml-[5px] -rotate-90 w-full h-full">
-              <circle
-                className="text-stone-200"
-                strokeWidth="2"
-                stroke="currentColor"
-                fill="transparent"
-                r="10"
-                cx="16"
-                cy="16"
-              />
-              <circle
-                className={`${getProgressColor()} transition-all duration-200`}
-                strokeWidth="2"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                stroke="currentColor"
-                fill="transparent"
-                r="10"
-                cx="16"
-                cy="16"
-              />
-            </svg>
-          </div>
-          {charCount > 260 && charCount < 280 && (
-            <div
-              className={`text-sm/6 ${280 - charCount < 1 ? 'text-red-500' : 'text-stone-800'} mr-3.5`}
-            >
-              <p>{280 - charCount < 20 ? 280 - charCount : charCount}</p>
-            </div>
-          )}
+    <div className="relative flex items-center justify-center">
+      <div className="h-8 w-8">
+        <svg className="-ml-[5px] -rotate-90 w-full h-full">
+          <circle
+            className="text-stone-200"
+            strokeWidth="2"
+            stroke="currentColor"
+            fill="transparent"
+            r="10"
+            cx="16"
+            cy="16"
+          />
+          <circle
+            className={`${getProgressColor()} transition-all duration-200`}
+            strokeWidth="2"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            stroke="currentColor"
+            fill="transparent"
+            r="10"
+            cx="16"
+            cy="16"
+          />
+        </svg>
+      </div>
+      {charCount > 260 && charCount < 280 && (
+        <div
+          className={`text-sm/6 ${280 - charCount < 1 ? 'text-red-500' : 'text-stone-800'} mr-3.5`}
+        >
+          <p>{280 - charCount < 20 ? 280 - charCount : charCount}</p>
         </div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>{getTooltipText()}</p>
-      </TooltipContent>
-    </Tooltip>
+      )}
+    </div>
   )
 }
 
