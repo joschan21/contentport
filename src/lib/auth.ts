@@ -3,7 +3,7 @@ import { db } from '@/db'
 import { getAccount } from '@/server/routers/utils/get-account'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { createAuthMiddleware, magicLink } from 'better-auth/plugins'
+import { createAuthMiddleware, magicLink, lastLoginMethod } from 'better-auth/plugins'
 import { PostHog } from 'posthog-node'
 import { Resend } from 'resend'
 import { redis } from './redis'
@@ -40,6 +40,7 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: getTrustedOrigins(),
   plugins: [
+    lastLoginMethod(),
     magicLink({
       sendMagicLink: async ({ email, token, url }, request) => {
         await redis.set(`redirect:${token}`, url, {
