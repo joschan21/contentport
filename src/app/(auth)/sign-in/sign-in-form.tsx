@@ -1,6 +1,7 @@
 'use client'
 
 import { Icons } from '@/components/icons'
+import DuolingoBadge from '@/components/ui/duolingo-badge'
 import DuolingoButton from '@/components/ui/duolingo-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +21,8 @@ export function SignInForm({ className, ...props }: React.ComponentProps<'div'>)
   const searchParams = useSearchParams()
 
   const isExpired = searchParams.get('expired')
+
+  const lastUsedMethod = authClient.getLastUsedLoginMethod()
 
   useEffect(() => {
     if (isExpired) {
@@ -48,7 +51,7 @@ export function SignInForm({ className, ...props }: React.ComponentProps<'div'>)
     try {
       setIsGoogleLoading(true)
 
-      const { data, error } = await authClient.signIn.social({
+      const { error } = await authClient.signIn.social({
         provider: 'google',
       })
 
@@ -97,26 +100,36 @@ export function SignInForm({ className, ...props }: React.ComponentProps<'div'>)
             <p className="text-sm text-indigo-600">Email sent to {variables?.email}!</p>
           ) : null}
         </div>
-        <DuolingoButton
-          loading={isPending}
-          onClick={handleSignIn}
-          type="submit"
-          className="w-full h-11"
-        >
-          Sign in
-        </DuolingoButton>
+        <div className="relative">
+          <DuolingoButton
+            loading={isPending}
+            onClick={handleSignIn}
+            type="submit"
+            className="w-full h-11"
+          >
+            Sign in
+          </DuolingoButton>
+          {lastUsedMethod === 'email' && (
+            <DuolingoBadge variant="achievement" size="sm" className="absolute -top-2 -right-2">Last used</DuolingoBadge>
+          )}
+        </div>
         <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
           <span className="bg-gray-50 text-stone-400 relative z-10 px-4">OR</span>
         </div>
-        <DuolingoButton
-          loading={isGoogleLoading}
-          onClick={handleGoogleSignIn}
-          variant="secondary"
-          className="w-full h-11 gap-2"
-        >
-          <Icons.google className="size-4" />
-          Google
-        </DuolingoButton>
+        <div className="relative">
+          <DuolingoButton
+            loading={isGoogleLoading}
+            onClick={handleGoogleSignIn}
+            variant="secondary"
+            className="w-full h-11 gap-2"
+          >
+            <Icons.google className="size-4" />
+            Google
+          </DuolingoButton>
+          {lastUsedMethod === 'google' && (
+            <DuolingoBadge variant="achievement" size="sm" className="absolute -top-2 -right-2">Last used</DuolingoBadge>
+          )}
+        </div>
       </div>
       <div className="text-left text-gray-500">
         Don&apos;t have an account?{' '}
