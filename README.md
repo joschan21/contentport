@@ -1,4 +1,4 @@
-# **contentport — public roadmap (last updated: 27th Nov 2025)**
+# **contentport — public roadmap (last updated: 29th Nov 2025)**
 
 ## **Features in Pipeline**
 
@@ -51,6 +51,8 @@
 
 * Timezone issues / “-1 days” calendar error
 * Creating transcripts from videos
+* Images get saved in the main tweet when using threads
+* Editing and rerun the prompts in Assistant
 
 ---
 
