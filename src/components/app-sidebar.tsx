@@ -261,7 +261,7 @@ const ChatInput = ({
                   <ContentEditable
                     autoFocus
                     disabled={isIndexing}
-                    className="w-full diabled:opacity-50 px-4 py-3 outline-none min-h-[4.5rem] text-base placeholder:text-gray-400"
+                    className="w-full disabled:opacity-50 px-4 py-3 outline-none min-h-[4.5rem] max-h-[50vh] overflow-y-auto text-base placeholder:text-gray-400"
                     style={{ minHeight: '4.5rem' }}
                     onPaste={handlePaste}
                   />
