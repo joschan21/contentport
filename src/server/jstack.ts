@@ -23,7 +23,7 @@ interface Env {
     RESEND_API_KEY: string
     FIRECRAWL_API_KEY: string
     CRW_API_KEY: string
-    CRW_API_URL: string
+    CRW_API_URL?: string
     AWS_GENERAL_ACCESS_KEY: string
     AWS_GENERAL_SECRET_KEY: string
     AWS_REGION: string
